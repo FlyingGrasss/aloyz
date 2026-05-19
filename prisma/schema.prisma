@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String     @id @default(cuid())
+  name          String?
+  email         String     @unique
+  emailVerified DateTime?
+  image         String?
+  password_hash String
+  role          String     @default("business") // 'admin' or 'business'
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  businesses    Business[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  id         String   @id @default(cuid())
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Business {
+  id                   String   @id @default(cuid())
+  ownerId              String?
+  name                 String
+  slug                 String   @unique // Restored slug field - only admin-managed
+  type                 String
+
+  phone                String
+  calendarId           String   @default("")
+
+  welcome_message      String?  @db.Text
+  address              String
+  website              String?
+  hours                Json
+
+  menu_or_services     String   @db.Text
+  faqs                 Json     @default("[]")
+  special_instructions String?  @db.Text
+
+  is_active            Boolean  @default(false) // Default to false (WhatsApp connection state)
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  owner                User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  conversations        Conversation[]
+  appointments         AppointmentTrack[]
+
+  @@index([ownerId])
+}
+
+model Conversation {
+  id          String   @id @default(cuid())
+  businessId  String
+  customerJid String
+
+  messages    Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, customerJid])
+  @@index([businessId])
+}
+
+model AppointmentTrack {
+  id          String   @id @default(cuid())
+  businessId  String
+  eventId     String   @unique
+  customerName String
+  phone       String
+  date        String
+
+  time        String
+
+  description String
+  status      String   @default("CONFIRMED")
+  createdAt   DateTime @default(now())
+
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
