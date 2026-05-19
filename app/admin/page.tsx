@@ -21,8 +21,14 @@ export default function AdminPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
 
-  const [activeTab, setActiveTab] = useState<'businesses' | 'create' | 'conversations' | 'appointments'>('businesses')
+  const [activeTab, setActiveTab] = useState<'businesses' | 'create' | 'conversations' | 'appointments' | 'whatsapp'>('businesses')
   const [loading, setLoading] = useState(true)
+
+  // WhatsApp Setup tab states
+  const [selectedBusinessId, setSelectedBusinessId] = useState('')
+  const [slugInput, setSlugInput] = useState('')
+  const [qrCodeLoading, setQrCodeLoading] = useState(false)
+  const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null)
 
   // Lists of fetched businesses (which include nested owner, conversations, and appointments)
   const [businesses, setBusinesses] = useState<any[]>([])
@@ -186,6 +192,84 @@ export default function AdminPage() {
     }
   }
 
+  // Handle WhatsApp Business Selection & Slug auto-population
+  const handleSelectBusiness = (businessId: string) => {
+    setSelectedBusinessId(businessId)
+    const biz = businesses.find(b => b.id === businessId)
+    setSlugInput(biz?.slug || '')
+    setQrCodeBase64(null)
+  }
+
+  // Handle WhatsApp Create Instance
+  async function handleCreateWhatsAppInstance() {
+    if (!selectedBusinessId || !slugInput) {
+      setActionError('Lütfen bir işletme seçin ve geçerli bir slug girin.')
+      return
+    }
+
+    setActionLoading(true)
+    setActionSuccess('')
+    setActionError('')
+    setQrCodeBase64(null)
+
+    try {
+      const res = await fetch('/api/instances/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug: slugInput,
+          businessId: selectedBusinessId,
+        }),
+      })
+
+      if (res.ok) {
+        setActionSuccess(`WhatsApp oturumu "${slugInput}" başarıyla oluşturuldu ve ayarlandı!`)
+        // Refresh businesses data in state to include new slug if changed
+        await fetchAdminData()
+      } else {
+        const data = await res.json()
+        setActionError(data.error || 'Oturum oluşturulurken bir hata oluştu.')
+      }
+    } catch (err) {
+      setActionError('Sistem hatası oluştu.')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // Handle QR Code Retrieval
+  async function handleFetchQRCode() {
+    if (!slugInput) {
+      setActionError('QR kodunu almak için geçerli bir slug bulunmalıdır.')
+      return
+    }
+
+    setQrCodeLoading(true)
+    setActionSuccess('')
+    setActionError('')
+    setQrCodeBase64(null)
+
+    try {
+      const res = await fetch(`/api/instances/qr?slug=${encodeURIComponent(slugInput)}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.qrBase64) {
+          setQrCodeBase64(data.qrBase64)
+          setActionSuccess('QR Kod başarıyla yüklendi! Lütfen WhatsApp uygulamanızdan taratın.')
+        } else {
+          setActionError('QR Kod verisi alınamadı. Bağlantının aktif veya bağlanmaya hazır olduğundan emin olun.')
+        }
+      } else {
+        const data = await res.json()
+        setActionError(data.error || 'QR kod yüklenirken hata oluştu.')
+      }
+    } catch (err) {
+      setActionError('Sistem veya bağlantı hatası oluştu.')
+    } finally {
+      setQrCodeLoading(false)
+    }
+  }
+
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50/50">
@@ -281,6 +365,15 @@ export default function AdminPage() {
               }`}
           >
             📅 Randevu Veri Havuzu
+          </button>
+          <button
+            onClick={() => setActiveTab('whatsapp')}
+            className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all flex items-center gap-3 ${activeTab === 'whatsapp'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
+                : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
+              }`}
+          >
+            🔌 WhatsApp Kurulumu
           </button>
         </aside>
 
@@ -615,6 +708,171 @@ export default function AdminPage() {
                     </tbody>
                   </table>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* TAB 5: WHATSAPP INTEGRATION & INSTANCE ONBOARDING */}
+          {activeTab === 'whatsapp' && (
+            <Card className="border-neutral-200 bg-white shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-xl font-bold">
+                  <span>🔌 WhatsApp Asistan Kurulumu</span>
+                </CardTitle>
+                <CardDescription>
+                  İşletmeleriniz için Evolution API tabanlı WhatsApp entegrasyonu oluşturun ve QR kod eşleştirmesi yapın.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                
+                {/* 1. Select Business */}
+                <div className="space-y-2">
+                  <Label htmlFor="business-select" className="text-sm font-bold text-neutral-700">
+                    1. Kurulum Yapılacak İşletmeyi Seçin
+                  </Label>
+                  <select
+                    id="business-select"
+                    value={selectedBusinessId}
+                    onChange={e => handleSelectBusiness(e.target.value)}
+                    className="w-full text-sm font-semibold p-3 rounded-xl border border-neutral-200 bg-white shadow-sm cursor-pointer focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  >
+                    <option value="">-- İşletme Seçin --</option>
+                    {businesses.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.type}) {b.slug ? `[Mevcut Slug: ${b.slug}]` : '[Slug Tanımlanmamış]'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedBusinessId && (
+                  <div className="space-y-6">
+                    
+                    {/* 2. Configure Slug */}
+                    <div className="space-y-2">
+                      <Label htmlFor="slug-input" className="text-sm font-bold text-neutral-700">
+                        2. WhatsApp Bağlantı Adresi (Slug)
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="slug-input"
+                          value={slugInput}
+                          onChange={e => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ''))}
+                          placeholder="ornegin-lumina-cafe"
+                          className="font-mono text-sm"
+                        />
+                      </div>
+                      <p className="text-xs text-neutral-500">
+                        İşletme için benzersiz ve küçük harflerden oluşan bir takma ad belirleyin. Boşluk içermemeli, sadece harf, rakam, tire (-) veya alt çizgi (_) barındırmalıdır.
+                      </p>
+                    </div>
+
+                    {/* 3. Action Buttons Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                      
+                      {/* Create Instance Button */}
+                      <div className="flex flex-col gap-1.5">
+                        <Button
+                          onClick={handleCreateWhatsAppInstance}
+                          disabled={actionLoading || !slugInput}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-md shadow-indigo-600/10 cursor-pointer flex items-center justify-center gap-2"
+                        >
+                          {actionLoading ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              <span>Oturum Oluşturuluyor...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>⚙️ Yeni WhatsApp Oturumu Oluştur</span>
+                            </>
+                          )}
+                        </Button>
+                        <span className="text-[10px] text-center text-neutral-500 font-medium">
+                          Yeni bir Evolution oturumu, webhook ve geçmiş senkronizasyon yapılandırması hazırlar.
+                        </span>
+                      </div>
+
+                      {/* Fetch QR Code Button */}
+                      <div className="flex flex-col gap-1.5">
+                        <Button
+                          onClick={handleFetchQRCode}
+                          disabled={qrCodeLoading || !slugInput}
+                          variant="outline"
+                          className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-bold py-3.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                        >
+                          {qrCodeLoading ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                              <span>QR Kod Alınıyor...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>📷 QR Kodunu Getir</span>
+                            </>
+                          )}
+                        </Button>
+                        <span className="text-[10px] text-center text-neutral-500 font-medium">
+                          WhatsApp Web QR kodunu getirerek hesabınızı sisteme bağlamanızı sağlar.
+                        </span>
+                      </div>
+
+                    </div>
+
+                    {/* QR Code Presentation & Pairing Instructions */}
+                    {qrCodeBase64 && (
+                      <div className="border border-emerald-200 bg-emerald-50/40 rounded-2xl p-6 mt-6 flex flex-col md:flex-row items-center gap-6">
+                        
+                        {/* QR Image Frame */}
+                        <div className="shrink-0 flex flex-col items-center gap-2">
+                          <div className="bg-white p-4 rounded-xl shadow-md border border-neutral-100">
+                            <img
+                              src={qrCodeBase64.startsWith('data:') ? qrCodeBase64 : `data:image/png;base64,${qrCodeBase64}`}
+                              alt="WhatsApp QR Code"
+                              className="w-48 h-48 mx-auto"
+                            />
+                          </div>
+                          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full animate-pulse">
+                            Bağlantı Bekleniyor
+                          </span>
+                        </div>
+
+                        {/* Pairing Instructions */}
+                        <div className="flex-1 space-y-3">
+                          <h4 className="text-sm font-bold text-neutral-900 flex items-center gap-1.5">
+                            <span>📲 Telefonunuzdan Nasıl Bağlayacaksınız?</span>
+                          </h4>
+                          <ol className="text-xs text-neutral-600 space-y-2 list-decimal list-inside pl-1">
+                            <li>Telefonunuzda <strong>WhatsApp</strong> uygulamasını açın.</li>
+                            <li>Sağ üst köşedeki menüden veya <strong>Ayarlar</strong> bölümünden <strong>Bağlı Cihazlar</strong> seçeneğine gidin.</li>
+                            <li><strong>"Cihaz Bağla"</strong> butonuna dokunun.</li>
+                            <li>Telefonunuzun kamerasını soldaki <strong>QR koduna</strong> doğrultarak taratın.</li>
+                            <li>Bağlantı tamamlandığında bu panelden veya işletmeler listesinden asistanı <strong>"Aktif"</strong> duruma getirin.</li>
+                          </ol>
+
+                          <div className="pt-2">
+                            <p className="text-[10px] text-neutral-500 italic">
+                              * QR kodları güvenlik nedeniyle kısa süre geçerlidir. Eşleşme başarısız olursa tekrar "QR Kodunu Getir" butonuna tıklayarak yeni kod talep edebilirsiniz.
+                            </p>
+                          </div>
+                        </div>
+
+                      </div>
+                    )}
+
+                  </div>
+                )}
+
+                {!selectedBusinessId && (
+                  <div className="border-2 border-dashed border-neutral-200 rounded-2xl p-12 text-center text-neutral-400">
+                    <div className="text-3xl mb-2">🔌</div>
+                    <div className="text-sm font-semibold">Başlamak için Lütfen Bir İşletme Seçin</div>
+                    <div className="text-xs text-neutral-400 mt-1 max-w-sm mx-auto">
+                      WhatsApp entegrasyonu yapmak istediğiniz kayıtlı işletmeyi yukarıdaki listeden seçerek kuruluma başlayabilirsiniz.
+                    </div>
+                  </div>
+                )}
+
               </CardContent>
             </Card>
           )}
