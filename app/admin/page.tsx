@@ -32,6 +32,8 @@ export default function AdminPage() {
 
   // Lists of fetched businesses (which include nested owner, conversations, and appointments)
   const [businesses, setBusinesses] = useState<any[]>([])
+  const [instances, setInstances] = useState<any[]>([])
+  const [instancesLoading, setInstancesLoading] = useState(false)
 
   // Row changes state tracking
   const [localChanges, setLocalChanges] = useState<Record<string, { calendarId: string; slug: string; is_active: boolean }>>({})
@@ -72,6 +74,23 @@ export default function AdminPage() {
     }
   }, [status])
 
+  async function fetchInstances() {
+    try {
+      setInstancesLoading(true)
+      const res = await fetch('/api/instances/list')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success && Array.isArray(data.instances)) {
+          setInstances(data.instances)
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching instances:', err)
+    } finally {
+      setInstancesLoading(false)
+    }
+  }
+
   async function fetchAdminData() {
     try {
       setLoading(true)
@@ -80,6 +99,7 @@ export default function AdminPage() {
         const data = await res.json()
         setBusinesses(data)
       }
+      await fetchInstances()
     } catch (err) {
       console.error('Error fetching admin data:', err)
     } finally {
@@ -270,6 +290,38 @@ export default function AdminPage() {
     }
   }
 
+  // Handle WhatsApp Instance Deletion
+  async function handleDeleteInstance(slug: string) {
+    if (!window.confirm(`"${slug}" oturumunu silmek istediğinizden emin misiniz? Bu işlem WhatsApp bağlantısını tamamen koparacaktır.`)) {
+      return
+    }
+
+    setActionLoading(true)
+    setActionSuccess('')
+    setActionError('')
+
+    try {
+      const res = await fetch(`/api/instances/delete?slug=${encodeURIComponent(slug)}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug }),
+      })
+
+      if (res.ok) {
+        setActionSuccess(`"${slug}" oturumu başarıyla silindi!`)
+        // Refresh businesses and instances
+        await fetchAdminData()
+      } else {
+        const data = await res.json()
+        setActionError(data.error || 'Oturum silinirken bir hata oluştu.')
+      }
+    } catch (err) {
+      setActionError('Sistem hatası oluştu.')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50/50">
@@ -411,6 +463,13 @@ export default function AdminPage() {
                     }
                     const isSaving = !!rowLoading[b.id]
 
+                    const bizSlug = b.slug || ''
+                    const matchingInstance = instances.find((inst: any) => {
+                      const name = inst.name || inst.instance?.instanceName || inst.instanceName
+                      return name === bizSlug
+                    })
+                    const instanceStatus = matchingInstance?.connectionStatus || matchingInstance?.status || matchingInstance?.instance?.status || null
+
                     return (
                       <div key={b.id} className="py-6 first:pt-0 last:pb-0 space-y-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -419,6 +478,36 @@ export default function AdminPage() {
                             <p className="text-xs text-neutral-500 mt-0.5">
                               Tipi: <span className="font-semibold">{b.type}</span> | Sahibi: <span className="font-semibold">{b.owner?.email}</span>
                             </p>
+                            {bizSlug ? (
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] text-neutral-500 font-semibold">WhatsApp Durumu:</span>
+                                {matchingInstance ? (
+                                  instanceStatus === 'open' ? (
+                                    <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                      🟢 Bağlı (Aktif)
+                                    </span>
+                                  ) : instanceStatus === 'connecting' ? (
+                                    <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 animate-pulse">
+                                      🟡 Bağlanıyor
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-100">
+                                      🔴 Bağlantı Kesildi ({instanceStatus || 'close'})
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-100 text-neutral-600 border border-neutral-200">
+                                    ⚪ Oturum Oluşturulmamış
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 text-neutral-500 border border-dashed border-neutral-300">
+                                  ⚠️ Slug Tanımlanmamış
+                                </span>
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-3">
@@ -872,6 +961,90 @@ export default function AdminPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Evolution Instances List (Always visible at the bottom of WhatsApp tab) */}
+                <div className="pt-8 border-t border-neutral-200 mt-8">
+                  <h3 className="text-lg font-bold text-neutral-900 mb-2 flex items-center gap-2">
+                    <span>🤖 Evolution API Aktif Oturumları</span>
+                    {instancesLoading && (
+                      <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                    )}
+                  </h3>
+                  <p className="text-xs text-neutral-500 mb-4">
+                    Sistemdeki Evolution API sunucusunda kurulu olan tüm WhatsApp oturumlarını ve bağlantı durumlarını buradan izleyebilirsiniz.
+                  </p>
+
+                  <div className="overflow-x-auto border border-neutral-200 rounded-xl bg-neutral-50/20">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-neutral-200 bg-neutral-50 text-neutral-500 font-bold text-xs uppercase tracking-wider">
+                          <th className="py-3 px-4">Oturum İsmi (Slug)</th>
+                          <th className="py-3 px-4">Eşleşen İşletme</th>
+                          <th className="py-3 px-4">Durum</th>
+                          <th className="py-3 px-4 text-right">İşlemler</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100 bg-white">
+                        {instances.map((inst: any, idx: number) => {
+                          const instName = inst.name || inst.instance?.instanceName || inst.instanceName || ''
+                          const matchingBiz = businesses.find(b => b.slug === instName)
+                          const instStatus = inst.connectionStatus || inst.status || inst.instance?.status || 'close'
+
+                          return (
+                            <tr key={idx} className="hover:bg-neutral-50/50 transition-colors">
+                              <td className="py-3.5 px-4 font-mono font-bold text-neutral-800 text-xs">
+                                {instName}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                {matchingBiz ? (
+                                  <div>
+                                    <span className="font-semibold text-neutral-950 text-xs">{matchingBiz.name}</span>
+                                    <span className="block text-[10px] text-neutral-500">{matchingBiz.type}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-[10px] text-neutral-400 italic">Eşleşen İşletme Bulunamadı</span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                {instStatus === 'open' ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                    🟢 Bağlı (Aktif)
+                                  </span>
+                                ) : instStatus === 'connecting' ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100 animate-pulse">
+                                    🟡 Bağlanıyor
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100">
+                                    🔴 Bağlantı Kesildi
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4 text-right">
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleDeleteInstance(instName)}
+                                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm cursor-pointer inline-flex items-center gap-1"
+                                >
+                                  🗑️ Oturumu Sil
+                                </Button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+
+                        {instances.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="text-center py-8 text-neutral-400 text-xs italic">
+                              Sunucuda aktif WhatsApp oturumu bulunmamaktadır.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
               </CardContent>
             </Card>

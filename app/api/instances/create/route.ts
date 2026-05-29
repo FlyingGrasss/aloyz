@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
           webhook: {
             enabled: true,
             url: whatsappBackendUrl,
-            byEvents: true,
+            byEvents: false,
             events: ["MESSAGES_UPSERT"],
           },
         }),
