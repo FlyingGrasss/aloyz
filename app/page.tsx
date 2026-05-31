@@ -1,84 +1,76 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 
 export default function HomePage() {
   return (
-    <main className="relative z-10 flex-1 max-w-6xl mx-auto w-full px-6 flex flex-col lg:flex-row items-center justify-center gap-12 lg:gap-16 py-12">
-      
-      {/* Left Side: Dynamic Pitch & Value Indicators */}
-      <div className="flex-1 space-y-8 text-center lg:text-left max-w-xl">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-indigo-100 bg-indigo-50 text-xs font-semibold text-indigo-600 tracking-wide uppercase">
-          <span>Kurumsal Yönetim Altyapısı</span>
-        </div>
-        
-        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1] text-neutral-900">
-          Müşteri İletişimini <br />
-          <span className="text-indigo-600">
-            Otomasyonla Güçlendirin
-          </span>
-        </h1>
-        
-        <p className="text-base sm:text-lg text-neutral-600 leading-relaxed max-w-md mx-auto lg:mx-0">
-          Müşteri verilerinizi, çalışma saatlerinizi ve özel talimatlarınızı tek bir panelden yönetin. Yapay zeka asistan altyapımız için kusursuz bilgi akışı sağlayın.
-        </p>
+    <main className="relative z-10 flex-1 max-w-6xl mx-auto w-full px-6 py-12">
+      <div className="grid min-h-[calc(100vh-180px)] grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] items-center gap-12">
+        <section className="space-y-8">
+          <div className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-neutral-600 shadow-sm">
+            WhatsApp ve Instagram otomasyon altyapısı
+          </div>
 
-        {/* Feature Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 text-left">
-          <div className="flex items-start gap-3 p-4 rounded-xl border border-neutral-200 bg-white shadow-sm">
-            <div className="mt-1 w-5 h-5 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100 font-bold text-xs">
-              ✓
+          <div className="space-y-5">
+            <div className="flex items-center gap-4">
+              <Image src="/logo.jpg" alt="Aloyz" width={68} height={68} className="rounded-2xl shadow-sm" priority />
+              <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight text-neutral-950">
+                Aloyz
+              </h1>
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-neutral-900">Google Calendar</h3>
-              <p className="text-xs text-neutral-500 mt-0.5">Mükemmel senkronize randevu takibi</p>
-            </div>
+            <p className="max-w-xl text-lg leading-relaxed text-neutral-600">
+              İşletmeler için WhatsApp ve Instagram üzerinden müşteri yanıtları, randevu akışı, takvim eşleşmesi ve görüşme takibini tek bir profesyonel panelde toplar.
+            </p>
           </div>
-          
-          <div className="flex items-start gap-3 p-4 rounded-xl border border-neutral-200 bg-white shadow-sm">
-            <div className="mt-1 w-5 h-5 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100 font-bold text-xs">
-              ✓
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-neutral-900">Dinamik Prompt</h3>
-              <p className="text-xs text-neutral-500 mt-0.5">Gelişmiş Türkçe Prompt Yapılandırması</p>
-            </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link
+              href="/login"
+              className={buttonVariants({ size: 'lg', className: 'rounded-lg bg-neutral-950 px-5 font-bold text-white hover:bg-neutral-800' })}
+            >
+              Panele Giriş Yap
+            </Link>
           </div>
-        </div>
+
+          <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
+            <div className="border-l border-neutral-300 pl-4">
+              <dt className="text-sm font-bold text-neutral-950">Randevu</dt>
+              <dd className="mt-1 text-xs leading-relaxed text-neutral-500">Google Takvim ile uyumlu kayıt ve takip akışı.</dd>
+            </div>
+            <div className="border-l border-neutral-300 pl-4">
+              <dt className="text-sm font-bold text-neutral-950">WhatsApp</dt>
+              <dd className="mt-1 text-xs leading-relaxed text-neutral-500">QR eşleşmesi ve işletme bazlı bağlantı yönetimi.</dd>
+            </div>
+            <div className="border-l border-neutral-300 pl-4">
+              <dt className="text-sm font-bold text-neutral-950">Instagram</dt>
+              <dd className="mt-1 text-xs leading-relaxed text-neutral-500">Instagram DM akışı ve işletme bazlı mesaj yönetimi.</dd>
+            </div>
+            <div className="border-l border-neutral-300 pl-4">
+              <dt className="text-sm font-bold text-neutral-950">Kontrol</dt>
+              <dd className="mt-1 text-xs leading-relaxed text-neutral-500">Test modu, içerik, SSS ve konuşma günlükleri.</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-xl shadow-neutral-900/5">
+          <div className="border-b border-neutral-200 pb-5">
+            <p className="text-xs font-bold uppercase tracking-wide text-neutral-400">Operasyon Özeti</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-neutral-950">Müşteri iletişimi için sakin, izlenebilir bir merkez.</h2>
+          </div>
+          <div className="divide-y divide-neutral-100">
+            {[
+              ['01', 'İşletme bilgilerini ve çalışma saatlerini güncel tutun.'],
+              ['02', 'Aloyz asistanının kullanacağı menü, hizmet ve SSS bilgisini yönetin.'],
+              ['03', 'WhatsApp, Instagram ve test modunu kontrollü şekilde yönetin.'],
+            ].map(([num, text]) => (
+              <div key={num} className="flex gap-4 py-5">
+                <span className="font-mono text-sm font-bold text-neutral-400">{num}</span>
+                <p className="text-sm leading-relaxed text-neutral-700">{text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
-
-      {/* Right Side: Elegant White Form Glassmorphic Card */}
-      <div className="w-full max-w-md shrink-0 lg:my-0 my-8">
-        <div className="relative group">
-          {/* Outer soft shadow aura */}
-          <div className="absolute -inset-1 rounded-3xl bg-indigo-600/5 opacity-40 blur-xl transition duration-1000 group-hover:opacity-60" />
-          
-          <div className="relative rounded-2xl border border-neutral-200/80 bg-white p-8 shadow-xl space-y-6">
-            <div className="space-y-2">
-              <h2 className="text-2xl font-bold tracking-tight text-neutral-900">
-                Yönetim Paneline Erişin
-              </h2>
-              <p className="text-sm text-neutral-500 leading-relaxed">
-                Hesabınıza giriş yaparak işletme ayarlarınızı, menü ve özel talimatlarınızı güncelleyin.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 pt-2">
-              <Link 
-                href="/login" 
-                className={buttonVariants({ size: 'lg', className: 'w-full rounded-xl font-bold text-white shadow-lg bg-indigo-600 hover:bg-indigo-700 transition-all flex items-center justify-center cursor-pointer border-none' })}
-              >
-                Giriş Yap
-              </Link>
-            </div>
-
-            <div className="pt-4 border-t border-neutral-100 flex justify-between items-center text-xs text-neutral-400 font-medium">
-              <span>🛡️ 256-bit Veri Güvenliği</span>
-              <span>⚡ WhatsApp Entegrasyonu</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
     </main>
   )
 }

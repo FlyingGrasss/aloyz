@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,8 +37,9 @@ export default function AdminPage() {
   const [instancesLoading, setInstancesLoading] = useState(false)
 
   // Row changes state tracking
-  const [localChanges, setLocalChanges] = useState<Record<string, { calendarId: string; slug: string; is_active: boolean }>>({})
+  const [localChanges, setLocalChanges] = useState<Record<string, { calendarId: string; slug: string; is_active: boolean; test_mode: boolean; instagram_page_id: string; instagram_access_token: string }>>({})
   const [rowLoading, setRowLoading] = useState<Record<string, boolean>>({})
+  const [showInstagramToken, setShowInstagramToken] = useState<Record<string, boolean>>({})
 
   // Action status triggers
   const [actionSuccess, setActionSuccess] = useState('')
@@ -114,7 +116,10 @@ export default function AdminPage() {
       const existing = prev[businessId] || {
         calendarId: biz?.calendarId || '',
         slug: biz?.slug || '',
-        is_active: !!biz?.is_active
+        is_active: !!biz?.is_active,
+        test_mode: !!biz?.test_mode,
+        instagram_page_id: biz?.instagram_page_id || '',
+        instagram_access_token: biz?.instagram_access_token || '',
       }
       return {
         ...prev,
@@ -176,7 +181,10 @@ export default function AdminPage() {
     const current = localChanges[businessId] || {
       calendarId: biz?.calendarId || '',
       slug: biz?.slug || '',
-      is_active: !!biz?.is_active
+      is_active: !!biz?.is_active,
+      test_mode: !!biz?.test_mode,
+      instagram_page_id: biz?.instagram_page_id || '',
+      instagram_access_token: biz?.instagram_access_token || '',
     }
 
     try {
@@ -187,7 +195,10 @@ export default function AdminPage() {
           businessId,
           calendarId: current.calendarId,
           is_active: current.is_active,
+          test_mode: current.test_mode,
           slug: current.slug,
+          instagram_page_id: current.instagram_page_id,
+          instagram_access_token: current.instagram_access_token,
         }),
       })
 
@@ -196,7 +207,7 @@ export default function AdminPage() {
         setBusinesses(prev =>
           prev.map(b =>
             b.id === businessId
-              ? { ...b, calendarId: current.calendarId, is_active: current.is_active, slug: current.slug }
+              ? { ...b, calendarId: current.calendarId, is_active: current.is_active, test_mode: current.test_mode, slug: current.slug, instagram_page_id: current.instagram_page_id, instagram_access_token: current.instagram_access_token }
               : b
           )
         )
@@ -352,12 +363,8 @@ export default function AdminPage() {
       <header className="bg-white border-b border-neutral-200/80 sticky top-0 z-20 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-neutral-900 text-white rounded-lg flex items-center justify-center shadow-md">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
-            </div>
-            <span className="text-lg font-bold tracking-tight text-neutral-900">CustomerAI</span>
+            <Image src="/logo.jpg" alt="Aloyz" width={34} height={34} className="rounded-lg shadow-sm" />
+            <span className="text-lg font-bold tracking-tight text-neutral-900">Aloyz</span>
             <span className="inline-block px-2.5 py-0.5 rounded-full bg-neutral-900 text-xs font-bold text-white">
               Sistem Yöneticisi
             </span>
@@ -459,7 +466,10 @@ export default function AdminPage() {
                     const rowChanges = localChanges[b.id] || {
                       calendarId: b.calendarId || '',
                       slug: b.slug || '',
-                      is_active: !!b.is_active
+                      is_active: !!b.is_active,
+                      test_mode: !!b.test_mode,
+                      instagram_page_id: b.instagram_page_id || '',
+                      instagram_access_token: b.instagram_access_token || '',
                     }
                     const isSaving = !!rowLoading[b.id]
 
@@ -510,15 +520,24 @@ export default function AdminPage() {
                             )}
                           </div>
 
-                          <div className="flex items-center gap-3">
+                          <div className="flex flex-wrap items-center gap-3">
                             <span className="text-xs font-semibold text-neutral-500">Asistan Durumu:</span>
                             <select
                               value={rowChanges.is_active ? 'active' : 'inactive'}
                               onChange={e => updateLocalField(b.id, 'is_active', e.target.value === 'active')}
-                              className="text-xs font-bold px-2.5 py-1 rounded border border-neutral-200 bg-white shadow-sm cursor-pointer"
+                              className="text-xs font-bold px-2.5 py-1 rounded border border-neutral-300 bg-white shadow-sm cursor-pointer hover:border-neutral-400"
                             >
                               <option value="inactive">Pasif / Kurulumda</option>
                               <option value="active">Aktif (WhatsApp Çalışıyor)</option>
+                            </select>
+                            <span className="text-xs font-semibold text-neutral-500">Test Modu:</span>
+                            <select
+                              value={rowChanges.test_mode ? 'enabled' : 'disabled'}
+                              onChange={e => updateLocalField(b.id, 'test_mode', e.target.value === 'enabled')}
+                              className="text-xs font-bold px-2.5 py-1 rounded border border-neutral-300 bg-white shadow-sm cursor-pointer hover:border-neutral-400"
+                            >
+                              <option value="disabled">Kapalı</option>
+                              <option value="enabled">Açık</option>
                             </select>
                           </div>
                         </div>
@@ -543,6 +562,58 @@ export default function AdminPage() {
                               onChange={e => updateLocalField(b.id, 'slug', e.target.value)}
                               className="h-8 text-xs bg-white flex-1 font-mono"
                             />
+                          </div>
+                        </div>
+
+                        {/* Instagram Integration Fields */}
+                        <div className="bg-neutral-50 p-3 rounded-xl border border-neutral-200/60 space-y-2">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-bold text-neutral-700">📸 Instagram Entegrasyonu</span>
+                            {b.instagram_page_id && b.instagram_access_token ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                Bağlı
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                Bağlı Değil
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="flex items-center gap-3">
+                              <Label className="text-xs font-bold text-neutral-600 shrink-0 w-24">Account ID:</Label>
+                              <Input
+                                placeholder="17841461542767332"
+                                value={rowChanges.instagram_page_id}
+                                onChange={e => updateLocalField(b.id, 'instagram_page_id', e.target.value)}
+                                className="h-8 text-xs bg-white flex-1 font-mono"
+                              />
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Label className="text-xs font-bold text-neutral-600 shrink-0 w-24">Access Token:</Label>
+                              <div className="relative flex-1">
+                                <Input
+                                  type={showInstagramToken[b.id] ? 'text' : 'password'}
+                                  placeholder="IGAAOh5..."
+                                  value={rowChanges.instagram_access_token}
+                                  onChange={e => updateLocalField(b.id, 'instagram_access_token', e.target.value)}
+                                  className="h-8 text-xs bg-white pr-8 font-mono"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowInstagramToken(prev => ({ ...prev, [b.id]: !prev[b.id] }))}
+                                  className="absolute inset-y-0 right-0 px-2 flex items-center text-neutral-400 hover:text-neutral-600"
+                                >
+                                  {showInstagramToken[b.id] ? (
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                                  ) : (
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         </div>
 

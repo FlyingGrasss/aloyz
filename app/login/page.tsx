@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -52,15 +53,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <Card className="w-full max-w-md shadow-lg border-border">
         <CardHeader className="text-center pb-6">
-          <div className="mx-auto w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center shadow-inner mb-4">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary animate-pulse">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              <path d="M13 8H7" />
-              <path d="M17 12H7" />
-            </svg>
-          </div>
+          <Image src="/logo.jpg" alt="Aloyz" width={52} height={52} className="mx-auto rounded-xl shadow-sm mb-4" />
           <CardTitle className="text-2xl font-bold tracking-tight">
-            CustomerAI
+            Aloyz
           </CardTitle>
           <CardDescription>
             İşletme panelinize güvenle giriş yapın

@@ -89,25 +89,15 @@ export async function POST(request: NextRequest) {
     owner: _owner,
     conversations: _conversations,
     appointments: _appointments,
-    calendarId: clientCalendarId,
-    is_active: clientIsActive,
+    // instagram fields are admin-only, always strip from business-owner POSTs
+    instagram_page_id: _igId,
+    instagram_access_token: _igToken,
     ...rest
   } = body
 
-  // Non-admins are strictly forbidden from editing calendarId and is_active (WhatsApp connection active state)
   const payload: Record<string, unknown> = {
     ...rest,
     ownerId: userId,
-  }
-
-  // Only admins can modify calendarId and is_active status
-  if (userRole === 'admin') {
-    if (clientCalendarId !== undefined) {
-      payload.calendarId = clientCalendarId
-    }
-    if (clientIsActive !== undefined) {
-      payload.is_active = !!clientIsActive
-    }
   }
 
   // Ensure hours is a proper JSON object
@@ -165,5 +155,58 @@ export async function POST(request: NextRequest) {
         headers: { 'Content-Type': 'application/json' },
       })
     }
+  }
+}
+
+// PATCH /api/business — quick-save calendarId, is_active, and test_mode for business owner
+export async function PATCH(request: NextRequest) {
+  const session = await auth()
+  const userId = session?.user?.id
+
+  if (!userId) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  try {
+    const body = await request.json()
+
+    const existing = await prisma.business.findFirst({
+      where: { ownerId: userId },
+      select: { id: true },
+    })
+
+    if (!existing) {
+      return new Response(JSON.stringify({ error: 'Business profile not found.' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    const updateData: Record<string, unknown> = {}
+    if (body.calendarId !== undefined) {
+      updateData.calendarId = body.calendarId
+    }
+    if (body.is_active !== undefined) {
+      updateData.is_active = !!body.is_active
+    }
+    if (body.test_mode !== undefined) {
+      updateData.test_mode = !!body.test_mode
+    }
+
+    const updated = await prisma.business.update({
+      where: { id: existing.id },
+      data: updateData,
+    })
+
+    return Response.json(updated)
+  } catch (error: any) {
+    console.error('Business PATCH error:', error)
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 }

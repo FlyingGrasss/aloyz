@@ -78,6 +78,10 @@ model Business {
   special_instructions String?  @db.Text
 
   is_active            Boolean  @default(false) // Default to false (WhatsApp connection state)
+  test_mode            Boolean  @default(false)
+
+  instagram_page_id      String?  @unique
+  instagram_access_token String?  @db.Text
 
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export function Navbar() {
   const pathname = usePathname()
@@ -13,15 +14,9 @@ export function Navbar() {
     <header className="sticky top-0 z-50 w-full bg-white border-b border-neutral-200/80 shadow-sm py-4">
       <div className="max-w-6xl mx-auto px-6 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-          <div className="w-9 h-9 bg-indigo-600 text-white rounded-lg flex items-center justify-center shadow-md shadow-indigo-600/10">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              <path d="M13 8H7" />
-              <path d="M17 12H7" />
-            </svg>
-          </div>
+          <Image src="/logo.jpg" alt="Aloyz" width={36} height={36} className="rounded-lg shadow-sm" />
           <span className="text-xl font-bold tracking-tight text-neutral-900">
-            CustomerAI
+            Aloyz
           </span>
         </Link>
         <div className="flex items-center gap-4">

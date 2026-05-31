@@ -103,6 +103,7 @@ async function main() {
         special_instructions:
           'Müşteri paket kahve çekirdeği almak isterse, elimizde Ethiopia Sidamo olduğunu belirt.',
         is_active: false, // Default to false
+        test_mode: false,
       },
     })
   }

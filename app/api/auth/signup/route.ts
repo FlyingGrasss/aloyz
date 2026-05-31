@@ -60,7 +60,8 @@ export async function POST(request: Request) {
           hours: {}, // Empty hours object (no default hours)
           menu_or_services: '',
           faqs: [],
-          is_active: false // Default to false (WhatsApp inactive)
+          is_active: false, // Default to false (WhatsApp inactive)
+          test_mode: false
         }
       })
 

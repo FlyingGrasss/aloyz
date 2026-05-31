@@ -1,0 +1,1 @@
+ALTER TABLE "Business" ADD COLUMN "test_mode" BOOLEAN NOT NULL DEFAULT false;

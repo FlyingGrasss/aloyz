@@ -2,17 +2,44 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
-
-export const metadata: Metadata = {
-  title: 'CustomerAI | Kurumsal İşletme Yönetim Paneli',
-  description: 'İşletmeniz için WhatsApp otomasyonu ve müşteri veri yönetim portalı',
-}
-
 import { Providers } from "@/components/Providers"
 import { Navbar } from "@/components/Navbar"
 import { Footer } from "@/components/Footer"
+
+const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
+
+export const metadata: Metadata = {
+  metadataBase: new URL('https://aloyz.co'),
+  title: {
+    default: 'Aloyz | WhatsApp ve Instagram Otomasyon Paneli',
+    template: '%s | Aloyz',
+  },
+  description: 'Aloyz, işletmeler için WhatsApp ve Instagram mesajlaşma otomasyonu, randevu takibi ve müşteri iletişimi yönetim panelidir.',
+  applicationName: 'Aloyz',
+  keywords: ['Aloyz', 'WhatsApp otomasyonu', 'Instagram otomasyonu', 'işletme paneli', 'randevu yönetimi', 'müşteri iletişimi'],
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    title: 'Aloyz',
+    description: 'WhatsApp ve Instagram otomasyonu ile müşteri iletişimi yönetimi.',
+    url: 'https://aloyz.co',
+    siteName: 'Aloyz',
+    images: [{ url: '/logo.jpg', width: 800, height: 800, alt: 'Aloyz logo' }],
+    locale: 'tr_TR',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Aloyz',
+    description: 'WhatsApp ve Instagram otomasyonu ile müşteri iletişimi yönetimi.',
+    images: ['/logo.jpg'],
+  },
+  icons: {
+    icon: '/logo.jpg',
+    apple: '/logo.jpg',
+  },
+}
 
 export default function RootLayout({
   children,
