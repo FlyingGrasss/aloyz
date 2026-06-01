@@ -20,6 +20,11 @@ model User {
   accounts      Account[]
   sessions      Session[]
   businesses    Business[]
+  sentEmails    SentEmail[]
+}
+
+enum EmailType {
+  CUSTOM
 }
 
 model Account {
@@ -125,4 +130,48 @@ model AppointmentTrack {
   business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
+}
+
+model SentEmail {
+  id           String    @id @default(cuid())
+  resendId     String?   @unique
+  senderName   String    @default("Aloyz")
+  sentFrom     String
+  sentTo       String
+  subject      String?
+  body         String?
+  bodyHtml     String?
+  contentMode  String    @default("text")
+  successful   Boolean   @default(false)
+  type         EmailType @default(CUSTOM)
+  errorMessage String?
+
+  userId       String?
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([sentTo])
+  @@index([type])
+  @@index([createdAt])
+  @@map("sent_emails")
+}
+
+model ReceivedEmail {
+  id          String   @id @default(cuid())
+  emailId     String   @unique
+  from        String
+  to          String[]
+  subject     String
+  body        String?
+  bodyHtml    String?
+  attachments Json?
+  messageId   String?
+  rawEvent    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([createdAt])
+  @@map("received_emails")
 }

@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 
 function getMessageText(m: any): string {
   if (!m) return ''
@@ -22,7 +23,7 @@ export default function AdminPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
 
-  const [activeTab, setActiveTab] = useState<'businesses' | 'create' | 'conversations' | 'appointments' | 'whatsapp'>('businesses')
+  const [activeTab, setActiveTab] = useState<'businesses' | 'create' | 'conversations' | 'appointments' | 'whatsapp' | 'mail'>('businesses')
   const [loading, setLoading] = useState(true)
 
   // WhatsApp Setup tab states
@@ -52,6 +53,19 @@ export default function AdminPage() {
   const [newName, setNewName] = useState('')
   const [newType, setNewType] = useState('')
 
+  const [mailFrom, setMailFrom] = useState('hello')
+  const [mailSenderName, setMailSenderName] = useState('Aloyz')
+  const [mailTo, setMailTo] = useState('')
+  const [mailSubject, setMailSubject] = useState('')
+  const [mailMessage, setMailMessage] = useState('')
+  const [mailHtml, setMailHtml] = useState('')
+  const [mailMode, setMailMode] = useState<'text' | 'html'>('text')
+  const [mailView, setMailView] = useState<'compose' | 'sent' | 'received'>('compose')
+  const [mailSearch, setMailSearch] = useState('')
+  const [mailLogsLoading, setMailLogsLoading] = useState(false)
+  const [sentEmails, setSentEmails] = useState<any[]>([])
+  const [receivedEmails, setReceivedEmails] = useState<any[]>([])
+
   // Detailed selected log viewer state
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
 
@@ -75,6 +89,12 @@ export default function AdminPage() {
       fetchAdminData()
     }
   }, [status])
+
+  useEffect(() => {
+    if (activeTab === 'mail' && mailView !== 'compose') {
+      fetchMailLogs(mailView)
+    }
+  }, [activeTab, mailView])
 
   async function fetchInstances() {
     try {
@@ -168,6 +188,117 @@ export default function AdminPage() {
       setActionError('Sistem hatası oluştu.')
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  async function handleSendMail(e: React.FormEvent) {
+    e.preventDefault()
+    setActionLoading(true)
+    setActionSuccess('')
+    setActionError('')
+
+    try {
+      const res = await fetch('/api/admin/mail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: mailFrom,
+          senderName: mailSenderName,
+          to: mailTo,
+          subject: mailSubject,
+          message: mailMessage,
+          html: mailHtml,
+          mode: mailMode,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        setActionSuccess('E-posta başarıyla gönderildi.')
+        setMailTo('')
+        setMailSubject('')
+        setMailMessage('')
+        setMailHtml('')
+        fetchMailLogs('sent')
+      } else {
+        setActionError(data.error || 'E-posta gönderilemedi.')
+      }
+    } catch (err) {
+      setActionError('E-posta gönderilirken bağlantı hatası oluştu.')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  function wrapMailSelection(before: string, after = before) {
+    const textarea = document.getElementById('mailMessage') as HTMLTextAreaElement | null
+    if (!textarea) return
+
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const next = `${mailMessage.slice(0, start)}${before}${mailMessage.slice(start, end)}${after}${mailMessage.slice(end)}`
+    setMailMessage(next)
+
+    requestAnimationFrame(() => {
+      textarea.focus()
+      textarea.setSelectionRange(start + before.length, end + before.length)
+    })
+  }
+
+  function insertMailLink() {
+    const textarea = document.getElementById('mailMessage') as HTMLTextAreaElement | null
+    if (!textarea) return
+
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selected = mailMessage.slice(start, end)
+    const snippet = /^https?:\/\//i.test(selected.trim()) ? selected.trim() : 'https://'
+    const next = `${mailMessage.slice(0, start)}${snippet}${mailMessage.slice(end)}`
+    setMailMessage(next)
+
+    requestAnimationFrame(() => {
+      textarea.focus()
+      textarea.setSelectionRange(start, start + snippet.length)
+    })
+  }
+
+  function insertHtmlSnippet(snippet: string) {
+    const textarea = document.getElementById('mailHtml') as HTMLTextAreaElement | null
+    if (!textarea) {
+      setMailHtml(prev => `${prev}${snippet}`)
+      return
+    }
+
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const next = `${mailHtml.slice(0, start)}${snippet}${mailHtml.slice(end)}`
+    setMailHtml(next)
+
+    requestAnimationFrame(() => {
+      textarea.focus()
+      textarea.setSelectionRange(start + snippet.length, start + snippet.length)
+    })
+  }
+
+  async function fetchMailLogs(box: 'sent' | 'received' = 'sent') {
+    try {
+      setMailLogsLoading(true)
+      const params = new URLSearchParams({ box })
+      if (mailSearch.trim()) params.set('search', mailSearch.trim())
+      const res = await fetch(`/api/admin/mail?${params.toString()}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (box === 'received') {
+          setReceivedEmails(Array.isArray(data.emails) ? data.emails : [])
+        } else {
+          setSentEmails(Array.isArray(data.emails) ? data.emails : [])
+        }
+      }
+    } catch (err) {
+      setActionError('Mail kayıtları alınırken hata oluştu.')
+    } finally {
+      setMailLogsLoading(false)
     }
   }
 
@@ -433,6 +564,15 @@ export default function AdminPage() {
               }`}
           >
             🔌 WhatsApp Kurulumu
+          </button>
+          <button
+            onClick={() => setActiveTab('mail')}
+            className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all flex items-center gap-3 ${activeTab === 'mail'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
+                : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
+              }`}
+          >
+            ✉️ Mail Gönderimi
           </button>
         </aside>
 
@@ -1117,6 +1257,256 @@ export default function AdminPage() {
                   </div>
                 </div>
 
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === 'mail' && (
+            <Card className="border-neutral-200 bg-white shadow-sm">
+              <CardHeader>
+                <CardTitle>Mail Gönderimi</CardTitle>
+                <CardDescription>
+                  Aloyz alan adından düz metin e-posta gönderin, gönderilen ve gelen mailleri takip edin.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    ['compose', 'Yeni Mail'],
+                    ['sent', 'Gönderilenler'],
+                    ['received', 'Gelenler'],
+                  ].map(([view, label]) => (
+                    <button
+                      key={view}
+                      type="button"
+                      onClick={() => setMailView(view as 'compose' | 'sent' | 'received')}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
+                        mailView === view
+                          ? 'border-indigo-600 bg-indigo-600 text-white'
+                          : 'border-neutral-300 bg-white text-neutral-600 hover:border-neutral-400'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {mailView === 'compose' && (
+                  <form onSubmit={handleSendMail} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="mailSenderName">Gönderen Adı</Label>
+                        <Input
+                          id="mailSenderName"
+                          value={mailSenderName}
+                          onChange={e => setMailSenderName(e.target.value)}
+                          placeholder="Aloyz"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="mailFrom">Gönderen</Label>
+                        <div className="flex items-center">
+                          <Input
+                            id="mailFrom"
+                            value={mailFrom}
+                            onChange={e => setMailFrom(e.target.value)}
+                            placeholder="hello"
+                            className="rounded-r-none"
+                          />
+                          <span className="h-8 inline-flex items-center rounded-r-lg border border-l-0 border-neutral-300 bg-neutral-100 px-3 text-sm font-semibold text-neutral-600">
+                            @aloyz.co
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="mailTo">Alıcı</Label>
+                        <Input
+                          id="mailTo"
+                          type="email"
+                          required
+                          value={mailTo}
+                          onChange={e => setMailTo(e.target.value)}
+                          placeholder="musteri@example.com"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 p-2">
+                      <span className="px-2 text-xs font-bold text-neutral-500">İçerik Tipi</span>
+                      <button
+                        type="button"
+                        onClick={() => setMailMode('text')}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${
+                          mailMode === 'text' ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-neutral-300 bg-white text-neutral-600'
+                        }`}
+                      >
+                        Düz Metin
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMailMode('html')}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${
+                          mailMode === 'html' ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-neutral-300 bg-white text-neutral-600'
+                        }`}
+                      >
+                        HTML Gönder
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="mailSubject">Konu</Label>
+                      <Input
+                        id="mailSubject"
+                        value={mailSubject}
+                        onChange={e => setMailSubject(e.target.value)}
+                        placeholder="Aloyz"
+                      />
+                    </div>
+
+                    {mailMode === 'text' ? (
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <Label htmlFor="mailMessage">Mesaj</Label>
+                          <div className="flex gap-1">
+                            <Button type="button" variant="outline" size="sm" onClick={() => wrapMailSelection('**')} className="h-7 px-2 text-xs font-black">
+                              B
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => wrapMailSelection('_')} className="h-7 px-2 text-xs italic">
+                              I
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={insertMailLink} className="h-7 px-2 text-xs">
+                              Link
+                            </Button>
+                          </div>
+                        </div>
+                        <Textarea
+                          id="mailMessage"
+                          required
+                          value={mailMessage}
+                          onChange={e => setMailMessage(e.target.value)}
+                          placeholder="Düz metin mesajınızı yazın..."
+                          rows={8}
+                        />
+                        <p className="text-xs text-neutral-500">Kalın, italik ve link biçimleri e-postada HTML olarak gönderilir.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <Label htmlFor="mailHtml">HTML İçeriği</Label>
+                            <div className="flex flex-wrap gap-1">
+                              <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => insertHtmlSnippet('<h1 style="font-family:Arial,sans-serif;color:#111827">Başlık</h1>\n')}>
+                                Başlık
+                              </Button>
+                              <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => insertHtmlSnippet('<a href="https://aloyz.co" style="display:inline-block;background:#111827;color:#ffffff;padding:10px 14px;border-radius:8px;text-decoration:none;font-family:Arial,sans-serif;font-weight:700">Buton</a>\n')}>
+                                Buton
+                              </Button>
+                              <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => insertHtmlSnippet('<img src="https://example.com/image.jpg" alt="" style="max-width:100%;height:auto;border-radius:8px" />\n')}>
+                                Görsel URL
+                              </Button>
+                            </div>
+                          </div>
+                          <Textarea
+                            id="mailHtml"
+                            required
+                            value={mailHtml}
+                            onChange={e => setMailHtml(e.target.value)}
+                            placeholder="<main><h1>Merhaba</h1><p>HTML mail içeriği...</p></main>"
+                            rows={12}
+                            className="font-mono text-xs"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Önizleme</Label>
+                          <iframe
+                            title="HTML mail önizleme"
+                            srcDoc={mailHtml || '<div style="font-family:Arial,sans-serif;color:#999;padding:24px">HTML önizleme burada görünecek.</div>'}
+                            className="h-[292px] w-full rounded-lg border border-neutral-300 bg-white"
+                            sandbox=""
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end pt-2">
+                      <Button
+                        type="submit"
+                        disabled={actionLoading}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2 rounded-xl transition-all shadow-md shadow-indigo-600/10 cursor-pointer"
+                      >
+                        {actionLoading ? 'Gönderiliyor...' : 'Mail Gönder'}
+                      </Button>
+                    </div>
+                  </form>
+                )}
+
+                {mailView !== 'compose' && (
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Input
+                        value={mailSearch}
+                        onChange={e => setMailSearch(e.target.value)}
+                        placeholder="E-posta, konu veya alıcı ara..."
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        onClick={() => fetchMailLogs(mailView)}
+                        disabled={mailLogsLoading}
+                        variant="outline"
+                      >
+                        {mailLogsLoading ? 'Yükleniyor...' : 'Yenile / Ara'}
+                      </Button>
+                    </div>
+
+                    <div className="divide-y divide-neutral-200 rounded-xl border border-neutral-200 bg-neutral-50/40">
+                      {(mailView === 'sent' ? sentEmails : receivedEmails).map((email: any) => (
+                        <div key={email.id} className="space-y-2 p-4">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-bold text-neutral-900">{email.subject || 'Konu yok'}</p>
+                              <p className="mt-0.5 text-xs text-neutral-500">
+                                {mailView === 'sent'
+                                  ? `${email.sentFrom} → ${email.sentTo}`
+                                  : `${email.from} → ${(email.to || []).join(', ')}`}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {mailView === 'sent' && (
+                                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                                  email.successful
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    : 'border-rose-200 bg-rose-50 text-rose-700'
+                                }`}>
+                                  {email.successful ? 'Gönderildi' : 'Hatalı'}
+                                </span>
+                              )}
+                              <span className="text-[10px] font-semibold text-neutral-400">
+                                {new Date(email.createdAt).toLocaleString('tr-TR')}
+                              </span>
+                            </div>
+                          </div>
+                          {(email.body || email.bodyHtml) && (
+                            <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-neutral-200 bg-white p-3 text-xs leading-relaxed text-neutral-700">
+                              {email.body || email.bodyHtml}
+                            </pre>
+                          )}
+                          {email.errorMessage && (
+                            <p className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-xs font-semibold text-rose-700">
+                              {email.errorMessage}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+
+                      {(mailView === 'sent' ? sentEmails : receivedEmails).length === 0 && (
+                        <div className="p-8 text-center text-xs font-semibold text-neutral-400">
+                          Kayıt bulunamadı.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

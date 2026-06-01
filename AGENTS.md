@@ -22,4 +22,14 @@ This project uses **pnpm** exclusively. Never use `npm` or `yarn`.
 
 ## FAQ field shape
 Business `faqs` JSON array uses `{ question: string, answer: string }` keys.
+
+## Verification Discipline
+- Keep verification lightweight and proportional to the change.
+- Do not run `pnpm build` for routine checks unless explicitly requested or the change genuinely needs a production build.
+- For syntax and TypeScript checks, prefer `pnpm exec tsc --noEmit`.
+- Avoid running multiple redundant verification commands when one targeted check is enough.
+
+## Git
+- Do not run git commands unless the user explicitly asks for them.
+- The user manages commits, pushes, and deploy-triggering changes through GitHub Desktop.
 <!-- END:project-rules -->
