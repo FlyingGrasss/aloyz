@@ -102,6 +102,7 @@ model Conversation {
   id          String   @id @default(cuid())
   businessId  String
   customerJid String
+  channel     String   @default("whatsapp")  // 'whatsapp' | 'instagram'
 
   messages    Json     @default("[]")
   createdAt   DateTime @default(now())
@@ -109,7 +110,7 @@ model Conversation {
 
   business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  @@unique([businessId, customerJid])
+  @@unique([businessId, customerJid, channel])
   @@index([businessId])
 }
 
