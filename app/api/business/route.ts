@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
     owner: _owner,
     conversations: _conversations,
     appointments: _appointments,
+    compiledPrompt: _compiledPrompt,
     // instagram fields are admin-only, always strip from business-owner POSTs
     instagram_page_id: _igId,
     instagram_access_token: _igToken,
