@@ -5,22 +5,25 @@ async function forwardInstagramWebhook(request: Request) {
   const targetUrl = new URL(VM_INSTAGRAM_WEBHOOK_URL)
   targetUrl.search = incomingUrl.search
 
-  const headers = new Headers(request.headers)
-  headers.delete('host')
-  headers.delete('connection')
-  headers.delete('content-length')
-
   const method = request.method
   const hasBody = !['GET', 'HEAD'].includes(method)
+
+  let body: string | undefined
+  if (hasBody) {
+    body = await request.text()
+    console.log('[IG-FORWARD] Body:', body?.slice(0, 300))
+  }
+
+  const headers = new Headers()
+  headers.set('Content-Type', 'application/json')
 
   try {
     const upstream = await fetch(targetUrl, {
       method,
       headers,
-      body: hasBody ? await request.arrayBuffer() : undefined,
+      body,
       redirect: 'manual',
     })
-
     return new Response(upstream.body, {
       status: upstream.status,
       statusText: upstream.statusText,
