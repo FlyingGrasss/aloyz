@@ -70,11 +70,11 @@ model Business {
   slug                 String   @unique // Restored slug field - only admin-managed
   type                 String
 
-  phone                String
+  phone                String?
   calendarId           String   @default("")
 
   welcome_message      String?  @db.Text
-  address              String
+  address              String?
   website              String?
   hours                Json
 
@@ -103,6 +103,10 @@ model Conversation {
   businessId  String
   customerJid String
   channel     String   @default("whatsapp")  // 'whatsapp' | 'instagram'
+
+  customerName       String?
+  customerPhone      String?  // WhatsApp contact phone
+  instagramUsername  String?  // Instagram @username
 
   messages    Json     @default("[]")
   createdAt   DateTime @default(now())

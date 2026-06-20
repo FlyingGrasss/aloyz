@@ -12,6 +12,9 @@ export async function GET(request: NextRequest) {
   let business = null
 
   if (slug || id) {
+    const session = await auth()
+    const isAdmin = (session?.user as any)?.role === 'admin'
+
     business = await prisma.business.findFirst({
       where: slug ? { slug } : { id: id! },
       include: {
@@ -20,6 +23,15 @@ export async function GET(request: NextRequest) {
             createdAt: 'desc',
           },
         },
+        ...(isAdmin && id
+          ? {
+              conversations: {
+                orderBy: {
+                  updatedAt: 'desc',
+                },
+              },
+            }
+          : {}),
       },
     })
   } else {

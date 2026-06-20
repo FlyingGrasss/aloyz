@@ -1,9 +1,9 @@
 // app/dashboard/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { getContactDisplayName, getContactSubtitle } from '@/lib/contactDisplay';
 
 // Helper to extract message text from WhatsApp message objects
 function getMessageText(m: any): string {
@@ -38,9 +39,27 @@ function getWhatsAppInstanceStatus(instance: any) {
   return instance?.connectionStatus || instance?.status || instance?.instance?.status || null;
 }
 
-export default function DashboardPage() {
+export default function DashboardPageWrapper() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-slate-50/50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-semibold text-neutral-600">Yükleniyor…</span>
+        </div>
+      </div>
+    }>
+      <DashboardPage />
+    </Suspense>
+  );
+}
+
+function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const adminBusinessId = searchParams.get('businessId');
+  const isAdminMode = (session?.user as any)?.role === 'admin' && !!adminBusinessId;
 
   const [activeTab, setActiveTab] = useState<'general' | 'hours' | 'content' | 'tracking'>('general');
   const [loading, setLoading] = useState(true);
@@ -71,14 +90,14 @@ export default function DashboardPage() {
     appointments: [],
   });
 
-  // Redirect admin users to /admin immediately
+  // Redirect admin users to /admin unless editing a specific business
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
-      if ((session.user as any).role === 'admin') {
+      if ((session.user as any).role === 'admin' && !adminBusinessId) {
         router.push('/admin');
       }
     }
-  }, [session, status, router]);
+  }, [session, status, router, adminBusinessId]);
 
   // Unauthenticated users go to login
   useEffect(() => {
@@ -87,29 +106,48 @@ export default function DashboardPage() {
 
   // Load business data on mount
   useEffect(() => {
-    if (status === 'authenticated') fetchBusiness();
-  }, [status]);
+    if (status === 'authenticated') {
+      if ((session?.user as any)?.role === 'admin' && !adminBusinessId) return;
+      fetchBusiness();
+    }
+  }, [status, adminBusinessId]);
 
   async function fetchBusiness() {
     try {
       setLoading(true);
-      const res = await fetch('/api/business');
+      const url = isAdminMode
+        ? `/api/business?id=${encodeURIComponent(adminBusinessId!)}`
+        : '/api/business';
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         // Ensure defaults for optional fields
         data.hours = data.hours || {};
         data.faqs = data.faqs || [];
         data.calendarId = data.calendarId || '';
+        data.phone = data.phone || '';
+        data.address = data.address || '';
         data.is_active = !!data.is_active;
         data.test_mode = !!data.test_mode;
         setBusiness(data);
-        fetchWhatsAppInstanceStatus();
+        if (!isAdminMode) {
+          fetchWhatsAppInstanceStatus();
+        }
       }
     } catch (err) {
       console.error('Error fetching business:', err);
     } finally {
       setLoading(false);
     }
+  }
+
+  async function adminPatch(fields: Record<string, unknown>) {
+    const res = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ businessId: adminBusinessId, ...fields }),
+    });
+    return res;
   }
 
   async function fetchWhatsAppInstanceStatus() {
@@ -161,14 +199,36 @@ export default function DashboardPage() {
     setSuccessMsg('');
     setErrorMsg('');
     try {
-      const res = await fetch('/api/business', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(business),
-      });
+      const res = isAdminMode
+        ? await adminPatch({
+            name: business.name,
+            type: business.type,
+            phone: business.phone || null,
+            address: business.address || null,
+            website: business.website,
+            welcome_message: business.welcome_message,
+            hours: business.hours,
+            menu_or_services: business.menu_or_services,
+            faqs: business.faqs,
+            special_instructions: business.special_instructions,
+            calendarId: business.calendarId,
+          })
+        : await fetch('/api/business', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(business),
+          });
       if (res.ok) {
+        const data = await res.json();
+        setBusiness((prev: any) => ({
+          ...prev,
+          ...data,
+          hours: data.hours || prev.hours || {},
+          faqs: data.faqs || prev.faqs || [],
+          conversations: prev.conversations,
+          appointments: prev.appointments,
+        }));
         setSuccessMsg('Ayarlarınız başarıyla kaydedildi.');
-        fetchBusiness();
       } else {
         const err = await res.json();
         setErrorMsg(err.error || 'Ayarlar kaydedilirken hata oluştu.');
@@ -184,11 +244,13 @@ export default function DashboardPage() {
   async function toggleBot(active: boolean) {
     setSaving(true);
     try {
-      const res = await fetch('/api/business', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: active }),
-      });
+      const res = isAdminMode
+        ? await adminPatch({ is_active: active })
+        : await fetch('/api/business', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_active: active }),
+          });
       if (res.ok) {
         setBusiness((prev: any) => ({ ...prev, is_active: active }));
         setSuccessMsg('Bot durumu güncellendi.');
@@ -208,11 +270,13 @@ export default function DashboardPage() {
     setSuccessMsg('');
     setErrorMsg('');
     try {
-      const res = await fetch('/api/business', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ test_mode: active }),
-      });
+      const res = isAdminMode
+        ? await adminPatch({ test_mode: active })
+        : await fetch('/api/business', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ test_mode: active }),
+          });
       if (res.ok) {
         setBusiness((prev: any) => ({ ...prev, test_mode: active }));
         setSuccessMsg(active ? 'Test modu açıldı.' : 'Test modu kapatıldı.');
@@ -267,11 +331,13 @@ export default function DashboardPage() {
   async function saveCalendarEmail() {
     setSaving(true);
     try {
-      const res = await fetch('/api/business', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ calendarId: business.calendarId }),
-      });
+      const res = isAdminMode
+        ? await adminPatch({ calendarId: business.calendarId })
+        : await fetch('/api/business', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ calendarId: business.calendarId }),
+          });
       if (res.ok) {
         setSuccessMsg('Takvim e‑posta kaydedildi.');
       } else {
@@ -313,10 +379,19 @@ export default function DashboardPage() {
             <Image src="/logo.jpg" alt="Aloyz" width={34} height={34} className="rounded-lg shadow-sm" />
             <span className="text-lg font-bold tracking-tight text-neutral-900">Aloyz</span>
             <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-xs font-semibold text-indigo-600">
-              İşletme Portalı
+              {isAdminMode ? 'Yönetici Düzenleme' : 'İşletme Portalı'}
             </span>
           </div>
           <div className="flex items-center gap-4">
+            {isAdminMode && (
+              <button
+                type="button"
+                onClick={() => router.push('/admin')}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors border border-indigo-200 px-3 py-1.5 rounded-lg bg-indigo-50 shadow-sm cursor-pointer"
+              >
+                ← Yönetici Paneline Dön
+              </button>
+            )}
             <span className="text-sm font-medium text-neutral-600 hidden sm:inline-block">
               {session?.user?.email}
             </span>
@@ -332,6 +407,11 @@ export default function DashboardPage() {
 
       {/* Main layout */}
       <div className="max-w-6xl mx-auto px-6 mt-8 grid grid-cols-1 md:grid-cols-4 gap-8">
+        {isAdminMode && (
+          <div className="md:col-span-4 p-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-sm font-medium">
+            <strong>{business.name || 'İşletme'}</strong> profilini yönetici olarak düzenliyorsunuz. Kaydettiğiniz değişiklikler doğrudan bu işletmeye uygulanır.
+          </div>
+        )}
         {/* Sidebar */}
         <aside className="md:col-span-1 flex flex-col gap-1">
           <button
@@ -450,16 +530,16 @@ export default function DashboardPage() {
                         <Input id="type" required value={business.type} onChange={e => handleChange('type', e.target.value)} placeholder="Örn: Kafe, Klinik" />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="phone">İletişim Telefonu</Label>
-                        <Input id="phone" required value={business.phone} onChange={e => handleChange('phone', e.target.value)} placeholder="0216 123 45 67" />
+                        <Label htmlFor="phone">İletişim Telefonu (Opsiyonel)</Label>
+                        <Input id="phone" value={business.phone} onChange={e => handleChange('phone', e.target.value)} placeholder="0216 123 45 67" />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="website">Web Sitesi (Opsiyonel)</Label>
                         <Input id="website" value={business.website} onChange={e => handleChange('website', e.target.value)} placeholder="www.example.com" />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="address">İşletme Adresi</Label>
-                        <Input id="address" required value={business.address} onChange={e => handleChange('address', e.target.value)} placeholder="Atatürk Cad. No:12, Kadıköy" />
+                        <Label htmlFor="address">İşletme Adresi (Opsiyonel)</Label>
+                        <Input id="address" value={business.address} onChange={e => handleChange('address', e.target.value)} placeholder="Atatürk Cad. No:12, Kadıköy" />
                       </div>
                     </div>
                   </CardContent>
@@ -673,23 +753,34 @@ export default function DashboardPage() {
                 {/* Conversations log */}
                 <Card className="border-neutral-200 bg-white shadow-sm">
                   <CardHeader>
-                    <CardTitle>💬 WhatsApp Görüşme Günlükleri</CardTitle>
-                    <CardDescription>Müşterilerle gerçekleşen diyalogların takibi.</CardDescription>
+                    <CardTitle>💬 Görüşme & Kişi Günlükleri</CardTitle>
+                    <CardDescription>Müşterilerle gerçekleşen diyalogların ve kayıtlı kişi bilgilerinin takibi.</CardDescription>
                   </CardHeader>
                   <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Conversation list */}
                     <div className="border rounded-xl divide-y max-h-[400px] overflow-y-auto bg-neutral-50/30">
-                      {business.conversations?.map((conv: any) => (
+                      {business.conversations?.map((conv: any) => {
+                        const subtitle = getContactSubtitle(conv);
+                        return (
                         <button
                           key={conv.id}
                           type="button"
                           onClick={() => setSelectedConvId(conv.id)}
                           className={`w-full text-left p-3.5 flex flex-col gap-1 ${selectedConvId === conv.id ? 'bg-indigo-50/80 border-l-4 border-l-indigo-600' : 'hover:bg-neutral-50'}`}
                         >
-                          <span className="text-sm font-bold truncate text-neutral-900">{conv.customerJid.split('@')[0]}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold truncate text-neutral-900">{getContactDisplayName(conv)}</span>
+                            <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${conv.channel === 'instagram' ? 'bg-pink-50 text-pink-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                              {conv.channel === 'instagram' ? 'IG' : 'WA'}
+                            </span>
+                          </div>
+                          {subtitle && (
+                            <span className="text-xs text-neutral-500 truncate">{subtitle}</span>
+                          )}
                           <span className="text-xs text-neutral-400">Son Güncelleme: {new Date(conv.updatedAt).toLocaleTimeString('tr-TR')}</span>
                         </button>
-                      ))}
+                        );
+                      })}
                       {(business.conversations || []).length === 0 && (
                         <div className="text-center py-12 text-neutral-400 text-xs">Aktif görüşme günlüğü yok.</div>
                       )}
@@ -698,9 +789,14 @@ export default function DashboardPage() {
                     <div className="md:col-span-2 border rounded-xl p-4 flex flex-col h-[400px] bg-neutral-950 text-neutral-200">
                       {selectedConv ? (
                         <div className="flex-1 flex flex-col h-full">
-                          <div className="pb-3 border-b border-neutral-800 flex justify-between items-center">
-                            <span className="font-bold text-indigo-400">{selectedConv.customerJid}</span>
-                            <span className="text-xs text-neutral-500">Müşteri Diyaloğu</span>
+                          <div className="pb-3 border-b border-neutral-800 flex justify-between items-center gap-3">
+                            <div className="min-w-0">
+                              <span className="font-bold text-indigo-400 block truncate">{getContactDisplayName(selectedConv)}</span>
+                              {getContactSubtitle(selectedConv) && (
+                                <span className="text-xs text-neutral-500 block truncate">{getContactSubtitle(selectedConv)}</span>
+                              )}
+                            </div>
+                            <span className="text-xs text-neutral-500 shrink-0">{selectedConv.channel === 'instagram' ? 'Instagram' : 'WhatsApp'}</span>
                           </div>
                           <div className="flex-1 overflow-y-auto py-3 space-y-3 text-sm pr-1">
                             {(() => {

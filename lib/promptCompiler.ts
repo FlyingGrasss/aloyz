@@ -10,8 +10,8 @@ export function compileSystemPrompt(
   business: {
     name: string;
     type: string;
-    phone: string;
-    address: string;
+    phone?: string | null;
+    address?: string | null;
     website?: string | null;
     hours: any;
     menu_or_services: string;
@@ -37,8 +37,8 @@ export function compileSystemPrompt(
 BUSINESS CONFIGURATION & KNOWLEDGE BASE:
 - İşletme Adı: ${business.name}
 - İşletme Tipi: ${business.type}
-- Telefon: ${business.phone}
-- Adres: ${business.address}
+- Telefon: ${business.phone || 'Belirtilmemiş'}
+- Adres: ${business.address || 'Belirtilmemiş'}
 - Web Sitesi: ${business.website || 'Bulunmuyor'}
 - Çalışma Saatleri: ${hoursValue}
 

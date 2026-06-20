@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { getContactDisplayName, getContactSubtitle } from '@/lib/contactDisplay'
 
 function getMessageText(m: any): string {
   if (!m) return ''
@@ -661,6 +662,14 @@ export default function AdminPage() {
                           </div>
 
                           <div className="flex flex-wrap items-center gap-3">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => router.push(`/dashboard?businessId=${b.id}`)}
+                              className="text-xs font-bold h-8 px-3"
+                            >
+                              Profili Düzenle
+                            </Button>
                             <span className="text-xs font-semibold text-neutral-500">Asistan Durumu:</span>
                             <select
                               value={rowChanges.is_active ? 'active' : 'inactive'}
@@ -885,12 +894,15 @@ export default function AdminPage() {
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-xs font-bold text-neutral-900 truncate">
-                            {conv.customerJid.split('@')[0]}
+                            {getContactDisplayName(conv)}
                           </span>
                           <span className="text-[9px] text-indigo-600 font-bold bg-indigo-50 border border-indigo-100/60 px-1.5 py-0.5 rounded truncate max-w-[80px]">
                             {conv.businessName}
                           </span>
                         </div>
+                        {getContactSubtitle(conv) && (
+                          <span className="text-[10px] text-neutral-500 truncate">{getContactSubtitle(conv)}</span>
+                        )}
                         <span className="text-[10px] text-neutral-400 font-medium">
                           Tarih: {new Date(conv.updatedAt).toLocaleDateString('tr-TR')} {new Date(conv.updatedAt).toLocaleTimeString('tr-TR')}
                         </span>
@@ -909,8 +921,11 @@ export default function AdminPage() {
                     {selectedConv ? (
                       <div className="flex-1 flex flex-col h-full">
                         <div className="pb-3 border-b border-neutral-800 flex justify-between items-center shrink-0">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-indigo-400">{selectedConv.customerJid}</span>
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-bold text-indigo-400 truncate">{getContactDisplayName(selectedConv)}</span>
+                            {getContactSubtitle(selectedConv) && (
+                              <span className="text-[10px] text-neutral-500 truncate">{getContactSubtitle(selectedConv)}</span>
+                            )}
                             <span className="text-[10px] text-neutral-400 font-medium italic mt-0.5">
                               İşletme: <span className="font-bold text-neutral-300">{selectedConv.businessName}</span>
                             </span>
