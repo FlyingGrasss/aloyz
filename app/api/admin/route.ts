@@ -6,12 +6,22 @@ const PROFILE_FIELDS = [
   'name',
   'type',
   'phone',
+  'email',
+  'city',
+  'district',
   'address',
   'website',
   'welcome_message',
   'hours',
   'menu_or_services',
   'faqs',
+  'staff',
+  'services',
+  'customers',
+  'checkouts',
+  'promotions',
+  'bookingSettings',
+  'botSettings',
   'special_instructions',
 ] as const
 
@@ -37,6 +47,26 @@ function sanitizeProfilePayload(body: Record<string, unknown>) {
       updateData.faqs = JSON.parse(updateData.faqs as string)
     } catch {
       updateData.faqs = []
+    }
+  }
+
+  for (const field of ['staff', 'services', 'customers', 'checkouts'] as const) {
+    if (updateData[field] && typeof updateData[field] === 'string') {
+      try {
+        updateData[field] = JSON.parse(updateData[field] as string)
+      } catch {
+        updateData[field] = []
+      }
+    }
+  }
+
+  for (const field of ['promotions', 'bookingSettings', 'botSettings'] as const) {
+    if (updateData[field] && typeof updateData[field] === 'string') {
+      try {
+        updateData[field] = JSON.parse(updateData[field] as string)
+      } catch {
+        updateData[field] = {}
+      }
     }
   }
 

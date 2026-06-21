@@ -5,8 +5,9 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function POST(request: NextRequest) {
   const session = await auth()
   const userRole = (session?.user as any)?.role
+  const userId = session?.user?.id
 
-  if (!session || userRole !== 'admin') {
+  if (!session) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },
@@ -18,6 +19,21 @@ export async function POST(request: NextRequest) {
 
     if (!slug || !businessId) {
       return NextResponse.json({ error: 'slug and businessId are required' }, { status: 400 })
+    }
+
+    if (userRole !== 'admin') {
+      if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+
+      const ownedBusiness = await prisma.business.findFirst({
+        where: { id: businessId, ownerId: userId },
+        select: { id: true },
+      })
+
+      if (!ownedBusiness) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     }
 
     // Generate a secure random token (uuid)
@@ -51,6 +67,14 @@ export async function POST(request: NextRequest) {
     if (!createRes.ok) {
       const errText = await createRes.text()
       console.error('Evolution API create instance error response:', errText)
+      if (errText.includes('already in use')) {
+        return NextResponse.json({
+          success: true,
+          alreadyExists: true,
+          instance: { instanceName: slug },
+          token: null,
+        })
+      }
       return NextResponse.json({ error: `Evolution instance creation failed: ${errText}` }, { status: createRes.status })
     }
 

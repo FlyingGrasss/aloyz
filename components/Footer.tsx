@@ -1,6 +1,14 @@
+'use client'
+
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
 export function Footer() {
+  const pathname = usePathname()
+  const isPortal = pathname === '/dashboard' || pathname === '/admin'
+
+  if (isPortal) return null
+
   return (
     <footer className="w-full bg-white border-t border-neutral-200/60 py-8">
       <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500">

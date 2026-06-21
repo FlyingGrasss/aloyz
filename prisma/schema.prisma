@@ -71,6 +71,9 @@ model Business {
   type                 String
 
   phone                String?
+  email                String?
+  city                 String?
+  district             String?
   calendarId           String   @default("")
 
   welcome_message      String?  @db.Text
@@ -80,6 +83,13 @@ model Business {
 
   menu_or_services     String   @db.Text
   faqs                 Json     @default("[]")
+  staff                Json     @default("[]")
+  services             Json     @default("[]")
+  customers            Json     @default("[]")
+  checkouts            Json     @default("[]")
+  promotions           Json     @default("{}")
+  bookingSettings      Json     @default("{}")
+  botSettings          Json     @default("{}")
   special_instructions String?  @db.Text
 
   is_active            Boolean  @default(false) // Default to false (WhatsApp connection state)

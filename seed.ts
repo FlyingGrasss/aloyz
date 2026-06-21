@@ -48,6 +48,9 @@ async function main() {
         name: 'Lumina Coffee House',
         slug: 'lumina-coffee', // Admin-managed unique slug
         type: 'Nesil Kahveci / Cafe',
+        email: 'demo@example.com',
+        city: 'İstanbul',
+        district: 'Kadıköy',
         address: 'Atatürk Caddesi No:123, Kadıköy, İstanbul',
         phone: '0216 123 45 67',
         calendarId: 'lumina_calendar_id',

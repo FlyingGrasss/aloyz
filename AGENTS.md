@@ -28,6 +28,7 @@ Business `faqs` JSON array uses `{ question: string, answer: string }` keys.
 - Do not run `pnpm build` for routine checks unless explicitly requested or the change genuinely needs a production build.
 - For syntax and TypeScript checks, prefer `pnpm exec tsc --noEmit`.
 - Avoid running multiple redundant verification commands when one targeted check is enough.
+- Do not use the in-app Browser or browser automation for routine local UI verification. The user will manually test visual/UI behavior unless they explicitly ask for browser-based verification.
 
 ## Git
 - Do not run git commands unless the user explicitly asks for them.

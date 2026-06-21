@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const { email, password, name, type, phone, address, website } = await request.json()
+    const { email, password, name, type, phone, address, website, city, district } = await request.json()
 
     if (!email || !password || !name) {
       return NextResponse.json({ error: 'E-posta, şifre ve isim/işletme adı zorunludur' }, { status: 400 })
@@ -54,6 +54,9 @@ export async function POST(request: Request) {
           slug: uniqueSlug, // Set generated unique slug
           type: type || 'İşletme',
           phone: phone || '',
+          email: email || '',
+          city: city || '',
+          district: district || '',
           address: address || '',
           website: website || '',
           welcome_message: '', // Optional welcome message

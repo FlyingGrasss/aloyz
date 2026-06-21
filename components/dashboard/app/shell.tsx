@@ -1,0 +1,484 @@
+"use client";
+
+import Image from "next/image";
+import {
+  Bell,
+  CalendarDays,
+  ChevronDown,
+  ChevronLeft,
+  Eye,
+  FileText,
+  Languages,
+  LockKeyhole,
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  Search,
+  Settings,
+  ShoppingBag,
+  UserCircle,
+} from "lucide-react";
+import { signOut } from "next-auth/react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Business,
+  NavItem,
+  NavSubGroup,
+  ViewId,
+  createItems,
+  navGroups,
+  primaryNav,
+  isNavSubGroup,
+  setupItems,
+  Dropdown,
+  DropdownButton,
+} from "./shared";
+import Link from "next/link";
+
+export function Sidebar({
+  activeView,
+  collapsed,
+  groupsOpen,
+  onToggleCollapsed,
+  onToggleGroup,
+  onSelect,
+}: {
+  activeView: ViewId;
+  collapsed: boolean;
+  groupsOpen: Record<string, boolean>;
+  onToggleCollapsed: () => void;
+  onToggleGroup: (key: string) => void;
+  onSelect: (view: ViewId) => void;
+}) {
+  return (
+    <aside
+      className={`relative hidden shrink-0 border-r border-white/10 text-white shadow-xl transition-[width] duration-200 md:flex md:flex-col ${
+        collapsed ? "w-[70px]" : "w-[204px]"
+      } bg-[linear-gradient(180deg,#293247_0%,#4a3b3c_42%,#9b6849_64%,#2d2832_100%)]`}
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_55%,rgba(255,189,110,0.23),transparent_25%),linear-gradient(180deg,rgba(5,10,20,0.15),rgba(5,10,20,0.42))]" />
+      <div
+        className={`relative flex h-16 items-center gap-2 px-3 ${collapsed ? "justify-center" : ""}`}
+      >
+        {!collapsed && (
+          <Image
+            src="/logo.jpg"
+            alt="Aloyz"
+            width={34}
+            height={34}
+            className="rounded-md shadow-sm"
+          />
+        )}
+        {!collapsed && <span className="text-lg font-semibold">Aloyz</span>}
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className={`${collapsed ? "" : "ml-auto"} grid size-8 place-items-center rounded-md bg-white/12 text-white hover:bg-white/20`}
+          title={collapsed ? "Menüyü aç" : "Menüyü daralt"}
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="size-4" />
+          ) : (
+            <PanelLeftClose className="size-4" />
+          )}
+        </button>
+      </div>
+
+      <nav
+        className={`relative min-h-0 flex-1 overflow-y-auto pb-4 ${collapsed ? "px-[18px]" : "px-2"}`}
+      >
+        <div className="space-y-1">
+          {primaryNav.map((item) => (
+            <SidebarItem
+              key={item.id}
+              item={item}
+              active={activeView === item.id}
+              collapsed={collapsed}
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
+        <div className="mt-2 space-y-1">
+          {navGroups.map((group) => {
+            const groupActive = group.children.some((item) =>
+              isNavSubGroup(item)
+                ? item.children.some((child) => child.id === activeView)
+                : item.id === activeView,
+            );
+            const open = !!groupsOpen[group.key] || groupActive;
+            const Icon = group.icon;
+            return (
+              <div key={group.key}>
+                <button
+                  type="button"
+                  onClick={() => onToggleGroup(group.key)}
+                  className={`flex h-9 items-center gap-2 rounded-sm text-left text-sm font-medium transition ${
+                    groupActive
+                      ? "bg-[#b4cf9d] text-slate-800"
+                      : "text-white hover:bg-white/12"
+                  } ${collapsed ? "w-9 justify-center px-0" : "w-full px-2"}`}
+                  title={group.label}
+                >
+                  <span
+                    className={`${collapsed ? "hidden" : "min-w-0 flex-1 truncate"}`}
+                  >
+                    {!collapsed && group.label}
+                  </span>
+                  {group.beta && !collapsed && (
+                    <span className="rounded border border-violet-300 px-1 text-[9px] font-bold text-violet-100">
+                      BETA
+                    </span>
+                  )}
+                  <Icon className="size-4 shrink-0" />
+                  {!collapsed && (
+                    <ChevronDown
+                      className={`size-4 transition ${open ? "rotate-180" : ""}`}
+                    />
+                  )}
+                </button>
+                {open && !collapsed && (
+                  <div className="ml-2 mt-1 space-y-1 border-l border-white/10 pl-2">
+                    {group.children.map((item) =>
+                      isNavSubGroup(item) ? (
+                        <SidebarSubGroup
+                          key={item.key}
+                          group={item}
+                          activeView={activeView}
+                          open={
+                            !!groupsOpen[item.key] ||
+                            item.children.some(
+                              (child) => child.id === activeView,
+                            )
+                          }
+                          onToggle={() => onToggleGroup(item.key)}
+                          onSelect={onSelect}
+                        />
+                      ) : (
+                        <SidebarItem
+                          key={item.id}
+                          item={item}
+                          active={activeView === item.id}
+                          collapsed={false}
+                          onSelect={onSelect}
+                          compact
+                        />
+                      ),
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </nav>
+    </aside>
+  );
+}
+
+function SidebarSubGroup({
+  group,
+  activeView,
+  open,
+  onToggle,
+  onSelect,
+}: {
+  group: NavSubGroup;
+  activeView: ViewId;
+  open: boolean;
+  onToggle: () => void;
+  onSelect: (view: ViewId) => void;
+}) {
+  const Icon = group.icon;
+  const active = group.children.some((item) => item.id === activeView);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left text-xs font-medium transition ${
+          active ? "bg-white/16 text-[#b4cf9d]" : "text-white hover:bg-white/12"
+        }`}
+      >
+        <span className="min-w-0 flex-1 truncate">{group.label}</span>
+        <Icon className="size-4 shrink-0" />
+        <ChevronDown
+          className={`size-4 transition ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="ml-2 mt-1 space-y-1 border-l border-white/10 pl-2">
+          {group.children.map((item) => (
+            <SidebarItem
+              key={item.id}
+              item={item}
+              active={activeView === item.id}
+              collapsed={false}
+              onSelect={onSelect}
+              compact
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SidebarItem({
+  item,
+  active,
+  collapsed,
+  compact,
+  onSelect,
+}: {
+  item: NavItem;
+  active: boolean;
+  collapsed: boolean;
+  compact?: boolean;
+  onSelect: (view: ViewId) => void;
+}) {
+  const Icon = item.icon;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(item.id)}
+      className={`flex h-9 items-center gap-2 rounded-sm text-left text-sm font-medium transition ${
+        active ? "bg-[#b4cf9d] text-slate-800" : "text-white hover:bg-white/12"
+      } ${compact ? "text-xs" : ""} ${collapsed ? "w-9 justify-center px-0" : "w-full px-2"}`}
+      title={item.label}
+    >
+      {!collapsed && (
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      )}
+      {item.beta && !collapsed && (
+        <span className="rounded border border-violet-300 px-1 text-[9px] font-bold text-violet-100">
+          BETA
+        </span>
+      )}
+      <Icon className="size-4 shrink-0" />
+    </button>
+  );
+}
+
+export function Topbar({
+  business,
+  selectedDate,
+  searchTerm,
+  userName,
+  userEmail,
+  userImage,
+  openMenu,
+  onOpenMenu,
+  onBack,
+  onDateChange,
+  onSearchChange,
+  onSelectView,
+  onOpenModal,
+}: {
+  business: Business;
+  selectedDate: string;
+  searchTerm: string;
+  userName: string;
+  userEmail: string;
+  userImage?: string;
+  openMenu: "date" | "create" | "settings" | "profile" | null;
+  onOpenMenu: (menu: "date" | "create" | "settings" | "profile" | null) => void;
+  onBack: () => void;
+  onDateChange: (date: string) => void;
+  onSearchChange: (value: string) => void;
+  onSelectView: (view: ViewId) => void;
+  onOpenModal: (
+    modal: "theme" | "language" | "password" | "create" | "notifications",
+  ) => void;
+}) {
+  return (
+    <header className="z-20 h-16 shrink-0 border-b border-slate-300 bg-[#eef2f7] shadow-sm">
+      <div className="flex h-full items-center gap-3 px-3 md:px-6">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onBack}
+          className="h-8 bg-white"
+        >
+          <ChevronLeft className="size-4" />
+          Geri
+        </Button>
+
+        <div className="relative ml-auto">
+          <button
+            type="button"
+            onClick={() => onOpenMenu(openMenu === "date" ? null : "date")}
+            className="grid size-9 place-items-center rounded-md text-slate-600 hover:bg-white"
+            title="Takvim tarihi"
+          >
+            <CalendarDays className="size-5" />
+          </button>
+          {openMenu === "date" && (
+            <Dropdown className="w-64 p-3">
+              <Label className="text-xs text-slate-500">Takvim tarihi</Label>
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={(event) => onDateChange(event.target.value)}
+                className="mt-2"
+              />
+              <Button
+                type="button"
+                className="mt-3 w-full bg-[#5f86b6] text-white"
+                onClick={() => onSelectView("calendar")}
+              >
+                Takvimi aç
+              </Button>
+            </Dropdown>
+          )}
+        </div>
+
+        <div className="relative hidden min-w-[220px] max-w-[420px] flex-1 sm:block">
+          <Search className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-slate-300" />
+          <Input
+            value={searchTerm}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="Müşteri ara..."
+            className="h-9 rounded-none border-0 bg-white pr-10 shadow-none"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onOpenModal("notifications")}
+          className="grid size-9 place-items-center rounded-md text-slate-600 hover:bg-white"
+          title="Bildirimler"
+        >
+          <Bell className="size-5" />
+        </button>
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => onOpenMenu(openMenu === "create" ? null : "create")}
+            className="grid size-9 place-items-center rounded-md text-slate-600 hover:bg-white"
+            title="Yeni oluştur"
+          >
+            <Plus className="size-6" />
+          </button>
+          {openMenu === "create" && (
+            <Dropdown className="w-52 py-1">
+              {createItems.map((item) => (
+                <DropdownButton
+                  key={item.label}
+                  icon={item.icon}
+                  label={item.label}
+                  onClick={() => onOpenModal("create")}
+                />
+              ))}
+            </Dropdown>
+          )}
+        </div>
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() =>
+              onOpenMenu(openMenu === "settings" ? null : "settings")
+            }
+            className="grid size-9 place-items-center rounded-md text-slate-600 hover:bg-white"
+            title="Ayarlar"
+          >
+            <Settings className="size-5" />
+          </button>
+          {openMenu === "settings" && (
+            <Dropdown className="w-64 py-1">
+              <div className="bg-[#5f86b6] px-3 py-2 text-sm font-semibold text-white">
+                Kurulum
+              </div>
+              {setupItems.map((item) => (
+                <DropdownButton
+                  key={item.id}
+                  icon={item.icon}
+                  label={item.label}
+                  onClick={() => onSelectView(item.id)}
+                />
+              ))}
+            </Dropdown>
+          )}
+        </div>
+
+        <div className="relative ">
+          <button
+            type="button"
+            onClick={() =>
+              onOpenMenu(openMenu === "profile" ? null : "profile")
+            }
+            className="flex h-12 items-center gap-3 rounded-md px-2 text-left hover:bg-white"
+          >
+            {userImage ? (
+              <Image
+                src={userImage}
+                alt={userName}
+                width={38}
+                height={38}
+                className="rounded-full"
+              />
+            ) : (
+              <UserCircle className="size-10 text-slate-950" />
+            )}
+            <span className="hidden min-w-0 md:block">
+              <span className="block truncate text-sm font-semibold text-slate-600">
+                {business.slug || userName}
+              </span>
+              <span className="block truncate text-xs text-slate-400">
+                {userEmail}
+              </span>
+            </span>
+            <ChevronDown className="hidden size-4 text-slate-500 md:block" />
+          </button>
+          {openMenu === "profile" && (
+            <Dropdown className="right-0 w-64 py-1">
+              <DropdownButton
+                icon={ShoppingBag}
+                label="Üyelik"
+                onClick={() => onSelectView("subscription")}
+              />
+              <Link
+                href=""
+                target="_self"
+                rel="noreferrer"
+                className="flex h-9 items-center gap-3 px-3 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                <Eye className="size-4 text-[#5f86b6]" />
+                Sayfam nasıl görünüyor
+              </Link>
+              <DropdownButton
+                icon={Settings}
+                label="Tema ayarları"
+                onClick={() => onOpenModal("theme")}
+              />
+              <DropdownButton
+                icon={Languages}
+                label="Dil değiştir"
+                onClick={() => onOpenModal("language")}
+              />
+              <DropdownButton
+                icon={LockKeyhole}
+                label="Şifre değiştir"
+                onClick={() => onOpenModal("password")}
+              />
+              <DropdownButton
+                icon={FileText}
+                label="Faturalar"
+                onClick={() => onSelectView("invoice/list")}
+              />
+              <DropdownButton
+                icon={LogOut}
+                label="Çıkış"
+                onClick={() => signOut({ callbackUrl: "/" })}
+              />
+            </Dropdown>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
