@@ -65,6 +65,7 @@ import {
 } from "./shared";
 
 import { CustomerModal } from "./customers";
+import { CustomerPicker, CustomerSelection } from "./customer-picker";
 
 export function CheckoutsPage({
   business,
@@ -83,11 +84,26 @@ export function CheckoutsPage({
     null,
   );
   const [openActionMenu, setOpenActionMenu] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("Tümü");
+  const [dateFilter, setDateFilter] = useState("Bugün");
+  const [sortDesc, setSortDesc] = useState(true);
   const checkouts = business.checkouts || [];
+  const filteredCheckouts = filterByPeriod(
+    checkouts.filter((checkout) =>
+      statusFilter === "Tümü" ? true : checkout.status === statusFilter,
+    ),
+    dateFilter,
+    (checkout) => checkout.date,
+  ).sort((a, b) => {
+    const aValue = `${a.date}T${a.hour}:${a.minute}:00`;
+    const bValue = `${b.date}T${b.hour}:${b.minute}:00`;
+    return sortDesc ? bValue.localeCompare(aValue) : aValue.localeCompare(bValue);
+  });
 
   async function createCheckout(checkout: CheckoutItem) {
     setModal(null);
-    await onUpdateAndSave({ checkouts: [checkout, ...checkouts] });
+    onUpdateAndSave({ checkouts: [checkout, ...checkouts] });
+    syncCheckoutToGoogleCalendar(business, checkout);
   }
 
   async function createCustomer(customer: CustomerProfile) {
@@ -97,11 +113,28 @@ export function CheckoutsPage({
     setModal("checkout");
   }
 
+  async function updateCheckout(checkout: CheckoutItem) {
+    await onUpdateAndSave({
+      checkouts: checkouts.map((item) =>
+        item.id === checkout.id ? checkout : item,
+      ),
+    });
+  }
+
   if (selectedCheckout) {
     return (
       <CheckoutDetailsPage
         checkout={selectedCheckout}
         business={business}
+        saving={saving}
+        onSave={async (checkout) => {
+          const next = checkouts.map((item) =>
+            item.id === checkout.id ? checkout : item,
+          );
+          setSelectedCheckout(checkout);
+          await onUpdateAndSave({ checkouts: next });
+          syncCheckoutToGoogleCalendar(business, checkout);
+        }}
         onBack={() => setSelectedCheckout(null)}
       />
     );
@@ -122,18 +155,21 @@ export function CheckoutsPage({
           </h1>
           <div className="flex gap-3">
             <NativeSelect
-              value="Onaylı"
-              onChange={() => undefined}
+              value={statusFilter}
+              onChange={setStatusFilter}
               options={[
-                { value: "Onaylı", label: "Onaylı" },
+                { value: "Tümü", label: "Tümü" },
                 { value: "Açık", label: "Açık" },
+                { value: "Kapalı", label: "Kapalı" },
+                { value: "İptal", label: "İptal" },
               ]}
             />
             <NativeSelect
-              value="Bugün"
-              onChange={() => undefined}
+              value={dateFilter}
+              onChange={setDateFilter}
               options={[
                 { value: "Bugün", label: "Bugün" },
+                { value: "Bu ay", label: "Bu ay" },
                 { value: "Tümü", label: "Tümü" },
               ]}
             />
@@ -148,7 +184,11 @@ export function CheckoutsPage({
           </div>
         </div>
         <div className="mt-4 bg-slate-100 p-3">
-          <Button type="button" className="bg-[#5f86b6] text-white">
+          <Button
+            type="button"
+            className="bg-[#5f86b6] text-white"
+            onClick={() => setSortDesc((value) => !value)}
+          >
             Filtrele / Sırala
           </Button>
         </div>
@@ -171,29 +211,42 @@ export function CheckoutsPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {checkouts.map((checkout) => {
-                const service = (business.services || []).find(
-                  (item) => item.id === checkout.serviceId,
-                );
+              {filteredCheckouts.map((checkout) => {
+                const lines = getCheckoutLines(checkout);
+                const serviceNames = lines
+                  .map((line) => {
+                    const service = (business.services || []).find(
+                      (item) => item.id === line.serviceId,
+                    );
+                    return service?.name;
+                  })
+                  .filter(Boolean)
+                  .join(", ");
                 const total = Math.max(0, checkout.amount - checkout.discount);
+                const paid = (checkout.payments || []).reduce(
+                  (sum, payment) => sum + payment.amount,
+                  0,
+                );
                 return (
                   <tr key={checkout.id}>
                     <td className="px-3 py-3">{checkout.status}</td>
                     <td className="px-3 py-3 font-medium">
                       {checkout.customerName}
                     </td>
-                    <td className="px-3 py-3">{service?.name || "-"}</td>
+                    <td className="px-3 py-3">{serviceNames || "-"}</td>
                     <td className="px-3 py-3">
                       {formatInputDate(checkout.date)}
                     </td>
                     <td className="px-3 py-3">
                       {checkout.hour}:{checkout.minute}
                     </td>
-                    <td className="px-3 py-3">Geldi</td>
+                    <td className="px-3 py-3">
+                      {checkout.attendance || "Belirtilmemiş"}
+                    </td>
                     <td className="px-3 py-3">{checkout.amount} TL</td>
                     <td className="px-3 py-3">{checkout.discount} TL</td>
-                    <td className="px-3 py-3">0 TL</td>
-                    <td className="px-3 py-3">{total} TL</td>
+                    <td className="px-3 py-3">{paid} TL</td>
+                    <td className="px-3 py-3">{Math.max(0, total - paid)} TL</td>
                     <td className="px-3 py-3">
                       {formatLastUpdate(checkout.createdAt)}
                     </td>
@@ -226,14 +279,20 @@ export function CheckoutsPage({
                           <button
                             type="button"
                             className="block w-full px-3 py-2 text-left hover:bg-slate-50"
-                            onClick={() => setOpenActionMenu(null)}
+                            onClick={() => {
+                              updateCheckout({ ...checkout, status: "Kapalı" });
+                              setOpenActionMenu(null);
+                            }}
                           >
                             Tahsilatsız kapat
                           </button>
                           <button
                             type="button"
                             className="block w-full px-3 py-2 text-left text-red-600 hover:bg-slate-50"
-                            onClick={() => setOpenActionMenu(null)}
+                            onClick={() => {
+                              updateCheckout({ ...checkout, status: "İptal" });
+                              setOpenActionMenu(null);
+                            }}
                           >
                             İptal et
                           </button>
@@ -243,7 +302,7 @@ export function CheckoutsPage({
                   </tr>
                 );
               })}
-              {checkouts.length === 0 && (
+              {filteredCheckouts.length === 0 && (
                 <tr>
                   <td
                     colSpan={12}
@@ -257,7 +316,7 @@ export function CheckoutsPage({
           </table>
         </div>
         <div className="mt-3 bg-slate-100 px-3 py-2 text-sm font-semibold">
-          Toplam kayıt sayısı: {checkouts.length}
+          Toplam kayıt sayısı: {filteredCheckouts.length}
         </div>
       </section>
       {modal === "checkout" && (
@@ -309,7 +368,7 @@ export function CheckoutModal({
   const staff = business.staff || [];
   const services = business.services || [];
   const [customerName, setCustomerName] = useState(initialCustomerName || "");
-  const [customerOpen, setCustomerOpen] = useState(false);
+  const [customerId, setCustomerId] = useState<string | undefined>();
   const [date, setDate] = useState(
     initialDate || now.toISOString().slice(0, 10),
   );
@@ -318,6 +377,8 @@ export function CheckoutModal({
     String(now.getMinutes()).padStart(2, "0"),
   );
   const [notes, setNotes] = useState("");
+  const [discountEnabled, setDiscountEnabled] = useState(false);
+  const [discountText, setDiscountText] = useState("0");
   const [lines, setLines] = useState<
     Array<{
       id: string;
@@ -335,13 +396,10 @@ export function CheckoutModal({
       amountText: "",
     },
   ]);
-  const customerMatches = customers
-    .filter((customer) =>
-      customer.name
-        .toLocaleLowerCase("tr-TR")
-        .startsWith(customerName.toLocaleLowerCase("tr-TR")),
-    )
-    .slice(0, 5);
+  function selectCustomer(selection: CustomerSelection) {
+    setCustomerName(selection.name);
+    setCustomerId(selection.id?.startsWith("contact:") ? undefined : selection.id);
+  }
   const completedLines = lines
     .map((line) => {
       const member = staff.find((item) => item.id === line.staffId);
@@ -358,6 +416,9 @@ export function CheckoutModal({
   const totalAmount = completedLines.reduce((sum, line) => {
     return sum + line.amount;
   }, 0);
+  const discountAmount = discountEnabled
+    ? Math.min(totalAmount, parseLooseNumber(discountText))
+    : 0;
   const firstCompleted = completedLines[0];
   const updateLine = (
     id: string,
@@ -407,41 +468,18 @@ export function CheckoutModal({
       <section className="mx-auto mt-4 w-full max-w-3xl rounded bg-white shadow-xl">
         <ModalHeader title="Yeni" onClose={onClose} />
         <div className="max-h-[78vh] space-y-3 overflow-y-auto p-5">
-          <div className="relative">
-            <Input
-              value={customerName}
-              onFocus={() => setCustomerOpen(true)}
-              onChange={(event) => {
-                setCustomerName(event.target.value);
-                setCustomerOpen(true);
-              }}
-              placeholder="Müşteri"
-            />
-            {customerOpen && customerName && (
-              <div className="absolute z-10 mt-1 w-full rounded border border-slate-200 bg-white shadow">
-                {customerMatches.map((customer) => (
-                  <button
-                    key={customer.id}
-                    type="button"
-                    onClick={() => {
-                      setCustomerName(customer.name);
-                      setCustomerOpen(false);
-                    }}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
-                  >
-                    {customer.name}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => onCreateCustomer(customerName)}
-                  className="block w-full px-3 py-2 text-left text-sm font-semibold text-[#24a647] hover:bg-slate-50"
-                >
-                  + Yeni müşteri olarak ekle
-                </button>
-              </div>
-            )}
-          </div>
+          <CustomerPicker
+            value={customerName}
+            selectedId={customerId}
+            customers={customers}
+            contacts={contacts}
+            onTextChange={(value) => {
+              setCustomerName(value);
+              setCustomerId(undefined);
+            }}
+            onSelect={selectCustomer}
+            onCreateCustomer={onCreateCustomer}
+          />
           <div className="grid gap-3 md:grid-cols-[1fr_120px_120px]">
             <Input
               type="date"
@@ -620,9 +658,23 @@ export function CheckoutModal({
           <ToggleRow
             label="İndirim"
             description="Bu adisyon için indirim uygula."
-            checked={false}
-            onChange={() => undefined}
+            checked={discountEnabled}
+            onChange={setDiscountEnabled}
           />
+          {discountEnabled && (
+            <div className="inline-flex w-48 rounded border border-slate-300">
+              <Input
+                value={discountText}
+                inputMode="decimal"
+                onChange={(event) => setDiscountText(event.target.value)}
+                className="rounded-r-none border-0"
+                aria-label="İndirim tutarı"
+              />
+              <span className="border-l border-slate-300 bg-slate-100 px-3 py-2">
+                TL
+              </span>
+            </div>
+          )}
           <Button
             type="button"
             disabled={saving || !customerName.trim() || !firstCompleted}
@@ -630,6 +682,7 @@ export function CheckoutModal({
               if (!firstCompleted) return;
               onSubmit({
                 id: crypto.randomUUID(),
+                customerId,
                 customerName,
                 date,
                 hour,
@@ -637,12 +690,21 @@ export function CheckoutModal({
                 notes,
                 staffId: firstCompleted.staffId,
                 serviceId: firstCompleted.serviceId,
+                lines: completedLines.map((line) => ({
+                  id: line.id,
+                  staffId: line.staffId,
+                  serviceId: line.serviceId,
+                  duration: line.duration,
+                  amount: line.amount,
+                })),
                 duration: completedLines.reduce(
                   (sum, line) => sum + line.duration,
                   0,
                 ),
                 amount: totalAmount,
-                discount: 0,
+                discount: discountAmount,
+                attendance: "Belirtilmemiş",
+                payments: [],
                 status: "Açık",
                 createdAt: new Date().toISOString(),
               });
@@ -660,18 +722,22 @@ export function CheckoutModal({
 function CheckoutDetailsPage({
   checkout,
   business,
+  saving,
+  onSave,
   onBack,
 }: {
   checkout: CheckoutItem;
   business: Business;
+  saving: boolean;
+  onSave: (checkout: CheckoutItem) => Promise<void>;
   onBack: () => void;
 }) {
-  const service = (business.services || []).find(
-    (item) => item.id === checkout.serviceId,
-  );
-  const staff = (business.staff || []).find(
-    (item) => item.id === checkout.staffId,
-  );
+  const [form, setForm] = useState<CheckoutItem>(checkout);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const lines = getCheckoutLines(form);
+  const payments = form.payments || [];
+  const paid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const total = Math.max(0, form.amount - form.discount);
   return (
     <div className="space-y-4">
       <Breadcrumb
@@ -686,8 +752,13 @@ function CheckoutDetailsPage({
           <Button type="button" variant="outline">
             Yazdır
           </Button>
-          <Button type="button" className="bg-[#24a647] text-white">
-            Değişiklikleri kaydet
+          <Button
+            type="button"
+            disabled={saving}
+            onClick={() => onSave(form)}
+            className="bg-[#24a647] text-white"
+          >
+            {saving ? "Kaydediliyor..." : "Değişiklikleri kaydet"}
           </Button>
           <Button type="button" variant="outline" onClick={onBack}>
             Listeye dön
@@ -698,58 +769,205 @@ function CheckoutDetailsPage({
         <div className="space-y-4">
           <section className="rounded bg-white p-4 shadow-sm">
             <div className="font-semibold text-blue-700">
-              {checkout.customerName}
+              {form.customerName}
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-[1fr_120px_120px]">
-              <Input value={formatInputDate(checkout.date)} readOnly />
-              <NativeSelect
-                value={checkout.hour}
-                onChange={() => undefined}
-                options={[{ value: checkout.hour, label: checkout.hour }]}
+              <Input
+                type="date"
+                value={form.date}
+                onChange={(event) => setForm({ ...form, date: event.target.value })}
               />
               <NativeSelect
-                value={checkout.minute}
-                onChange={() => undefined}
-                options={[{ value: checkout.minute, label: checkout.minute }]}
+                value={form.hour}
+                onChange={(hour) => setForm({ ...form, hour })}
+                options={Array.from({ length: 24 }, (_, h) => ({
+                  value: String(h).padStart(2, "0"),
+                  label: String(h).padStart(2, "0"),
+                }))}
+              />
+              <NativeSelect
+                value={form.minute}
+                onChange={(minute) => setForm({ ...form, minute })}
+                options={["00", "15", "30", "45"].map((minute) => ({
+                  value: minute,
+                  label: minute,
+                }))}
               />
             </div>
-            <Input value={checkout.notes || ""} readOnly className="mt-3" />
+            <Input
+              value={form.notes || ""}
+              onChange={(event) => setForm({ ...form, notes: event.target.value })}
+              className="mt-3"
+            />
             <div className="mt-3 grid grid-cols-3 overflow-hidden rounded text-sm text-white">
-              <button className="bg-slate-600 px-3 py-2">Belirtilmemiş</button>
-              <button className="bg-slate-700 px-3 py-2">Geldi</button>
-              <button className="bg-slate-600 px-3 py-2">Gelmedi</button>
+              {(["Belirtilmemiş", "Geldi", "Gelmedi"] as const).map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => setForm({ ...form, attendance: status })}
+                  className={`px-3 py-2 ${
+                    (form.attendance || "Belirtilmemiş") === status
+                      ? "bg-slate-800"
+                      : "bg-slate-600"
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
             </div>
           </section>
           <section className="rounded bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">Hizmetler</h2>
-              <Button type="button" className="bg-[#24a647] text-white">
+              <Button
+                type="button"
+                className="bg-[#24a647] text-white"
+                onClick={() =>
+                  setForm((prev) => {
+                    const firstStaff = business.staff?.[0]?.id || "";
+                    const firstService = business.services?.find((service) =>
+                      firstStaff ? service.staffIds.includes(firstStaff) : true,
+                    );
+                    const nextLines = [
+                      ...getCheckoutLines(prev),
+                      {
+                        id: crypto.randomUUID(),
+                        staffId: firstStaff,
+                        serviceId: firstService?.id || "",
+                        duration: firstService?.duration || 0,
+                        amount:
+                          firstService?.priceType === "range"
+                            ? firstService.minPrice || 0
+                            : firstService?.price || 0,
+                      },
+                    ];
+                    return {
+                      ...prev,
+                      lines: nextLines,
+                      staffId: nextLines[0]?.staffId || prev.staffId,
+                      serviceId: nextLines[0]?.serviceId || prev.serviceId,
+                      duration: nextLines.reduce(
+                        (sum, item) => sum + item.duration,
+                        0,
+                      ),
+                      amount: nextLines.reduce(
+                        (sum, item) => sum + item.amount,
+                        0,
+                      ),
+                    };
+                  })
+                }
+              >
                 <Plus className="size-4" />
                 Yeni hizmet
               </Button>
             </div>
-            <div className="mt-3 rounded border-l-4 border-[#5f86b6] bg-white p-4 shadow-sm">
-              <div className="font-semibold">{service?.name || "Hizmet"}</div>
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <label className="grid gap-1 text-xs text-slate-500">
-                  Personel
-                  <NativeSelect
-                    value={checkout.staffId}
-                    onChange={() => undefined}
-                    options={[
-                      { value: checkout.staffId, label: staff?.name || "-" },
-                    ]}
-                  />
-                </label>
-                <label className="grid gap-1 text-xs text-slate-500">
-                  Süre
-                  <Input value={checkout.duration} readOnly />
-                </label>
-                <label className="grid gap-1 text-xs text-slate-500">
-                  Fiyat
-                  <Input value={checkout.amount} readOnly />
-                </label>
-              </div>
+            <div className="mt-3 grid gap-3">
+              {lines.map((line) => {
+                const service = (business.services || []).find(
+                  (item) => item.id === line.serviceId,
+                );
+                const staff = (business.staff || []).find(
+                  (item) => item.id === line.staffId,
+                );
+                return (
+                  <div
+                    key={line.id}
+                    className="rounded border-l-4 border-[#5f86b6] bg-white p-4 shadow-sm"
+                  >
+                    <div className="font-semibold">
+                      {service?.name || "Hizmet"}
+                    </div>
+                    <div className="mt-3 grid gap-3 md:grid-cols-3">
+                      <label className="grid gap-1 text-xs text-slate-500">
+                        Personel
+                        <NativeSelect
+                          value={line.staffId}
+                          onChange={(staffId) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              lines: getCheckoutLines(prev).map((item) =>
+                                item.id === line.id
+                                  ? { ...item, staffId }
+                                  : item,
+                              ),
+                            }))
+                          }
+                          options={(business.staff || []).map((member) => ({
+                            value: member.id,
+                            label: member.name,
+                          }))}
+                        />
+                      </label>
+                      <label className="grid gap-1 text-xs text-slate-500">
+                        Süre
+                        <Input
+                          value={String(line.duration)}
+                          inputMode="decimal"
+                          onChange={(event) =>
+                            setForm((prev) => {
+                              const nextLines = getCheckoutLines(prev).map(
+                                (item) =>
+                                  item.id === line.id
+                                    ? {
+                                        ...item,
+                                        duration: parseLooseNumber(
+                                          event.target.value,
+                                        ),
+                                      }
+                                    : item,
+                              );
+                              return {
+                                ...prev,
+                                lines: nextLines,
+                                duration: nextLines.reduce(
+                                  (sum, item) => sum + item.duration,
+                                  0,
+                                ),
+                              };
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="grid gap-1 text-xs text-slate-500">
+                        Fiyat
+                        <Input
+                          value={String(line.amount)}
+                          inputMode="decimal"
+                          onChange={(event) =>
+                            setForm((prev) => {
+                              const nextLines = getCheckoutLines(prev).map(
+                                (item) =>
+                                  item.id === line.id
+                                    ? {
+                                        ...item,
+                                        amount: parseLooseNumber(
+                                          event.target.value,
+                                        ),
+                                      }
+                                    : item,
+                              );
+                              return {
+                                ...prev,
+                                lines: nextLines,
+                                amount: nextLines.reduce(
+                                  (sum, item) => sum + item.amount,
+                                  0,
+                                ),
+                              };
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+                    {staff && (
+                      <div className="mt-2 text-xs text-slate-500">
+                        {staff.name}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </section>
           {["Ürün satışları", "Randevu Etiketleri", "Randevu fotoğrafları"].map(
@@ -767,28 +985,168 @@ function CheckoutDetailsPage({
           <h2 className="text-2xl font-semibold text-slate-700">Ödeme</h2>
           <InfoCard
             label="Hizmet ve ürünler toplamı"
-            value={`${checkout.amount} TL`}
+            value={`${form.amount} TL`}
           />
-          <InfoCard label="İndirim" value={`${checkout.discount} TL`} />
+          <section className="rounded bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between text-sm font-semibold">
+              <span>İndirim</span>
+              <span>{form.discount || 0} TL</span>
+            </div>
+            <Input
+              value={String(form.discount || 0)}
+              inputMode="decimal"
+              onChange={(event) =>
+                setForm({ ...form, discount: parseLooseNumber(event.target.value) })
+              }
+              className="mt-3"
+            />
+          </section>
           <section className="rounded bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between font-semibold">
               Tahsilatlar
-              <Button type="button" className="bg-[#5f86b6] text-white">
+              <Button
+                type="button"
+                onClick={() => setPaymentOpen(true)}
+                className="bg-[#5f86b6] text-white"
+              >
                 <Plus className="size-4" />
                 Yeni tahsilat
               </Button>
             </div>
-            <p className="mt-3 text-sm text-slate-500">
-              Kayıtlı tahsilat bulunmamaktadır
-            </p>
+            <div className="mt-3 divide-y divide-slate-100 text-sm">
+              {payments.map((payment) => (
+                <div
+                  key={payment.id}
+                  className="grid grid-cols-[1fr_1fr_auto] gap-2 py-2"
+                >
+                  <span>{formatInputDate(payment.date)}</span>
+                  <span>{payment.method}</span>
+                  <span>{payment.amount} TL</span>
+                </div>
+              ))}
+              {payments.length === 0 && (
+                <p className="py-3 text-slate-500">
+                  Kayıtlı tahsilat bulunmamaktadır
+                </p>
+              )}
+            </div>
+            <div className="mt-3 border-t border-slate-200 pt-2 text-sm">
+              <div className="flex justify-between">
+                <span>Tahsil edilen toplam tutar</span>
+                <span>{paid} TL</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tahsil edilecek kalan tutar</span>
+                <span>{Math.max(0, total - paid)} TL</span>
+              </div>
+            </div>
           </section>
-          <Button type="button" className="w-full bg-[#24a647] text-white">
-            Değişiklikleri kaydet
+          <Button
+            type="button"
+            disabled={saving}
+            onClick={() => onSave(form)}
+            className="w-full bg-[#24a647] text-white"
+          >
+            {saving ? "Kaydediliyor..." : "Değişiklikleri kaydet"}
           </Button>
         </aside>
       </div>
+      {paymentOpen && (
+        <PaymentModal
+          maxAmount={Math.max(0, total - paid)}
+          onClose={() => setPaymentOpen(false)}
+          onSubmit={(payment) => {
+            setForm((prev) => ({
+              ...prev,
+              payments: [payment, ...(prev.payments || [])],
+            }));
+            setPaymentOpen(false);
+          }}
+        />
+      )}
     </div>
   );
+}
+
+function PaymentModal({
+  maxAmount,
+  onClose,
+  onSubmit,
+}: {
+  maxAmount: number;
+  onClose: () => void;
+  onSubmit: (payment: NonNullable<CheckoutItem["payments"]>[number]) => void;
+}) {
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [amount, setAmount] = useState(String(maxAmount || ""));
+  const [method, setMethod] = useState("");
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-start bg-slate-950/35 p-6">
+      <section className="mx-auto mt-4 w-full max-w-md rounded bg-white shadow-xl">
+        <ModalHeader title="Yeni tahsilat" onClose={onClose} />
+        <div className="grid gap-3 p-4">
+          <Input
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+          />
+          <div className="inline-flex rounded border border-slate-300">
+            <Input
+              value={amount}
+              inputMode="decimal"
+              onChange={(event) => setAmount(event.target.value)}
+              className="rounded-r-none border-0"
+            />
+            <span className="border-l border-slate-300 bg-slate-100 px-3 py-2">
+              TL
+            </span>
+          </div>
+          <NativeSelect
+            value={method}
+            onChange={setMethod}
+            options={[
+              { value: "", label: "Ödeme yöntemi" },
+              { value: "Nakit", label: "Nakit" },
+              { value: "Kredi kartı", label: "Kredi kartı" },
+              { value: "Havale", label: "Havale" },
+              { value: "Online ödeme", label: "Online ödeme" },
+              { value: "Diğer", label: "Diğer" },
+            ]}
+          />
+          <Button
+            type="button"
+            disabled={!method || parseLooseNumber(amount) <= 0}
+            onClick={() =>
+              onSubmit({
+                id: crypto.randomUUID(),
+                date,
+                amount: parseLooseNumber(amount),
+                method,
+              })
+            }
+            className="bg-[#5f86b6] text-white"
+          >
+            Kaydet
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function filterByPeriod<T>(rows: T[], period: string, getDate: (item: T) => string) {
+  if (period === "Tümü") return [...rows];
+  const today = new Date();
+  const todayKey = today.toISOString().slice(0, 10);
+  if (period === "Bugün") {
+    return rows.filter((item) => getDate(item) === todayKey);
+  }
+  if (period === "Bu ay") {
+    const monthKey = todayKey.slice(0, 7);
+    return rows.filter((item) => getDate(item).startsWith(monthKey));
+  }
+  return [...rows];
 }
 
 function InfoCard({ label, value }: { label: string; value: string }) {
@@ -798,4 +1156,52 @@ function InfoCard({ label, value }: { label: string; value: string }) {
       <span className="text-slate-700">{value}</span>
     </div>
   );
+}
+
+function getCheckoutLines(checkout: CheckoutItem) {
+  if (checkout.lines && checkout.lines.length > 0) {
+    return checkout.lines;
+  }
+  return [
+    {
+      id: `${checkout.id}-line`,
+      staffId: checkout.staffId,
+      serviceId: checkout.serviceId,
+      duration: checkout.duration,
+      amount: checkout.amount,
+    },
+  ];
+}
+
+function syncCheckoutToGoogleCalendar(business: Business, checkout: CheckoutItem) {
+  if (!business.calendarId) return;
+  const lines = getCheckoutLines(checkout);
+  for (const line of lines) {
+    const service = (business.services || []).find(
+      (item) => item.id === line.serviceId,
+    );
+    const staff = (business.staff || []).find((item) => item.id === line.staffId);
+    const start = new Date(
+      `${checkout.date}T${checkout.hour}:${checkout.minute}:00+03:00`,
+    );
+    const end = new Date(start.getTime() + line.duration * 60 * 1000);
+    fetch(`/api/calendar/events?businessId=${encodeURIComponent(business.id)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        summary: `${checkout.customerName} - ${service?.name || "Hizmet"}`,
+        description: [
+          checkout.notes,
+          staff ? `Personel: ${staff.name}` : null,
+          `Adisyon: ${checkout.id}`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        start: start.toISOString(),
+        end: end.toISOString(),
+        checkoutId: checkout.id,
+        lineId: line.id,
+      }),
+    }).catch(() => undefined);
+  }
 }

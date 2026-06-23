@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Bell,
   CalendarDays,
@@ -10,6 +10,7 @@ import {
   MessageCircle,
   Pencil,
   Plus,
+  RefreshCw,
   Search,
   Settings,
   X,
@@ -92,8 +93,35 @@ export function CalendarPage({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [selectedStaffId, setSelectedStaffId] = useState("all");
+  const [googleAppointments, setGoogleAppointments] = useState<Appointment[]>([]);
+  const [googleSyncing, setGoogleSyncing] = useState(false);
+  const [googleSyncMessage, setGoogleSyncMessage] = useState("");
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const calendarScrollRef = useRef<HTMLDivElement | null>(null);
   const staff = business.staff || [];
-  const dayAppointments = appointments.filter(
+  const calendarSettings = business.bookingSettings || {};
+  const calendarView = normalizeCalendarView(calendarSettings.calendarView);
+  const calendarWidth = Number(calendarSettings.calendarWidth || "100");
+  const slotInterval = Number(
+    String(calendarSettings.calendarSlotInterval || "60 Dakika").match(/\d+/)?.[0] ||
+      "60",
+  );
+  const calendarTextClass =
+    calendarSettings.calendarTextColor === "Açık"
+      ? "text-white"
+      : calendarSettings.calendarTextColor === "Koyu"
+        ? "text-slate-950"
+        : "text-slate-800";
+  const weekStart = getWeekStart(selectedDate);
+  const visibleDates =
+    calendarView === "Haftalık görünüm"
+      ? Array.from({ length: 7 }, (_, index) => addDays(weekStart, index))
+      : [selectedDate];
+  const monthDates = getMonthGridDates(selectedDate);
+  const today = formatDateInIstanbul(new Date());
+  const currentTime = formatTimeInIstanbul(new Date());
+  const visibleAppointments = [...appointments, ...googleAppointments];
+  const dayAppointments = visibleAppointments.filter(
     (appointment) =>
       appointment.date === selectedDate &&
       (selectedStaffId === "all" ||
@@ -104,11 +132,61 @@ export function CalendarPage({
   const dayCheckouts = checkouts.filter(
     (checkout) =>
       checkout.date === selectedDate &&
-      (selectedStaffId === "all" || checkout.staffId === selectedStaffId),
+      (selectedStaffId === "all" ||
+        getCheckoutStaffIds(checkout).includes(selectedStaffId)),
   );
+
+  useEffect(() => {
+    if (!calendarId) {
+      setGoogleAppointments([]);
+      setGoogleSyncMessage("");
+      return;
+    }
+    setGoogleSyncing(true);
+    const start = new Date(`${selectedDate}T00:00:00+03:00`);
+    start.setDate(start.getDate() - 7);
+    const end = new Date(`${selectedDate}T23:59:59+03:00`);
+    end.setDate(end.getDate() + 14);
+    fetch(
+      `/api/calendar/events?from=${encodeURIComponent(
+        start.toISOString(),
+      )}&to=${encodeURIComponent(
+        end.toISOString(),
+      )}&businessId=${encodeURIComponent(business.id)}`,
+    )
+      .then((res) => (res.ok ? res.json() : { events: [] }))
+      .then((data) => {
+        const events = data.events || [];
+        setGoogleAppointments(
+          events.map((event: any) => {
+            const startValue = event.start?.dateTime || event.start?.date;
+            const startDate = new Date(startValue);
+            return {
+              id: `google-${event.id}`,
+              customerName: event.summary || "Google Takvim",
+              phone: "",
+              date: formatDateInIstanbul(startDate),
+              time: formatTimeInIstanbul(startDate),
+              description: event.description || "Google Calendar",
+              status: "GOOGLE",
+              createdAt: event.created || new Date().toISOString(),
+            };
+          }),
+        );
+        setGoogleSyncMessage(
+          `Google Takvim senkronize edildi (${events.length} etkinlik).`,
+        );
+      })
+      .catch(() => {
+        setGoogleAppointments([]);
+        setGoogleSyncMessage("Google Takvim senkronizasyonu başarısız.");
+      })
+      .finally(() => setGoogleSyncing(false));
+  }, [calendarId, selectedDate, refreshNonce]);
   async function createCheckout(checkout: CheckoutItem) {
     setModal(null);
-    await onUpdateAndSave({ checkouts: [checkout, ...checkouts] });
+    onUpdateAndSave({ checkouts: [checkout, ...checkouts] });
+    syncCheckoutToGoogleCalendar(business, checkout);
   }
   async function createCustomer(customer: CustomerProfile) {
     await onUpdateAndSave({
@@ -116,12 +194,36 @@ export function CalendarPage({
     });
     setModal("checkout");
   }
-  const hours = Array.from({ length: 24 }, (_, hour) => hour);
+  const slots = Array.from(
+    { length: Math.ceil((24 * 60) / slotInterval) },
+    (_, index) => {
+      const totalMinutes = index * slotInterval;
+      const hour = Math.floor(totalMinutes / 60);
+      const minute = totalMinutes % 60;
+      return {
+        hour,
+        minute,
+        label: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+      };
+    },
+  );
   const shiftDate = (days: number) => {
     const date = new Date(`${selectedDate}T12:00:00`);
     date.setDate(date.getDate() + days);
     onDateChange(date.toISOString().slice(0, 10));
   };
+
+  useEffect(() => {
+    const container = calendarScrollRef.current;
+    if (!container || calendarView === "Aylık görünüm") return;
+    if (!visibleDates.includes(today)) return;
+    window.setTimeout(() => {
+      const currentRow = container.querySelector<HTMLElement>(
+        "[data-current-time-slot='true']",
+      );
+      currentRow?.scrollIntoView({ block: "center" });
+    }, 50);
+  }, [calendarView, selectedDate, slotInterval, today, visibleDates.join("|")]);
   return (
     <div className="space-y-3">
       <Breadcrumb
@@ -190,8 +292,22 @@ export function CalendarPage({
               <Settings className="size-4" />
             </Button>
             <span className="rounded border border-slate-200 px-3 py-1.5 text-xs text-slate-500">
-              {calendarId || "Google Takvim bağlı değil"}
+              {calendarId
+                ? `Google Takvim bağlı: ${calendarId}`
+                : "Google Takvim bağlı değil"}
             </span>
+            {calendarId && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                disabled={googleSyncing}
+                onClick={() => setRefreshNonce((value) => value + 1)}
+                title="Google Takvim'i yenile"
+              >
+                <RefreshCw className="size-4" />
+              </Button>
+            )}
             <Button
               type="button"
               className="bg-[#24a647] text-white"
@@ -202,72 +318,223 @@ export function CalendarPage({
             </Button>
           </div>
         </div>
-        <div className="max-h-[calc(100vh-180px)] overflow-auto">
-          <div className="grid min-w-[860px] grid-cols-[64px_1fr]">
-            <div className="border-r border-slate-200 bg-slate-50" />
-            <div className="sticky top-0 z-10 border-b border-slate-200 bg-[#e8f4e3] px-4 py-2 text-center text-xs font-semibold text-green-800">
-              {calendarId || "Takvim"}
-            </div>
-            {hours.map((hour) => (
-              <div key={hour} className="contents">
-                <div className="border-r border-b border-slate-200 bg-slate-50 px-2 py-2 text-right text-xs text-slate-500">
-                  {String(hour).padStart(2, "0")}:00
-                </div>
-                <div className="relative min-h-[56px] border-b border-slate-200 bg-[#fffde9]">
-                  {dayAppointments
-                    .filter(
-                      (appointment) =>
-                        Number(appointment.time.slice(0, 2)) === hour,
-                    )
-                    .map((appointment) => (
-                      <div
-                        key={appointment.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => onSelectView("booking/list")}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            onSelectView("booking/list");
-                          }
-                        }}
-                        className="absolute left-2 right-2 top-2 rounded border-l-4 border-[#5f86b6] bg-white px-3 py-2 text-xs shadow-sm"
-                      >
-                        <div className="font-semibold">
-                          {appointment.time} - {appointment.customerName}
-                        </div>
-                        <div className="truncate text-slate-500">
-                          {appointment.description || appointment.status}
-                        </div>
-                      </div>
-                    ))}
-                  {dayCheckouts
-                    .filter((checkout) => Number(checkout.hour) === hour)
-                    .map((checkout) => (
-                      <div
-                        key={checkout.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => onSelectView("visit/list")}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            onSelectView("visit/list");
-                          }
-                        }}
-                        className="absolute left-2 right-2 top-2 rounded border-l-4 border-[#24a647] bg-white px-3 py-2 text-xs shadow-sm"
-                      >
-                        <div className="font-semibold">
-                          {checkout.hour}:{checkout.minute} -{" "}
-                          {checkout.customerName}
-                        </div>
-                        <div className="truncate text-slate-500">
-                          {checkout.notes || checkout.status}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            ))}
+        {googleSyncMessage && (
+          <div className="border-b border-slate-200 bg-emerald-50 px-4 py-2 text-xs font-medium text-emerald-700">
+            {googleSyncMessage}
           </div>
+        )}
+        <div ref={calendarScrollRef} className="max-h-[calc(100vh-180px)] overflow-auto">
+          {calendarView === "Aylık görünüm" ? (
+            <div
+              className="grid"
+              style={{
+                minWidth: Math.round(1120 * (calendarWidth / 100)),
+                gridTemplateColumns: "repeat(7, minmax(150px, 1fr))",
+              }}
+            >
+              {["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((day) => (
+                <div
+                  key={day}
+                  className="border-b border-r border-slate-200 bg-slate-50 px-3 py-2 text-center text-xs font-semibold text-slate-600"
+                >
+                  {day}
+                </div>
+              ))}
+              {monthDates.map((date) => {
+                const dateAppointments = visibleAppointments.filter(
+                  (appointment) =>
+                    appointment.date === date &&
+                    (selectedStaffId === "all" ||
+                      (appointment as Appointment & { staffId?: string }).staffId ===
+                        selectedStaffId),
+                );
+                const dateCheckouts = checkouts.filter(
+                  (checkout) =>
+                    checkout.date === date &&
+                    (selectedStaffId === "all" ||
+                      getCheckoutStaffIds(checkout).includes(selectedStaffId)),
+                );
+                const inSelectedMonth = date.slice(0, 7) === selectedDate.slice(0, 7);
+                const isToday = date === today;
+                return (
+                  <div
+                    key={date}
+                    className={[
+                      "min-h-[118px] border-b border-r border-slate-200 p-1.5",
+                      isToday ? "bg-[#f4efcf]" : "bg-white",
+                      !inSelectedMonth ? "text-slate-300" : "text-slate-700",
+                    ].join(" ")}
+                  >
+                    <div className="mb-1 text-right text-xs font-medium">
+                      {Number(date.slice(-2))}
+                    </div>
+                    {dateAppointments.map((appointment) => (
+                      <button
+                        key={appointment.id}
+                        type="button"
+                        onClick={() => onSelectView("booking/list")}
+                        className="mb-1 block w-full truncate rounded bg-[#5f86b6] px-1.5 py-0.5 text-left text-[11px] font-medium text-white"
+                      >
+                        {appointment.time} {appointment.customerName}
+                      </button>
+                    ))}
+                    {dateCheckouts.map((checkout) => (
+                      <button
+                        key={checkout.id}
+                        type="button"
+                        onClick={() => onSelectView("visit/list")}
+                        className="mb-1 block w-full truncate rounded bg-[#24a647] px-1.5 py-0.5 text-left text-[11px] font-medium text-white"
+                      >
+                        {checkout.hour}:{checkout.minute} {checkout.customerName}{" "}
+                        {getCheckoutServiceSummary(business, checkout)}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div
+              className="grid"
+              style={{
+                minWidth: Math.round(
+                  (calendarView === "Haftalık görünüm" ? 1240 : 860) *
+                    (calendarWidth / 100),
+                ),
+                gridTemplateColumns:
+                  "64px repeat(" + visibleDates.length + ", minmax(160px, 1fr))",
+              }}
+            >
+              <div className="border-r border-slate-200 bg-slate-50" />
+              {visibleDates.map((date) => (
+                <div
+                  key={date}
+                  className={[
+                    "sticky top-0 z-10 border-b border-r border-slate-200 px-4 py-2 text-center text-xs font-semibold",
+                    date === today
+                      ? "bg-[#f4efcf] text-slate-800"
+                      : "bg-[#e8f4e3] text-green-800",
+                  ].join(" ")}
+                >
+                  <div>{formatDateLong(date)}</div>
+                  <div className="font-normal">{calendarId || "Takvim"}</div>
+                </div>
+              ))}
+              {slots.map((slot) => {
+                const isCurrentSlot = isInSlot(
+                  currentTime,
+                  slot.hour,
+                  slot.minute,
+                  slotInterval,
+                );
+                return (
+                  <div
+                    key={slot.label}
+                    className="contents"
+                    data-current-time-slot={isCurrentSlot ? "true" : undefined}
+                  >
+                    <div
+                      className={[
+                        "border-r border-b border-slate-200 px-2 py-2 text-right text-xs text-slate-500",
+                        isCurrentSlot ? "bg-[#f4efcf] font-semibold" : "bg-slate-50",
+                      ].join(" ")}
+                    >
+                      {slot.label}
+                    </div>
+                    {visibleDates.map((date) => {
+                      const slotAppointments = visibleAppointments.filter(
+                        (appointment) =>
+                          appointment.date === date &&
+                          isInSlot(
+                            appointment.time,
+                            slot.hour,
+                            slot.minute,
+                            slotInterval,
+                          ) &&
+                          (selectedStaffId === "all" ||
+                            (appointment as Appointment & { staffId?: string })
+                              .staffId === selectedStaffId),
+                      );
+                      const slotCheckouts = checkouts.filter(
+                        (checkout) =>
+                          checkout.date === date &&
+                          isInSlot(
+                            checkout.hour + ":" + checkout.minute,
+                            slot.hour,
+                            slot.minute,
+                            slotInterval,
+                          ) &&
+                          (selectedStaffId === "all" ||
+                            getCheckoutStaffIds(checkout).includes(selectedStaffId)),
+                      );
+                      return (
+                        <div
+                          key={date + "-" + slot.label}
+                          className={[
+                            "min-h-[64px] border-b border-r border-slate-200 py-1",
+                            date === today
+                              ? isCurrentSlot
+                                ? "bg-[#f7efc0]"
+                                : "bg-[#fff8d8]"
+                              : "bg-[#fffde9]",
+                          ].join(" ")}
+                        >
+                          {slotAppointments.map((appointment) => (
+                            <div
+                              key={appointment.id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => onSelectView("booking/list")}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  onSelectView("booking/list");
+                                }
+                              }}
+                              className={[
+                                "mx-2 mt-1 rounded border-l-4 border-[#5f86b6] bg-white px-3 py-2 text-xs shadow-sm",
+                                calendarTextClass,
+                              ].join(" ")}
+                            >
+                              <div className="font-semibold">
+                                {appointment.time} - {appointment.customerName}
+                              </div>
+                              <div className="truncate text-slate-500">
+                                {appointment.description || appointment.status}
+                              </div>
+                            </div>
+                          ))}
+                          {slotCheckouts.map((checkout) => (
+                            <div
+                              key={checkout.id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => onSelectView("visit/list")}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  onSelectView("visit/list");
+                                }
+                              }}
+                              className={[
+                                "mx-2 mt-1 rounded border-l-4 border-[#24a647] bg-white px-3 py-2 text-xs shadow-sm",
+                                calendarTextClass,
+                              ].join(" ")}
+                            >
+                              <div className="font-semibold">
+                                {checkout.hour}:{checkout.minute} - {checkout.customerName}
+                              </div>
+                              <div className="truncate text-slate-500">
+                                {getCheckoutServiceSummary(business, checkout)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
       {modal === "checkout" && (
@@ -294,7 +561,20 @@ export function CalendarPage({
         />
       )}
       {settingsOpen && (
-        <CalendarSettingsModal onClose={() => setSettingsOpen(false)} />
+        <CalendarSettingsModal
+          settings={business.bookingSettings || {}}
+          saving={saving}
+          onClose={() => setSettingsOpen(false)}
+          onSave={async (settings) => {
+            await onUpdateAndSave({
+              bookingSettings: {
+                ...(business.bookingSettings || {}),
+                ...settings,
+              },
+            });
+            setSettingsOpen(false);
+          }}
+        />
       )}
     </div>
   );
@@ -356,8 +636,160 @@ export function AppointmentsPage({ appointments }: { appointments: Appointment[]
   );
 }
 
-function CalendarSettingsModal({ onClose }: { onClose: () => void }) {
-  const [width, setWidth] = useState("100");
+function getCheckoutLines(checkout: CheckoutItem) {
+  if (checkout.lines && checkout.lines.length > 0) {
+    return checkout.lines;
+  }
+  return [
+    {
+      id: `${checkout.id}-line`,
+      staffId: checkout.staffId,
+      serviceId: checkout.serviceId,
+      duration: checkout.duration,
+      amount: checkout.amount,
+    },
+  ];
+}
+
+function getCheckoutStaffIds(checkout: CheckoutItem) {
+  return Array.from(new Set(getCheckoutLines(checkout).map((line) => line.staffId)));
+}
+
+function getCheckoutServiceSummary(business: Business, checkout: CheckoutItem) {
+  return getCheckoutLines(checkout)
+    .map((line) => {
+      const service = (business.services || []).find(
+        (item) => item.id === line.serviceId,
+      );
+      return service?.name;
+    })
+    .filter(Boolean)
+    .join(", ");
+}
+
+function isInSlot(
+  time: string,
+  slotHour: number,
+  slotMinute: number,
+  interval: number,
+) {
+  const [hourText, minuteText] = time.split(":");
+  const total = Number(hourText) * 60 + Number(minuteText || "0");
+  const slotStart = slotHour * 60 + slotMinute;
+  return total >= slotStart && total < slotStart + interval;
+}
+
+function addDays(value: string, days: number) {
+  const date = new Date(`${value}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function getWeekStart(value: string) {
+  const date = new Date(`${value}T12:00:00`);
+  const day = date.getDay() || 7;
+  date.setDate(date.getDate() - day + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizeCalendarView(value: string | undefined) {
+  if (value === "Haftalık görünüm" || value === "Aylık görünüm") return value;
+  return "Günlük görünüm";
+}
+
+function getMonthGridDates(value: string) {
+  const selected = new Date(`${value}T12:00:00`);
+  const firstOfMonth = new Date(selected.getFullYear(), selected.getMonth(), 1, 12);
+  const startDay = firstOfMonth.getDay() || 7;
+  const gridStart = new Date(firstOfMonth);
+  gridStart.setDate(firstOfMonth.getDate() - startDay + 1);
+  return Array.from({ length: 35 }, (_, index) => {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
+    return date.toISOString().slice(0, 10);
+  });
+}
+
+function formatDateInIstanbul(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (type: string) =>
+    parts.find((part) => part.type === type)?.value || "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function formatTimeInIstanbul(date: Date) {
+  return new Intl.DateTimeFormat("tr-TR", {
+    timeZone: "Europe/Istanbul",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function syncCheckoutToGoogleCalendar(business: Business, checkout: CheckoutItem) {
+  if (!business.calendarId) return;
+  for (const line of getCheckoutLines(checkout)) {
+    const service = (business.services || []).find(
+      (item) => item.id === line.serviceId,
+    );
+    const staff = (business.staff || []).find((item) => item.id === line.staffId);
+    const start = new Date(
+      `${checkout.date}T${checkout.hour}:${checkout.minute}:00+03:00`,
+    );
+    const end = new Date(start.getTime() + line.duration * 60 * 1000);
+    fetch(`/api/calendar/events?businessId=${encodeURIComponent(business.id)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        summary: `${checkout.customerName} - ${service?.name || "Hizmet"}`,
+        description: [
+          checkout.notes,
+          staff ? `Personel: ${staff.name}` : null,
+          `Adisyon: ${checkout.id}`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        start: start.toISOString(),
+        end: end.toISOString(),
+        checkoutId: checkout.id,
+        lineId: line.id,
+      }),
+    }).catch(() => undefined);
+  }
+}
+
+function CalendarSettingsModal({
+  settings,
+  saving,
+  onClose,
+  onSave,
+}: {
+  settings: BookingSettings;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (settings: Partial<BookingSettings>) => Promise<void>;
+}) {
+  const [view, setView] = useState(normalizeCalendarView(settings.calendarView));
+  const [width, setWidth] = useState(settings.calendarWidth || "100");
+  const [slotInterval, setSlotInterval] = useState(
+    settings.calendarSlotInterval || "15 Dakika",
+  );
+  const [textColor, setTextColor] = useState(
+    settings.calendarTextColor || "Dinamik",
+  );
+
+  function resetDefaults() {
+    setView("Günlük görünüm");
+    setWidth("100");
+    setSlotInterval("15 Dakika");
+    setTextColor("Dinamik");
+  }
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-start bg-slate-950/35 p-6">
       <section className="mx-auto mt-4 w-full max-w-md rounded bg-white shadow-xl">
@@ -366,11 +798,12 @@ function CalendarSettingsModal({ onClose }: { onClose: () => void }) {
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
             Takvim görünümü
             <NativeSelect
-              value="Günlük görünüm"
-              onChange={() => undefined}
+              value={view}
+              onChange={setView}
               options={[
                 { value: "Günlük görünüm", label: "Günlük görünüm" },
                 { value: "Haftalık görünüm", label: "Haftalık görünüm" },
+                { value: "Aylık görünüm", label: "Aylık görünüm" },
               ]}
             />
           </label>
@@ -389,8 +822,8 @@ function CalendarSettingsModal({ onClose }: { onClose: () => void }) {
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
             Takvim saat aralığı
             <NativeSelect
-              value="15 Dakika"
-              onChange={() => undefined}
+              value={slotInterval}
+              onChange={setSlotInterval}
               options={["15 Dakika", "30 Dakika", "60 Dakika"].map((value) => ({
                 value,
                 label: value,
@@ -400,23 +833,31 @@ function CalendarSettingsModal({ onClose }: { onClose: () => void }) {
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
             Takvim yazı rengi
             <NativeSelect
-              value="Dinamik"
-              onChange={() => undefined}
+              value={textColor}
+              onChange={setTextColor}
               options={["Dinamik", "Koyu", "Açık"].map((value) => ({
                 value,
                 label: value,
               }))}
             />
           </label>
-          <Button type="button" className="bg-cyan-600 text-white">
+          <Button type="button" onClick={resetDefaults} className="bg-cyan-600 text-white">
             Varsayılan ayarlara dön
           </Button>
           <Button
             type="button"
-            onClick={onClose}
+            disabled={saving}
+            onClick={() =>
+              onSave({
+                calendarView: view,
+                calendarWidth: width,
+                calendarSlotInterval: slotInterval,
+                calendarTextColor: textColor,
+              })
+            }
             className="bg-[#24a647] text-white"
           >
-            Kaydet
+            {saving ? "Kaydediliyor..." : "Kaydet"}
           </Button>
         </div>
       </section>

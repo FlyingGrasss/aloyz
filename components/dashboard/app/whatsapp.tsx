@@ -65,10 +65,45 @@ import {
 } from "./shared";
 
 export function AutomaticMessagesPage({
+  contacts,
   onSelectView,
 }: {
+  contacts: ContactRow[];
   onSelectView: (view: ViewId) => void;
 }) {
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [period, setPeriod] = useState("Bu ay");
+  const [status, setStatus] = useState("Tümü");
+  const whatsappContacts = contacts.filter((contact) => contact.channel !== "instagram");
+  const rows = whatsappContacts.flatMap((contact) =>
+    getConversationMessages(contact.conversation).map((message, index) => ({
+      id: `${contact.id}-${index}`,
+      customer: contact.name,
+      phone: contact.phone,
+      status: message.role === "model" ? "Gönderildi" : "Okundu",
+      date: contact.updatedAt.slice(0, 10),
+      sentAt: message.role === "model" ? contact.updatedAt : "-",
+      deliveredAt: message.role === "model" ? contact.updatedAt : "-",
+      readAt: contact.updatedAt,
+      errorCode: "-",
+      error: "-",
+    })),
+  );
+  const filteredRows = rows.filter((row) => {
+    const query = customerQuery.trim().toLocaleLowerCase("tr-TR");
+    const matchesCustomer =
+      !query || row.customer.toLocaleLowerCase("tr-TR").startsWith(query);
+    const matchesStatus = status === "Tümü" || row.status === status;
+    const matchesPeriod = period === "Tümü" || isInPeriod(row.date, period);
+    return matchesCustomer && matchesStatus && matchesPeriod;
+  });
+  const counts = {
+    Tümü: filteredRows.length,
+    Gönderildi: filteredRows.filter((row) => row.status === "Gönderildi").length,
+    İletildi: 0,
+    Okundu: filteredRows.filter((row) => row.status === "Okundu").length,
+    Başarısız: 0,
+  };
   return (
     <div className="space-y-4">
       <Breadcrumb
@@ -86,7 +121,11 @@ export function AutomaticMessagesPage({
           <h1 className="text-2xl font-semibold text-slate-700">
             Otomatik Mesajlar
           </h1>
-          <Button type="button" className="bg-[#24a647] text-white">
+          <Button
+            type="button"
+            className="bg-[#24a647] text-white"
+            onClick={() => onSelectView("setup/salon-bot-settings")}
+          >
             <Pencil className="size-4" />
             Otomatik Mesajları Düzenle
           </Button>
@@ -94,31 +133,44 @@ export function AutomaticMessagesPage({
         <div className="mt-4 grid gap-4 md:grid-cols-[280px_1fr_280px]">
           <label className="grid gap-1 text-xs text-slate-600">
             Müşteri
-            <Input value="Tümü" readOnly />
+            <Input
+              value={customerQuery}
+              onChange={(event) => setCustomerQuery(event.target.value)}
+              placeholder="Tümü"
+            />
           </label>
           <div />
           <label className="grid gap-1 text-xs text-slate-600">
             Tarih Aralığı
             <NativeSelect
-              value="Bu ay"
-              onChange={() => undefined}
-              options={[{ value: "Bu ay", label: "Bu ay" }]}
+              value={period}
+              onChange={setPeriod}
+              options={["Bu ay", "Bugün", "Tümü"].map((value) => ({
+                value,
+                label: value,
+              }))}
             />
           </label>
         </div>
         <div className="mt-4 flex flex-wrap gap-2 text-xs">
-          {["Tümü", "Gönderildi", "İletildi", "Okundu", "Başarısız"].map(
+          {(["Tümü", "Gönderildi", "İletildi", "Okundu", "Başarısız"] as const).map(
             (label) => (
-              <span
+              <button
                 key={label}
-                className="rounded-full border border-slate-300 px-3 py-1"
+                type="button"
+                onClick={() => setStatus(label)}
+                className={`rounded-full border px-3 py-1 ${
+                  status === label
+                    ? "border-slate-700 bg-slate-100"
+                    : "border-slate-300"
+                }`}
               >
-                {label} <b>0</b>
-              </span>
+                {label} <b>{counts[label]}</b>
+              </button>
             ),
           )}
         </div>
-        <MessageEmptyTable
+        <MessageTable
           columns={[
             "Müşteri",
             "Telefon numarası",
@@ -130,6 +182,17 @@ export function AutomaticMessagesPage({
             "Hata kodu",
             "Hata",
           ]}
+          rows={filteredRows.map((row) => [
+            row.customer,
+            row.phone || "-",
+            row.status,
+            row.date,
+            row.sentAt,
+            row.deliveredAt,
+            row.readAt,
+            row.errorCode,
+            row.error,
+          ])}
         />
       </section>
     </div>
@@ -225,10 +288,16 @@ export function WhatsappRegisterPage({
 }
 
 export function ReminderRepliesPage({
+  contacts,
   onSelectView,
 }: {
+  contacts: ContactRow[];
   onSelectView: (view: ViewId) => void;
 }) {
+  const replyRows = contacts
+    .filter((contact) => contact.channel !== "instagram")
+    .filter((contact) => getConversationMessages(contact.conversation).some((message) => message.role === "user"))
+    .map((contact) => [contact.name, contact.phone || "-"]);
   return (
     <div className="space-y-4">
       <Breadcrumb
@@ -246,24 +315,46 @@ export function ReminderRepliesPage({
           <h1 className="text-2xl font-semibold text-slate-700">
             Hatırlatma Yanıtları
           </h1>
-          <span className="text-xs text-slate-500">Toplam Yanıt Sayısı: 0</span>
+          <span className="text-xs text-slate-500">
+            Toplam Yanıt Sayısı: {replyRows.length}
+          </span>
         </div>
         <div className="mt-6 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
           Bu sayfa, gönderilen hatırlatma mesajlarına müşterilerinizin WhatsApp
           üzerinden gönderdiği yanıtları listeler.
         </div>
-        <MessageEmptyTable columns={["Müşteri", "Telefon numarası"]} />
+        <MessageTable columns={["Müşteri", "Telefon numarası"]} rows={replyRows} />
       </section>
     </div>
   );
 }
 
-function MessageEmptyTable({ columns }: { columns: string[] }) {
+function MessageTable({
+  columns,
+  rows,
+}: {
+  columns: string[];
+  rows: Array<Array<string | number>>;
+}) {
+  const [page, setPage] = useState(0);
+  const [sortDesc, setSortDesc] = useState(true);
+  const pageSize = 50;
+  const sortedRows = [...rows].sort((a, b) => {
+    const left = String(a[0] || "");
+    const right = String(b[0] || "");
+    return sortDesc ? right.localeCompare(left, "tr") : left.localeCompare(right, "tr");
+  });
+  const pageRows = sortedRows.slice(page * pageSize, page * pageSize + pageSize);
+  const maxPage = Math.max(0, Math.ceil(rows.length / pageSize) - 1);
   return (
     <div className="mt-6">
       <div className="bg-slate-100 p-3">
-        <Button type="button" className="bg-[#5f86b6] text-white">
-          Filtrele / Sırala
+        <Button
+          type="button"
+          className="bg-[#5f86b6] text-white"
+          onClick={() => setSortDesc((value) => !value)}
+        >
+          {sortDesc ? "Z → A" : "A → Z"}
         </Button>
       </div>
       <table className="w-full text-left text-sm">
@@ -277,32 +368,50 @@ function MessageEmptyTable({ columns }: { columns: string[] }) {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td
-              colSpan={columns.length}
-              className="py-12 text-center text-slate-500"
-            >
-              Kayıt bulunamadı
-            </td>
-          </tr>
+          {pageRows.map((row, index) => (
+            <tr key={index} className="border-b border-slate-100">
+              {row.map((cell, cellIndex) => (
+                <td key={cellIndex} className="px-3 py-3">
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+          {pageRows.length === 0 && (
+            <tr>
+              <td
+                colSpan={columns.length}
+                className="py-12 text-center text-slate-500"
+              >
+                Kayıt bulunamadı
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
       <div className="mt-3 flex justify-center gap-1 text-sm text-slate-500">
-        <Button type="button" variant="outline" size="icon-sm">
+        <Button type="button" variant="outline" size="icon-sm" onClick={() => setPage(0)} disabled={page === 0}>
           ‹‹
         </Button>
-        <Button type="button" variant="outline" size="icon-sm">
+        <Button type="button" variant="outline" size="icon-sm" onClick={() => setPage((value) => Math.max(0, value - 1))} disabled={page === 0}>
           ‹
         </Button>
-        <Button type="button" variant="outline" size="icon-sm">
+        <Button type="button" variant="outline" size="icon-sm" onClick={() => setPage((value) => Math.min(maxPage, value + 1))} disabled={page >= maxPage}>
           ›
         </Button>
-        <Button type="button" variant="outline" size="icon-sm">
+        <Button type="button" variant="outline" size="icon-sm" onClick={() => setPage(maxPage)} disabled={page >= maxPage}>
           ››
         </Button>
       </div>
     </div>
   );
+}
+
+function isInPeriod(date: string, period: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (period === "Bugün") return date === today;
+  if (period === "Bu ay") return date.startsWith(today.slice(0, 7));
+  return true;
 }
 
 export function MessagingPage({

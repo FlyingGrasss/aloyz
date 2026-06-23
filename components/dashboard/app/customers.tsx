@@ -79,28 +79,45 @@ export function ContactsPage({
 }) {
   const [editingCustomer, setEditingCustomer] =
     useState<CustomerProfile | null>(null);
+  const [contactFilter, setContactFilter] = useState("all");
   const savedCustomers = business.customers || [];
-  const savedCustomerKeys = new Set(
-    savedCustomers.map((customer) =>
-      normalizeContactKey(customer.phone || customer.name),
-    ),
-  );
-  const messageCustomers = contacts
-    .filter(
-      (contact) =>
-        !savedCustomerKeys.has(
-          normalizeContactKey(contact.phone || contact.name),
-        ),
-    )
-    .map((contact) => contactToCustomerProfile(contact));
-  const rows = [...savedCustomers, ...messageCustomers];
+  const normalizedSearch = searchTerm.trim().toLocaleLowerCase("tr-TR");
+  const filteredSavedCustomers = savedCustomers.filter((customer) => {
+    if (!normalizedSearch) return true;
+    return [
+      customer.name,
+      customer.phone,
+      customer.email,
+      customer.instagramUsername,
+      customer.notes,
+    ]
+      .filter(Boolean)
+      .some((value) =>
+        String(value).toLocaleLowerCase("tr-TR").includes(normalizedSearch),
+      );
+  });
+  const filteredContacts = contacts.filter((contact) => {
+    const channelMatch =
+      contactFilter === "all" || contact.channel === contactFilter;
+    if (!channelMatch) return false;
+    if (!normalizedSearch) return true;
+    return [
+      contact.name,
+      contact.subtitle,
+      contact.phone,
+      contact.username,
+      contact.lastMessage,
+    ]
+      .filter(Boolean)
+      .some((value) =>
+        String(value).toLocaleLowerCase("tr-TR").includes(normalizedSearch),
+      );
+  });
 
   async function saveCustomer(customer: CustomerProfile) {
     const exists = savedCustomers.some((item) => item.id === customer.id);
     const next = exists
-      ? savedCustomers.map((item) =>
-          item.id === customer.id ? customer : item,
-        )
+      ? savedCustomers.map((item) => (item.id === customer.id ? customer : item))
       : [customer, ...savedCustomers];
     setEditingCustomer(null);
     await onUpdateAndSave({ customers: next });
@@ -108,73 +125,126 @@ export function ContactsPage({
 
   return (
     <div className="space-y-4">
-      <Breadcrumb items={["Aloyz", "Kişiler"]} />
-      <div className="grid gap-4">
-        <section className="rounded bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <div>
-              <h1 className="text-lg font-semibold">Kişiler</h1>
-              <p className="text-sm text-slate-500">
-                {rows.length} kayıt gösteriliyor
-                {searchTerm ? `, arama: "${searchTerm}"` : ""}
-              </p>
-            </div>
+      <Breadcrumb items={["Aloyz", "Müşteriler"]} />
+      <section className="rounded bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <div>
+            <h1 className="text-lg font-semibold">Müşteriler</h1>
+            <p className="text-sm text-slate-500">
+              {filteredSavedCustomers.length} kayıt gösteriliyor
+              {searchTerm ? ', arama: "' + searchTerm + '"' : ""}
+            </p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[840px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Kişi</th>
-                  <th className="px-4 py-3">Kanal</th>
-                  <th className="px-4 py-3">İletişim</th>
-                  <th className="px-4 py-3">Son güncelleme</th>
-                  <th className="px-4 py-3">Mesaj</th>
-                  <th className="px-4 py-3">Randevu</th>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[840px] text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Müşteri</th>
+                <th className="px-4 py-3">Telefon</th>
+                <th className="px-4 py-3">E-posta</th>
+                <th className="px-4 py-3">Instagram</th>
+                <th className="px-4 py-3">Not</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredSavedCustomers.map((customer) => (
+                <tr
+                  key={customer.id}
+                  onClick={() => setEditingCustomer(customer)}
+                  className="cursor-pointer hover:bg-slate-50"
+                >
+                  <td className="px-4 py-3 font-semibold text-slate-800">
+                    {customer.name}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {[customer.countryCode, customer.phone].filter(Boolean).join(" ") || "-"}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{customer.email || "-"}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {customer.instagramUsername || "-"}
+                  </td>
+                  <td className="max-w-[340px] truncate px-4 py-3 text-slate-600">
+                    {customer.notes || "-"}
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {rows.map((customer) => (
-                  <tr
-                    key={customer.id}
-                    onClick={() => setEditingCustomer(customer)}
-                    className="cursor-pointer hover:bg-slate-50"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-800">
-                        {customer.name}
-                      </div>
-                      <div className="max-w-[320px] truncate text-xs text-slate-500">
-                        {customer.notes ||
-                          customer.instagramUsername ||
-                          "Detay yok"}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-slate-500">Müşteri</span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {customer.phone || customer.email || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">-</td>
-                    <td className="px-4 py-3 text-slate-600">-</td>
-                    <td className="px-4 py-3 text-slate-600">-</td>
-                  </tr>
-                ))}
-                {rows.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-4 py-10 text-center text-slate-400"
-                    >
-                      Kişi kaydı bulunamadı.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+              ))}
+              {filteredSavedCustomers.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                    Müşteri kaydı bulunamadı.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="rounded bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <div>
+            <h2 className="text-lg font-semibold">Mesaj Kişileri</h2>
+            <p className="text-sm text-slate-500">
+              WhatsApp ve Instagram konuşmalarından gelen kişiler
+            </p>
           </div>
-        </section>
-      </div>
+          <NativeSelect
+            value={contactFilter}
+            onChange={setContactFilter}
+            options={[
+              { value: "all", label: "Tümü" },
+              { value: "whatsapp", label: "WhatsApp" },
+              { value: "instagram", label: "Instagram" },
+            ]}
+          />
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[840px] text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Kişi</th>
+                <th className="px-4 py-3">Kanal</th>
+                <th className="px-4 py-3">İletişim</th>
+                <th className="px-4 py-3">Son güncelleme</th>
+                <th className="px-4 py-3">Mesaj</th>
+                <th className="px-4 py-3">Randevu</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredContacts.map((contact) => (
+                <tr key={contact.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-3">
+                    <div className="font-semibold text-slate-800">{contact.name}</div>
+                    <div className="max-w-[320px] truncate text-xs text-slate-500">
+                      {contact.lastMessage || contact.subtitle || "Detay yok"}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <ChannelBadge channel={contact.channel} />
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {contact.phone || contact.username || "-"}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {contact.updatedAt ? formatLastUpdate(contact.updatedAt) : "-"}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{contact.messageCount}</td>
+                  <td className="px-4 py-3 text-slate-600">{contact.appointmentCount}</td>
+                </tr>
+              ))}
+              {filteredContacts.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
+                    Mesaj kişisi bulunamadı.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       {editingCustomer && (
         <CustomerModal
           saving={saving}
@@ -220,7 +290,10 @@ export function CustomerModal({
   return (
     <div className="fixed inset-0 z-[60] grid place-items-start bg-slate-950/35 p-6">
       <section className="mx-auto mt-4 w-full max-w-md rounded bg-white shadow-xl">
-        <ModalHeader title="Yeni müşteri" onClose={onClose} />
+        <ModalHeader
+          title={initialCustomer ? "Müşteri Bilgileri" : "Yeni müşteri"}
+          onClose={onClose}
+        />
         <div className="grid gap-3 p-4">
           <Input
             value={customer.name}

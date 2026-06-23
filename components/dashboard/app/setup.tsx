@@ -35,7 +35,6 @@ import {
   ModalHeader,
   NativeSelect,
   PlaceholderPage,
-  PromotionsSettings,
   ServiceItem,
   SettingsPanel,
   SettingsSelect,
@@ -64,6 +63,7 @@ import {
   TIME_OPTIONS,
   GOOGLE_SERVICE_ACCOUNT_EMAIL,
 } from "./shared";
+import { SetupExtraPage } from "./setup-extra";
 
 export function OnboardingPanel({
   business,
@@ -112,6 +112,7 @@ export function SetupPage({
   onUpdateAndSave,
   onTogglePatch,
   onReconnectWhatsApp,
+  onDisconnectWhatsApp,
   onSelectView,
 }: {
   view: SetupViewId;
@@ -125,6 +126,7 @@ export function SetupPage({
   onUpdateAndSave: (fields: Partial<Business>) => Promise<boolean>;
   onTogglePatch: (field: "is_active" | "test_mode", value: boolean) => void;
   onReconnectWhatsApp: () => void;
+  onDisconnectWhatsApp: () => void;
   onSelectView: (view: ViewId) => void;
 }) {
   return (
@@ -174,6 +176,7 @@ export function SetupPage({
               saving={saving}
               onHourChange={onHourChange}
               onSave={onSave}
+              onUpdateAndSave={onUpdateAndSave}
             />
           )}
           {view === "setup/connections" && (
@@ -187,6 +190,7 @@ export function SetupPage({
               onUpdateAndSave={onUpdateAndSave}
               onTogglePatch={onTogglePatch}
               onReconnectWhatsApp={onReconnectWhatsApp}
+              onDisconnectWhatsApp={onDisconnectWhatsApp}
             />
           )}
           {view === "setup/staff" && (
@@ -207,17 +211,14 @@ export function SetupPage({
             <ServiceAttributePage
               mode="duration"
               services={business.services || []}
+              saving={saving}
+              onUpdateAndSave={onUpdateAndSave}
             />
           )}
           {view === "setup/service_prices" && (
             <ServiceAttributePage
               mode="price"
               services={business.services || []}
-            />
-          )}
-          {view === "setup/promotions" && (
-            <PromotionsSetupPage
-              business={business}
               saving={saving}
               onUpdateAndSave={onUpdateAndSave}
             />
@@ -226,6 +227,7 @@ export function SetupPage({
             <SalonBotSettingsPage
               business={business}
               saving={saving}
+              whatsAppStatus={whatsAppStatus}
               onUpdateAndSave={onUpdateAndSave}
             />
           )}
@@ -236,16 +238,30 @@ export function SetupPage({
               onUpdateAndSave={onUpdateAndSave}
             />
           )}
+          {(view === "setup/special-working-hours" ||
+            view === "setup/products" ||
+            view === "setup/service_packages" ||
+            view === "setup/tag_settings") && (
+            <SetupExtraPage
+              view={view}
+              business={business}
+              saving={saving}
+              onUpdateAndSave={onUpdateAndSave}
+            />
+          )}
           {view !== "setup/general" &&
             view !== "setup/working-hours" &&
+            view !== "setup/special-working-hours" &&
             view !== "setup/connections" &&
             view !== "setup/staff" &&
             view !== "setup/services" &&
             view !== "setup/service_durations" &&
             view !== "setup/service_prices" &&
-            view !== "setup/promotions" &&
+            view !== "setup/products" &&
+            view !== "setup/service_packages" &&
             view !== "setup/salon-bot-settings" &&
-            view !== "setup/booking_settings" && (
+            view !== "setup/booking_settings" &&
+            view !== "setup/tag_settings" && (
               <PlaceholderPage view={view} compact />
             )}
         </section>
@@ -381,6 +397,10 @@ function StaffModal({
   onSubmit: (member: StaffMember) => void;
 }) {
   const [form, setForm] = useState(member);
+  const [staffPanel, setStaffPanel] = useState<
+    "hours" | "breaks" | "commission" | null
+  >(null);
+  const staffBreaks = form.breakHours || [];
   return (
     <div className="fixed inset-0 z-50 grid place-items-start bg-slate-950/35 p-6">
       <section className="mx-auto mt-4 w-full max-w-2xl rounded bg-white shadow-xl">
@@ -430,15 +450,242 @@ function StaffModal({
               setForm({ ...form, calendarVisible: checked })
             }
           />
-          <Button type="button" variant="outline">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() =>
+              setStaffPanel(staffPanel === "hours" ? null : "hours")
+            }
+          >
             <Plus className="size-4" /> Çalışma saatleri
           </Button>
-          <Button type="button" variant="outline">
+          {staffPanel === "hours" && (
+            <div className="rounded border border-slate-200 p-3">
+              <div className="mb-2 text-sm font-semibold">Çalışma saatleri</div>
+              <div className="grid gap-2">
+                {DAYS.map((day) => {
+                  const value =
+                    form.workingHours?.[day.key] || "Açık: 09:00 - 18:00";
+                  const parsed = parseHourValue(value);
+                  return (
+                    <div
+                      key={day.key}
+                      className="grid items-center gap-2 md:grid-cols-[72px_1fr_1fr_1fr]"
+                    >
+                      <span className="text-sm font-medium">{day.short}</span>
+                      <NativeSelect
+                        value={parsed.status}
+                        onChange={(status) =>
+                          setForm({
+                            ...form,
+                            workingHours: {
+                              ...(form.workingHours || {}),
+                              [day.key]: formatHourValue(
+                                status,
+                                parsed.start,
+                                parsed.end,
+                              ),
+                            },
+                          })
+                        }
+                        options={[
+                          { value: "Açık", label: "Açık" },
+                          { value: "Kapalı", label: "Kapalı" },
+                        ]}
+                      />
+                      <NativeSelect
+                        value={parsed.start}
+                        disabled={parsed.status === "Kapalı"}
+                        onChange={(start) =>
+                          setForm({
+                            ...form,
+                            workingHours: {
+                              ...(form.workingHours || {}),
+                              [day.key]: formatHourValue(
+                                parsed.status,
+                                start,
+                                parsed.end,
+                              ),
+                            },
+                          })
+                        }
+                        options={TIME_OPTIONS.map((time) => ({
+                          value: time,
+                          label: time,
+                        }))}
+                      />
+                      <NativeSelect
+                        value={parsed.end}
+                        disabled={parsed.status === "Kapalı"}
+                        onChange={(end) =>
+                          setForm({
+                            ...form,
+                            workingHours: {
+                              ...(form.workingHours || {}),
+                              [day.key]: formatHourValue(
+                                parsed.status,
+                                parsed.start,
+                                end,
+                              ),
+                            },
+                          })
+                        }
+                        options={TIME_OPTIONS.map((time) => ({
+                          value: time,
+                          label: time,
+                        }))}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() =>
+              setStaffPanel(staffPanel === "breaks" ? null : "breaks")
+            }
+          >
             <Plus className="size-4" /> Öğle arası mola saatleri
           </Button>
-          <Button type="button" variant="outline">
+          {staffPanel === "breaks" && (
+            <div className="rounded border border-slate-200 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm font-semibold">Mola saatleri</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      breakHours: [
+                        ...staffBreaks,
+                        {
+                          id: crypto.randomUUID(),
+                          label: "Öğle arası",
+                          start: "12:00",
+                          end: "13:00",
+                          days: DAYS.map((day) => day.key),
+                        },
+                      ],
+                    })
+                  }
+                >
+                  Ekle
+                </Button>
+              </div>
+              <div className="grid gap-2">
+                {staffBreaks.map((item) => (
+                  <div
+                    key={item.id}
+                    className="grid gap-2 md:grid-cols-[1fr_120px_120px_auto]"
+                  >
+                    <Input
+                      value={item.label}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          breakHours: staffBreaks.map((breakHour) =>
+                            breakHour.id === item.id
+                              ? { ...breakHour, label: event.target.value }
+                              : breakHour,
+                          ),
+                        })
+                      }
+                    />
+                    <NativeSelect
+                      value={item.start}
+                      onChange={(start) =>
+                        setForm({
+                          ...form,
+                          breakHours: staffBreaks.map((breakHour) =>
+                            breakHour.id === item.id
+                              ? { ...breakHour, start }
+                              : breakHour,
+                          ),
+                        })
+                      }
+                      options={TIME_OPTIONS.map((time) => ({
+                        value: time,
+                        label: time,
+                      }))}
+                    />
+                    <NativeSelect
+                      value={item.end}
+                      onChange={(end) =>
+                        setForm({
+                          ...form,
+                          breakHours: staffBreaks.map((breakHour) =>
+                            breakHour.id === item.id
+                              ? { ...breakHour, end }
+                              : breakHour,
+                          ),
+                        })
+                      }
+                      options={TIME_OPTIONS.map((time) => ({
+                        value: time,
+                        label: time,
+                      }))}
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          breakHours: staffBreaks.filter(
+                            (breakHour) => breakHour.id !== item.id,
+                          ),
+                        })
+                      }
+                    >
+                      Sil
+                    </Button>
+                  </div>
+                ))}
+                {staffBreaks.length === 0 && (
+                  <div className="py-3 text-sm text-slate-400">
+                    Mola saati eklenmedi.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() =>
+              setStaffPanel(staffPanel === "commission" ? null : "commission")
+            }
+          >
             <Plus className="size-4" /> Hak ediş ayarları
           </Button>
+          {staffPanel === "commission" && (
+            <div className="grid gap-2 rounded border border-slate-200 p-3">
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                Hak ediş oranı (%)
+                <Input
+                  value={String(form.commissionRate || 0)}
+                  inputMode="decimal"
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      commissionRate: parseLooseNumber(event.target.value),
+                    })
+                  }
+                />
+              </label>
+              <Input
+                value={form.commissionNotes || ""}
+                onChange={(event) =>
+                  setForm({ ...form, commissionNotes: event.target.value })
+                }
+                placeholder="Hak ediş notları"
+              />
+            </div>
+          )}
           <Button
             type="button"
             disabled={saving || !form.name.trim()}
@@ -462,8 +709,13 @@ function StaffServicesModal({
   services: ServiceItem[];
   onClose: () => void;
 }) {
+  const [search, setSearch] = useState("");
   const linked = services.filter((service) =>
     service.staffIds.includes(member.id),
+  ).filter((service) =>
+    service.name
+      .toLocaleLowerCase("tr-TR")
+      .includes(search.trim().toLocaleLowerCase("tr-TR")),
   );
   return (
     <div className="fixed inset-0 z-50 grid place-items-start bg-slate-950/35 p-6">
@@ -471,10 +723,11 @@ function StaffServicesModal({
         <ModalHeader title="Çalışan hizmetleri" onClose={onClose} />
         <div className="space-y-3 p-4">
           <div className="flex gap-3 bg-slate-100 p-3">
-            <Input placeholder="Ara" />
-            <Button type="button" className="ml-auto bg-[#5f86b6] text-white">
-              <Plus className="size-4" /> Hizmet ekle
-            </Button>
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Ara"
+            />
           </div>
           <div className="border-b border-slate-200 pb-2 text-sm font-semibold">
             Hizmet
@@ -493,9 +746,9 @@ function StaffServicesModal({
               description="Bu personele bağlı hizmet bulunmuyor."
             />
           )}
-          <Button type="button" className="w-full bg-[#5f86b6] text-white">
-            Hizmetleri başka bir personelden kopyala
-          </Button>
+          <p className="text-xs text-slate-500">
+            Hizmet atamaları Hizmetler sayfasındaki personel seçimlerinden yönetilir.
+          </p>
         </div>
       </section>
     </div>
@@ -759,11 +1012,16 @@ function ServiceModal({
 function ServiceAttributePage({
   mode,
   services,
+  saving,
+  onUpdateAndSave,
 }: {
   mode: "duration" | "price";
   services: ServiceItem[];
+  saving: boolean;
+  onUpdateAndSave: (fields: Partial<Business>) => Promise<boolean>;
 }) {
   const [search, setSearch] = useState("");
+  const [editing, setEditing] = useState<ServiceItem | null>(null);
   const normalizedSearch = search.toLocaleLowerCase("tr-TR").trim();
   const filteredServices = services.filter((service) =>
     [service.name, service.gender]
@@ -820,7 +1078,11 @@ function ServiceAttributePage({
                     : `${formatServicePrice(service)} TL`}
                 </td>
                 <td className="px-3 py-3 text-right">
-                  <Button type="button" className="bg-[#5f86b6] text-white">
+                  <Button
+                    type="button"
+                    className="bg-[#5f86b6] text-white"
+                    onClick={() => setEditing(service)}
+                  >
                     <Pencil className="size-4" />
                     {isDuration
                       ? "Tüm Personel Sürelerini Düzenle"
@@ -842,95 +1104,171 @@ function ServiceAttributePage({
           </tbody>
         </table>
       </div>
+      {editing && (
+        <ServiceAttributeModal
+          mode={mode}
+          service={editing}
+          saving={saving}
+          onClose={() => setEditing(null)}
+          onSubmit={async (service) => {
+            setEditing(null);
+            await onUpdateAndSave({
+              services: services.map((item) =>
+                item.id === service.id ? service : item,
+              ),
+            });
+          }}
+        />
+      )}
     </section>
   );
 }
 
-function PromotionsSetupPage({
-  business,
+function ServiceAttributeModal({
+  mode,
+  service,
   saving,
-  onUpdateAndSave,
+  onClose,
+  onSubmit,
 }: {
-  business: Business;
+  mode: "duration" | "price";
+  service: ServiceItem;
   saving: boolean;
-  onUpdateAndSave: (fields: Partial<Business>) => Promise<boolean>;
+  onClose: () => void;
+  onSubmit: (service: ServiceItem) => void;
 }) {
-  const [form, setForm] = useState<PromotionsSettings>(
-    business.promotions || {},
+  const isDuration = mode === "duration";
+  const [duration, setDuration] = useState(String(service.duration || 0));
+  const [price, setPrice] = useState(
+    String(
+      service.priceType === "range"
+        ? service.minPrice || 0
+        : service.price || 0,
+    ),
   );
-  const percentOptions = ["0%", "5%", "10%", "15%", "20%"].map((value) => ({
-    value,
-    label: value,
-  }));
   return (
-    <SettingsPanel
-      title="Promosyonlar"
-      saving={saving}
-      onSave={() => onUpdateAndSave({ promotions: form })}
-    >
-      <SettingsSelect
-        label="Nakit ödemelerden % kaç parapuan kazanılsın"
-        value={form.cashReward || "0%"}
-        options={percentOptions}
-        onChange={(value) => setForm({ ...form, cashReward: value })}
-      />
-      <SettingsSelect
-        label="Kartla ödemelerden % kaç parapuan kazanılsın"
-        value={form.cardReward || "0%"}
-        options={percentOptions}
-        onChange={(value) => setForm({ ...form, cardReward: value })}
-      />
-      <SettingsSelect
-        label="Parapuanlar kaç TL'ye ulaşıldığında kullanılsın"
-        value={form.rewardUsage || "20 TL"}
-        options={["20 TL", "50 TL", "100 TL"].map((value) => ({
-          value,
-          label: value,
-        }))}
-        onChange={(value) => setForm({ ...form, rewardUsage: value })}
-      />
-      <SettingsSelect
-        label="Müşteriler doğum günlerinde % kaç indirim kazansın"
-        value={form.birthdayDiscount || "0%"}
-        options={percentOptions}
-        onChange={(value) => setForm({ ...form, birthdayDiscount: value })}
-      />
-      <SettingsSelect
-        label="Kolay Randevu'ya özel % kaç indirim sunmak istersiniz"
-        value={form.onlineBookingDiscount || "0%"}
-        options={percentOptions}
-        onChange={(value) => setForm({ ...form, onlineBookingDiscount: value })}
-      />
-    </SettingsPanel>
+    <div className="fixed inset-0 z-50 grid place-items-start bg-slate-950/35 p-6">
+      <section className="mx-auto mt-4 w-full max-w-md rounded bg-white shadow-xl">
+        <ModalHeader
+          title={isDuration ? "Hizmet süresi" : "Hizmet fiyatı"}
+          onClose={onClose}
+        />
+        <div className="grid gap-3 p-4">
+          <div className="font-semibold">{service.name}</div>
+          {isDuration ? (
+            <Input
+              value={duration}
+              onChange={(event) => setDuration(event.target.value)}
+              inputMode="decimal"
+              placeholder="Dakika"
+            />
+          ) : (
+            <Input
+              value={price}
+              onChange={(event) => setPrice(event.target.value)}
+              inputMode="decimal"
+              placeholder="TL"
+            />
+          )}
+          <Button
+            type="button"
+            disabled={saving}
+            onClick={() =>
+              onSubmit(
+                isDuration
+                  ? { ...service, duration: parseLooseNumber(duration) }
+                  : {
+                      ...service,
+                      priceType: "single",
+                      price: parseLooseNumber(price),
+                      minPrice: 0,
+                      maxPrice: 0,
+                    },
+              )
+            }
+            className="bg-[#5f86b6] text-white"
+          >
+            Kaydet
+          </Button>
+        </div>
+      </section>
+    </div>
   );
 }
 
 function SalonBotSettingsPage({
   business,
   saving,
+  whatsAppStatus,
   onUpdateAndSave,
 }: {
   business: Business;
   saving: boolean;
+  whatsAppStatus: string | null;
   onUpdateAndSave: (fields: Partial<Business>) => Promise<boolean>;
 }) {
   const [form, setForm] = useState<BotSettings>(business.botSettings || {});
+  const [active, setActive] = useState(business.is_active);
+  const [testMode, setTestMode] = useState(business.test_mode);
+  const whatsAppConnected =
+    whatsAppStatus === "open" ||
+    whatsAppStatus === "connected" ||
+    !!form.whatsappConnected;
+  const instagramConnected =
+    !!business.instagram_page_id || !!form.instagramConnected;
   return (
     <SettingsPanel
       title="Salon BOT Ayarları"
       saving={saving}
-      onSave={() => onUpdateAndSave({ botSettings: form })}
+      onSave={() =>
+        onUpdateAndSave({
+          botSettings: {
+            ...form,
+            whatsappConnected: whatsAppConnected,
+            instagramConnected,
+            active,
+          },
+          is_active: active,
+          test_mode: testMode,
+        })
+      }
     >
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="rounded border border-slate-200 p-3">
+          <div className="text-sm font-semibold">WhatsApp bağlantısı</div>
+          <div className="mt-1 text-sm text-slate-500">
+            {whatsAppConnected ? "Bağlı" : "Bağlı değil"}
+          </div>
+        </div>
+        <div className="rounded border border-slate-200 p-3">
+          <div className="text-sm font-semibold">Instagram bağlantısı</div>
+          <div className="mt-1 text-sm text-slate-500">
+            {instagramConnected ? "Bağlı" : "Bağlı değil"}
+          </div>
+        </div>
+      </div>
+      <ToggleRow
+        label="Bot aktif"
+        description="Kapalıyken bot bağlı kanallarda otomatik yanıt vermez."
+        checked={active}
+        onChange={setActive}
+      />
+      <ToggleRow
+        label="Test modu"
+        description="Açıkken bot yalnızca işletmenin kendi test mesajlarına yanıt verir."
+        checked={testMode}
+        onChange={setTestMode}
+      />
       <ToggleRow
         label="Instagram Salon BOT Aktif/Pasif"
         description=""
-        checked={!!form.instagram}
+        checked={!!form.instagram && instagramConnected}
         onChange={(checked) => setForm({ ...form, instagram: checked })}
       />
       <ToggleRow
         label="WhatsApp Salon BOT Aktif/Pasif"
         description=""
-        checked={!!form.whatsapp}
+        checked={!!form.whatsapp && whatsAppConnected}
         onChange={(checked) => setForm({ ...form, whatsapp: checked })}
       />
     </SettingsPanel>
@@ -1120,12 +1458,25 @@ function WorkingHoursForm({
   saving,
   onHourChange,
   onSave,
+  onUpdateAndSave,
 }: {
   business: Business;
   saving: boolean;
   onHourChange: (dayKey: string, value: string, field: "start" | "end") => void;
   onSave: () => void;
+  onUpdateAndSave?: (fields: Partial<Business>) => Promise<boolean>;
 }) {
+  const [breaksOpen, setBreaksOpen] = useState(false);
+  const breakHours = business.bookingSettings?.breakHours || [];
+  async function saveBreakHours(nextBreakHours: typeof breakHours) {
+    if (!onUpdateAndSave) return;
+    await onUpdateAndSave({
+      bookingSettings: {
+        ...(business.bookingSettings || {}),
+        breakHours: nextBreakHours,
+      },
+    });
+  }
   return (
     <section className="rounded bg-white p-5 shadow-sm">
       <h1 className="mb-4 text-2xl font-semibold text-slate-700">
@@ -1191,10 +1542,78 @@ function WorkingHoursForm({
         })}
       </div>
       <div className="mt-5 rounded border border-slate-200 p-2">
-        <Button type="button" variant="outline">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setBreaksOpen((value) => !value)}
+        >
           <Plus className="size-4" />
           Öğle arası mola saatleri
         </Button>
+        {breaksOpen && (
+          <div className="mt-3 grid gap-2">
+            {breakHours.map((item) => (
+              <div
+                key={item.id}
+                className="grid gap-2 md:grid-cols-[1fr_120px_120px_auto]"
+              >
+                <Input value={item.label} readOnly />
+                <NativeSelect
+                  value={item.start}
+                  onChange={(start) =>
+                    saveBreakHours(
+                      breakHours.map((breakHour) =>
+                        breakHour.id === item.id ? { ...breakHour, start } : breakHour,
+                      ),
+                    )
+                  }
+                  options={TIME_OPTIONS.map((time) => ({ value: time, label: time }))}
+                />
+                <NativeSelect
+                  value={item.end}
+                  onChange={(end) =>
+                    saveBreakHours(
+                      breakHours.map((breakHour) =>
+                        breakHour.id === item.id ? { ...breakHour, end } : breakHour,
+                      ),
+                    )
+                  }
+                  options={TIME_OPTIONS.map((time) => ({ value: time, label: time }))}
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() =>
+                    saveBreakHours(
+                      breakHours.filter((breakHour) => breakHour.id !== item.id),
+                    )
+                  }
+                >
+                  Sil
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!onUpdateAndSave}
+              onClick={() =>
+                saveBreakHours([
+                  ...breakHours,
+                  {
+                    id: crypto.randomUUID(),
+                    label: "Öğle arası",
+                    start: "12:00",
+                    end: "13:00",
+                    days: DAYS.map((day) => day.key),
+                  },
+                ])
+              }
+            >
+              Mola saati ekle
+            </Button>
+          </div>
+        )}
       </div>
       <Button
         type="button"
@@ -1216,6 +1635,7 @@ function ConnectionsPanel({
   onUpdateAndSave,
   onTogglePatch,
   onReconnectWhatsApp,
+  onDisconnectWhatsApp,
 }: {
   business: Business;
   saving: boolean;
@@ -1226,9 +1646,33 @@ function ConnectionsPanel({
   onUpdateAndSave: (fields: Partial<Business>) => Promise<boolean>;
   onTogglePatch: (field: "is_active" | "test_mode", value: boolean) => void;
   onReconnectWhatsApp: () => void;
+  onDisconnectWhatsApp: () => void;
 }) {
   const whatsAppConnected =
-    whatsAppStatus === "open" || whatsAppStatus === "connected";
+    whatsAppStatus === "open" ||
+    whatsAppStatus === "connected" ||
+    !!business.botSettings?.whatsappConnected;
+  const instagramConnected =
+    !!business.instagram_page_id || !!business.botSettings?.instagramConnected;
+  async function connectInstagram() {
+    window.location.href = "/api/integrations/instagram/connect";
+  }
+  async function disconnectInstagram() {
+    const res = await fetch("/api/integrations/instagram/disconnect", {
+      method: "POST",
+    });
+    if (res.ok) {
+      await onUpdateAndSave({
+        botSettings: {
+          ...(business.botSettings || {}),
+          instagramConnected: false,
+          instagram: false,
+          instagramUsername: "",
+          instagramProfilePicture: "",
+        },
+      });
+    }
+  }
   return (
     <section className="rounded bg-white p-4 shadow-sm">
       <h1 className="mb-8 text-2xl font-semibold text-slate-700">
@@ -1238,23 +1682,52 @@ function ConnectionsPanel({
         <ConnectionRow
           label="Instagram"
           icon={MessageCircle}
-          connected={!!business.instagram_page_id}
+          connected={instagramConnected}
+          actionLabel="Giriş yap"
+          disabled={saving}
+          onAction={instagramConnected ? disconnectInstagram : connectInstagram}
         />
+        {instagramConnected && business.botSettings?.instagramUsername && (
+          <div className="flex items-center gap-3 px-3 py-3 text-sm">
+            {business.botSettings.instagramProfilePicture && (
+              <img
+                src={business.botSettings.instagramProfilePicture}
+                alt=""
+                className="size-9 rounded-full"
+              />
+            )}
+            <div>
+              <div className="font-semibold">
+                @{business.botSettings.instagramUsername}
+              </div>
+              <div className="text-xs text-slate-500">
+                Instagram professional account connected
+              </div>
+            </div>
+          </div>
+        )}
         <ConnectionRow
           label="WhatsApp"
           icon={MessageCircle}
           connected={whatsAppConnected}
           actionLabel="Giriş yap"
           disabled={saving || !business.slug}
-          onAction={onReconnectWhatsApp}
+          onAction={whatsAppConnected ? onDisconnectWhatsApp : onReconnectWhatsApp}
         />
       </div>
       <GoogleCalendarIntegrationPanel
         calendarId={business.calendarId || ""}
         saving={saving}
         onSave={(calendarId) => onUpdateAndSave({ calendarId })}
+        onDisconnect={() => onUpdateAndSave({ calendarId: "" })}
       />
       <div className="mt-5 rounded border border-slate-200 p-3">
+        <ToggleRow
+          label="Bot aktif"
+          description="Kapalıyken bağlı kanallar mesaj alsa bile otomatik yanıt vermez."
+          checked={business.is_active}
+          onChange={(value) => onTogglePatch("is_active", value)}
+        />
         <ToggleRow
           label="Test modu"
           description="Açıkken bot yalnızca işletme telefonundan gelen test mesajlarına yanıt verir."
@@ -1283,12 +1756,14 @@ function GoogleCalendarIntegrationPanel({
   calendarId,
   saving,
   onSave,
+  onDisconnect,
   showSave = true,
   onEmailChange,
 }: {
   calendarId: string;
   saving: boolean;
   onSave?: (calendarId: string) => Promise<boolean> | void;
+  onDisconnect?: () => Promise<boolean> | void;
   showSave?: boolean;
   onEmailChange?: (calendarId: string) => void;
 }) {
@@ -1310,6 +1785,11 @@ function GoogleCalendarIntegrationPanel({
       <h2 className="text-lg font-semibold text-slate-900">
         Google Takvim Entegrasyonu
       </h2>
+      {calendarId && (
+        <div className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+          Bağlı ve senkronize: {calendarId}
+        </div>
+      )}
       <p className="mt-1 text-sm text-slate-600">
         Takvim sahibinin e-posta adresini girin.{" "}
         <strong>Aşağıdaki açıklamayı okuyun.</strong>
@@ -1336,7 +1816,7 @@ function GoogleCalendarIntegrationPanel({
         <p>4. Rol olarak "Editor" seçin ve kaydedin.</p>
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-[200px_1fr_auto] md:items-center">
+      <div className="mt-5 grid gap-3 md:grid-cols-[200px_1fr_auto_auto] md:items-center">
         <label
           htmlFor="calendar-email"
           className="text-sm font-semibold text-slate-900"
@@ -1361,6 +1841,17 @@ function GoogleCalendarIntegrationPanel({
             className="h-10 bg-slate-900 px-5 text-white hover:bg-slate-800"
           >
             {saving ? "Kaydediliyor..." : "Kaydet"}
+          </Button>
+        )}
+        {showSave && calendarId && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={saving}
+            onClick={() => onDisconnect?.()}
+            className="h-10"
+          >
+            Bağlantıyı kes
           </Button>
         )}
       </div>

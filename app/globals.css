@@ -153,3 +153,119 @@
   to { opacity: 1; transform: translateY(0); }
 }
 .fade-in { animation: fadeIn 0.3s ease forwards; }
+
+.dark .dashboard-app .bg-white {
+  background-color: rgb(15 23 42);
+  color: rgb(226 232 240);
+}
+
+.dark .dashboard-app .bg-slate-50,
+.dark .dashboard-app .bg-slate-100 {
+  background-color: rgb(30 41 59);
+}
+
+.dark .dashboard-app .bg-\[\#eef2f7\],
+.dark .dashboard-app header {
+  background-color: rgb(15 23 42);
+  border-color: rgb(51 65 85);
+}
+
+.dark .dashboard-app header button.text-slate-600,
+.dark .dashboard-app header .text-slate-600 {
+  color: rgb(203 213 225);
+}
+
+.dark .dashboard-app header .hover\:bg-white:hover,
+.dark .dashboard-app .hover\:bg-white:hover {
+  background-color: rgb(30 41 59);
+}
+
+.dark .dashboard-app .text-slate-800,
+.dark .dashboard-app .text-slate-700,
+.dark .dashboard-app .text-slate-600 {
+  color: rgb(226 232 240);
+}
+
+.dark .dashboard-app .text-slate-500 {
+  color: rgb(148 163 184);
+}
+
+.dark .dashboard-app .border-slate-200,
+.dark .dashboard-app .border-slate-300 {
+  border-color: rgb(51 65 85);
+}
+
+.dark .dashboard-app input,
+.dark .dashboard-app textarea,
+.dark .dashboard-app select {
+  background-color: rgb(15 23 42);
+  color: rgb(226 232 240);
+  border-color: rgb(51 65 85);
+}
+
+.dark .dashboard-app input::placeholder,
+.dark .dashboard-app textarea::placeholder {
+  color: rgb(100 116 139);
+}
+
+.dark .dashboard-app table,
+.dark .dashboard-app thead,
+.dark .dashboard-app tbody,
+.dark .dashboard-app tr {
+  background-color: transparent;
+}
+
+.dark .dashboard-app .hover\:bg-slate-50:hover,
+.dark .dashboard-app .hover\:bg-slate-100:hover {
+  background-color: rgb(30 41 59);
+}
+
+.dark .dashboard-app .bg-\[\#fffde9\],
+.dark .dashboard-app .bg-\[\#e8f4e3\],
+.dark .dashboard-app .bg-\[\#eef5e9\],
+.dark .dashboard-app .bg-\[\#fff4e8\],
+.dark .dashboard-app .bg-\[\#f4efcf\],
+.dark .dashboard-app .bg-\[\#f7efc0\],
+.dark .dashboard-app .bg-\[\#fff8d8\] {
+  background-color: rgb(30 41 59);
+}
+
+.dark .dashboard-app .bg-emerald-50 {
+  background-color: rgb(6 78 59);
+}
+
+.dark .dashboard-app .bg-red-50 {
+  background-color: rgb(127 29 29);
+}
+
+.dark .dashboard-app .bg-amber-50 {
+  background-color: rgb(120 53 15);
+}
+
+.dark .dashboard-app .border-emerald-200 {
+  border-color: rgb(16 185 129);
+}
+
+.dark .dashboard-app .border-red-200 {
+  border-color: rgb(248 113 113);
+}
+
+.dark .dashboard-app .border-amber-200 {
+  border-color: rgb(251 191 36);
+}
+
+.dark .dashboard-app .text-green-800,
+.dark .dashboard-app .text-pink-700,
+.dark .dashboard-app .text-emerald-700,
+.dark .dashboard-app .text-emerald-800,
+.dark .dashboard-app .text-red-800,
+.dark .dashboard-app .text-amber-900 {
+  color: rgb(226 232 240);
+}
+
+.dark .dashboard-app .shadow-sm,
+.dark .dashboard-app .shadow,
+.dark .dashboard-app .shadow-lg,
+.dark .dashboard-app .shadow-xl {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+}

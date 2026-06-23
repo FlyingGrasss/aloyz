@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import { useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
@@ -50,7 +51,6 @@ export type ViewId =
   | "client/list"
   | "product_sale/list"
   | "package_sale/list"
-  | "pos/pos_application"
   | "report/cashier"
   | "report/staff"
   | "report/sales"
@@ -58,8 +58,6 @@ export type ViewId =
   | "messaging/whatsapp/register"
   | "messaging/whatsapp/reminder-messages"
   | "messaging/instagram/list"
-  | "messaging/instagram/dashboard"
-  | "sms/apply"
   | "other/commissions"
   | "other/review/list"
   | "other/call_log/list"
@@ -79,13 +77,11 @@ export type SetupViewId =
   | "setup/services"
   | "setup/service_durations"
   | "setup/service_prices"
-  | "setup/promotions"
   | "setup/products"
   | "setup/service_packages"
   | "setup/booking_settings"
   | "setup/tag_settings"
   | "setup/salon-bot-settings"
-  | "setup/instagram-audiences"
   | "setup/connections";
 
 export type Conversation = {
@@ -119,6 +115,10 @@ export type StaffMember = {
   role: string;
   onlineBooking: boolean;
   calendarVisible: boolean;
+  workingHours?: Record<string, string>;
+  breakHours?: BreakHourItem[];
+  commissionRate?: number;
+  commissionNotes?: string;
 };
 
 export type ServiceItem = {
@@ -151,6 +151,7 @@ export type CustomerProfile = {
 
 export type CheckoutItem = {
   id: string;
+  customerId?: string;
   customerName: string;
   date: string;
   hour: string;
@@ -158,11 +159,30 @@ export type CheckoutItem = {
   notes: string;
   staffId: string;
   serviceId: string;
+  lines?: CheckoutServiceLine[];
   duration: number;
   amount: number;
   discount: number;
+  attendance?: "Belirtilmemiş" | "Geldi" | "Gelmedi";
+  payments?: CheckoutPayment[];
   status: string;
   createdAt: string;
+};
+
+export type CheckoutServiceLine = {
+  id: string;
+  staffId: string;
+  serviceId: string;
+  duration: number;
+  amount: number;
+  merged?: boolean;
+};
+
+export type CheckoutPayment = {
+  id: string;
+  date: string;
+  amount: number;
+  method: string;
 };
 
 export type PromotionsSettings = {
@@ -171,6 +191,189 @@ export type PromotionsSettings = {
   rewardUsage: string;
   birthdayDiscount: string;
   onlineBookingDiscount: string;
+  products?: ProductCatalogItem[];
+  packages?: PackageCatalogItem[];
+  productSales?: ProductSaleItem[];
+  packageSales?: PackageSaleItem[];
+  expenses?: ExpenseItem[];
+  payments?: PaymentItem[];
+  receivables?: LedgerItem[];
+  debts?: LedgerItem[];
+  reviews?: ReviewItem[];
+  callLogs?: CallLogItem[];
+  commissions?: CommissionItem[];
+  specialWorkingHours?: SpecialWorkingHourItem[];
+  tags?: ClientTagItem[];
+  audiences?: AudienceItem[];
+};
+
+export type BreakHourItem = {
+  id: string;
+  label: string;
+  start: string;
+  end: string;
+  days: string[];
+};
+
+export type ProductCatalogItem = {
+  id: string;
+  name: string;
+  barcode: string;
+  price: number;
+};
+
+export type PackageCatalogItem = {
+  id: string;
+  name: string;
+  type: string;
+  serviceId: string;
+  quantity: number;
+  price: number;
+};
+
+export type ProductSaleLine = {
+  id: string;
+  productId: string;
+  name: string;
+  quantity: number;
+  amount: number;
+};
+
+export type ProductSaleItem = {
+  id: string;
+  customerId?: string;
+  date: string;
+  customerName: string;
+  sellerId: string;
+  notes: string;
+  lines: ProductSaleLine[];
+  paid: boolean;
+  total: number;
+  paidAmount: number;
+  createdBy: string;
+  createdAt: string;
+};
+
+export type PackageSaleLine = {
+  id: string;
+  packageId: string;
+  name: string;
+  packageType: string;
+  serviceId: string;
+  quantity: number;
+  amount: number;
+};
+
+export type PackageSaleItem = {
+  id: string;
+  customerId?: string;
+  date: string;
+  customerName: string;
+  sellerId: string;
+  notes: string;
+  lines: PackageSaleLine[];
+  hasExpiry: boolean;
+  openPaymentWindow: boolean;
+  createReceivable: boolean;
+  total: number;
+  paidAmount: number;
+  createdBy: string;
+  createdAt: string;
+};
+
+export type ExpenseItem = {
+  id: string;
+  date: string;
+  category: string;
+  title: string;
+  amount: number;
+  paymentMethod: string;
+  status: string;
+  notes: string;
+  createdAt: string;
+};
+
+export type PaymentItem = {
+  id: string;
+  date: string;
+  customerId?: string;
+  customerName: string;
+  amount: number;
+  method: string;
+  source: string;
+  notes: string;
+  createdAt: string;
+};
+
+export type LedgerItem = {
+  id: string;
+  date: string;
+  customerId?: string;
+  personName: string;
+  amount: number;
+  paidAmount: number;
+  description: string;
+  status: string;
+  reminderSentAt?: string;
+  createdAt: string;
+};
+
+export type ReviewItem = {
+  id: string;
+  date: string;
+  customerId?: string;
+  customerName: string;
+  rating: number;
+  channel: string;
+  comment: string;
+  status: string;
+};
+
+export type CallLogItem = {
+  id: string;
+  date: string;
+  customerId?: string;
+  customerName: string;
+  phone: string;
+  direction: string;
+  result: string;
+  notes: string;
+};
+
+export type CommissionItem = {
+  id: string;
+  date: string;
+  staffId: string;
+  source: string;
+  amount: number;
+  status: string;
+};
+
+export type SpecialWorkingHourItem = {
+  id: string;
+  title: string;
+  date: string;
+  open: boolean;
+  start: string;
+  end: string;
+  staffIds: string[];
+};
+
+export type ClientTagItem = {
+  id: string;
+  name: string;
+  color: string;
+  discountRate: number;
+};
+
+export type AudienceItem = {
+  id: string;
+  name: string;
+  channel: string;
+  filter: string;
+  size: number;
+  status: string;
+  createdAt: string;
 };
 
 export type BookingSettings = {
@@ -182,15 +385,27 @@ export type BookingSettings = {
   packageWindow: boolean;
   waitingListWindow: boolean;
   googleOnlineBooking: boolean;
+  calendarView?: string;
+  calendarWidth?: string;
+  calendarSlotInterval?: string;
+  calendarTextColor?: string;
+  breakHours?: BreakHourItem[];
 };
 
 export type BotSettings = {
   instagram: boolean;
   whatsapp: boolean;
+  instagramConnected?: boolean;
+  instagramUsername?: string;
+  instagramProfilePicture?: string;
+  whatsappConnected?: boolean;
+  active?: boolean;
 };
 
 export type Business = {
   id: string;
+  createdAt?: string;
+  updatedAt?: string;
   slug: string;
   name: string;
   type: string;
@@ -293,7 +508,6 @@ export const setupItems: NavItem[] = [
     label: "Hizmet fiyatları",
     icon: CircleDollarSign,
   },
-  { id: "setup/promotions", label: "Promosyonlar", icon: Percent },
   { id: "setup/products", label: "Ürünler", icon: Tag },
   { id: "setup/service_packages", label: "Paketler", icon: Package },
   {
@@ -306,11 +520,6 @@ export const setupItems: NavItem[] = [
     id: "setup/salon-bot-settings",
     label: "Salon BOT Ayarları",
     icon: MessageCircle,
-  },
-  {
-    id: "setup/instagram-audiences",
-    label: "Meta Hedef Kitleleri",
-    icon: Users,
   },
   {
     id: "setup/connections",
@@ -357,7 +566,7 @@ export const navGroups: NavGroup[] = [
           },
           {
             id: "messaging/whatsapp/register",
-            label: "İşletme Kaydı",
+            label: "WhatsApp Kurulumu",
             icon: MessageCircle,
           },
           {
@@ -574,6 +783,107 @@ export function UtilityModal({
   onClose: () => void;
   onLogout: () => void;
 }) {
+  const [darkMode, setDarkMode] = useState(false);
+  const [language, setLanguage] = useState("tr");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [repeatPassword, setRepeatPassword] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    appointments: true,
+    messages: true,
+    payments: true,
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storedTheme = localStorage.getItem("aloyz-theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const nextDarkMode = storedTheme ? storedTheme === "dark" : prefersDark;
+    document.documentElement.classList.toggle("dark", nextDarkMode);
+    setDarkMode(nextDarkMode);
+    setLanguage(localStorage.getItem("aloyz-language") || "tr");
+    const savedPrefs = localStorage.getItem("aloyz-notifications");
+    if (savedPrefs) {
+      try {
+        setNotificationPrefs({
+          appointments: true,
+          messages: true,
+          payments: true,
+          ...JSON.parse(savedPrefs),
+        });
+      } catch {
+        setNotificationPrefs({
+          appointments: true,
+          messages: true,
+          payments: true,
+        });
+      }
+    }
+  }, []);
+
+  function applyTheme(nextDarkMode: boolean) {
+    setDarkMode(nextDarkMode);
+    document.documentElement.classList.toggle("dark", nextDarkMode);
+    localStorage.setItem("aloyz-theme", nextDarkMode ? "dark" : "light");
+  }
+
+  function applyLanguage(nextLanguage: string) {
+    setLanguage(nextLanguage);
+    document.documentElement.lang = nextLanguage;
+    document.documentElement.dataset.language = nextLanguage;
+    localStorage.setItem("aloyz-language", nextLanguage);
+    window.dispatchEvent(
+      new CustomEvent("aloyz-language-change", { detail: nextLanguage }),
+    );
+  }
+
+  async function changePassword() {
+    setPasswordMessage("");
+    if (!currentPassword || !newPassword || !repeatPassword) {
+      setPasswordMessage("Tüm şifre alanlarını doldurun.");
+      return;
+    }
+    if (newPassword !== repeatPassword) {
+      setPasswordMessage("Yeni şifreler eşleşmiyor.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordMessage("Yeni şifre en az 8 karakter olmalı.");
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      const res = await fetch("/api/auth/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPasswordMessage(data.error || "Şifre değiştirilemedi.");
+        return;
+      }
+      setPasswordMessage("Şifre güncellendi.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setRepeatPassword("");
+      window.setTimeout(onClose, 700);
+    } finally {
+      setPasswordSaving(false);
+    }
+  }
+
+  function updateNotificationPref(
+    key: keyof typeof notificationPrefs,
+    checked: boolean,
+  ) {
+    const next = { ...notificationPrefs, [key]: checked };
+    setNotificationPrefs(next);
+    localStorage.setItem("aloyz-notifications", JSON.stringify(next));
+  }
+
   const title =
     type === "theme"
       ? "Tema ayarları"
@@ -587,13 +897,13 @@ export function UtilityModal({
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 p-4">
-      <section className="w-full max-w-md rounded bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+      <section className="w-full max-w-md rounded bg-white shadow-xl dark:bg-slate-900 dark:text-slate-100">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
           <h2 className="font-semibold">{title}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="grid size-8 place-items-center rounded hover:bg-slate-100"
+            className="grid size-8 place-items-center rounded hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <X className="size-4" />
           </button>
@@ -603,46 +913,128 @@ export function UtilityModal({
             <div className="grid grid-cols-2 gap-3">
               <Button
                 type="button"
-                className="bg-white text-slate-800 ring-1 ring-slate-200"
+                onClick={() => applyTheme(false)}
+                className={
+                  darkMode
+                    ? "bg-white text-slate-800 ring-1 ring-slate-200"
+                    : "bg-[#5f86b6] text-white"
+                }
               >
                 Açık tema
               </Button>
-              <Button type="button" variant="outline">
+              <Button
+                type="button"
+                onClick={() => applyTheme(true)}
+                className={
+                  darkMode
+                    ? "bg-[#1f2937] text-white"
+                    : "bg-white text-slate-800 ring-1 ring-slate-200"
+                }
+              >
                 Koyu tema
               </Button>
             </div>
           )}
           {type === "language" && (
             <div className="grid grid-cols-2 gap-3">
-              <Button type="button" className="bg-[#5f86b6] text-white">
+              <Button
+                type="button"
+                onClick={() => applyLanguage("tr")}
+                className={
+                  language === "tr"
+                    ? "bg-[#5f86b6] text-white"
+                    : "bg-white text-slate-800 ring-1 ring-slate-200"
+                }
+              >
                 Türkçe
               </Button>
-              <Button type="button" variant="outline">
+              <Button
+                type="button"
+                onClick={() => applyLanguage("en")}
+                className={
+                  language === "en"
+                    ? "bg-[#5f86b6] text-white"
+                    : "bg-white text-slate-800 ring-1 ring-slate-200"
+                }
+              >
                 English
               </Button>
             </div>
           )}
           {type === "password" && (
             <div className="grid gap-3">
-              <Input type="password" placeholder="Mevcut şifre" />
-              <Input type="password" placeholder="Yeni şifre" />
-              <Input type="password" placeholder="Yeni şifre tekrar" />
-              <Button type="button" className="bg-[#5f86b6] text-white">
-                Kaydet
+              <Input
+                type="password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                placeholder="Mevcut şifre"
+              />
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                placeholder="Yeni şifre"
+              />
+              <Input
+                type="password"
+                value={repeatPassword}
+                onChange={(event) => {
+                  setRepeatPassword(event.target.value);
+                  if (newPassword && event.target.value !== newPassword) {
+                    setPasswordMessage("Yeni şifreler eşleşmiyor.");
+                  } else {
+                    setPasswordMessage("");
+                  }
+                }}
+                placeholder="Yeni şifre tekrar"
+              />
+              {passwordMessage && (
+                <p className="text-sm text-slate-600 dark:text-slate-300">{passwordMessage}</p>
+              )}
+              <Button
+                type="button"
+                disabled={
+                  passwordSaving ||
+                  !currentPassword ||
+                  !newPassword ||
+                  !repeatPassword ||
+                  newPassword !== repeatPassword ||
+                  newPassword.length < 8
+                }
+                onClick={changePassword}
+                className="bg-[#5f86b6] text-white"
+              >
+                {passwordSaving ? "Kaydediliyor..." : "Kaydet"}
               </Button>
             </div>
           )}
           {type === "notifications" && (
-            <EmptyState
-              title="Bildirim yok"
-              description="Yeni bildirimler burada görünecek."
-            />
-          )}
-          {type === "create" && (
-            <EmptyState
-              title="Kayıt oluşturma"
-              description="Bu akış bir sonraki adımda gerçek formlara bağlanacak."
-            />
+            <div className="grid gap-3">
+              <ToggleRow
+                label="Randevu bildirimleri"
+                description="Yeni randevu ve adisyon güncellemeleri."
+                checked={notificationPrefs.appointments}
+                onChange={(checked) =>
+                  updateNotificationPref("appointments", checked)
+                }
+              />
+              <ToggleRow
+                label="Mesaj bildirimleri"
+                description="WhatsApp ve Instagram konuşmaları."
+                checked={notificationPrefs.messages}
+                onChange={(checked) =>
+                  updateNotificationPref("messages", checked)
+                }
+              />
+              <ToggleRow
+                label="Ödeme bildirimleri"
+                description="Tahsilat, alacak ve borç hareketleri."
+                checked={notificationPrefs.payments}
+                onChange={(checked) =>
+                  updateNotificationPref("payments", checked)
+                }
+              />
+            </div>
           )}
           {type === "logout" && (
             <Button type="button" onClick={onLogout}>

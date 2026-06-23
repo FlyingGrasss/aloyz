@@ -5,8 +5,9 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function DELETE(request: NextRequest) {
   const session = await auth()
   const userRole = (session?.user as any)?.role
+  const userId = session?.user?.id
 
-  if (!session || userRole !== 'admin') {
+  if (!session) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },
@@ -31,6 +32,17 @@ export async function DELETE(request: NextRequest) {
 
     if (!slug) {
       return NextResponse.json({ error: 'slug is required' }, { status: 400 })
+    }
+
+    if (userRole !== 'admin') {
+      const ownedBusiness = await prisma.business.findFirst({
+        where: { slug, ownerId: userId },
+        select: { id: true },
+      })
+
+      if (!ownedBusiness) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     }
 
     const evolutionUrl = process.env.EVOLUTION_URL || 'http://localhost:8080'

@@ -290,7 +290,7 @@ export function Topbar({
   onSearchChange: (value: string) => void;
   onSelectView: (view: ViewId) => void;
   onOpenModal: (
-    modal: "theme" | "language" | "password" | "create" | "notifications",
+    modal: "theme" | "language" | "password" | "notifications",
   ) => void;
 }) {
   return (
@@ -370,7 +370,13 @@ export function Topbar({
                   key={item.label}
                   icon={item.icon}
                   label={item.label}
-                  onClick={() => onOpenModal("create")}
+                  onClick={() => {
+                    const target = createItemView(item.label);
+                    if (target) {
+                      onSelectView(target);
+                      onOpenMenu(null);
+                    }
+                  }}
                 />
               ))}
             </Dropdown>
@@ -481,4 +487,16 @@ export function Topbar({
       </div>
     </header>
   );
+}
+
+function createItemView(label: string): ViewId | null {
+  if (label === "Yeni randevu") return "calendar";
+  if (label === "Yeni adisyon") return "visit/list";
+  if (label === "Yeni müşteri") return "client/list";
+  if (label === "Yeni ürün satışı") return "product_sale/list";
+  if (label === "Yeni paket satışı") return "package_sale/list";
+  if (label === "Yeni masraf") return "other/expense/list";
+  if (label === "Yeni alacak") return "other/receivable/list";
+  if (label === "Yeni borç") return "other/debt/list";
+  return null;
 }

@@ -46,6 +46,7 @@ export function DashboardApp() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [openGroup, setOpenGroup] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState("");
+  const [dashboardLanguage, setDashboardLanguage] = useState("tr");
   const [selectedContactId, setSelectedContactId] = useState<string | null>(
     null,
   );
@@ -56,7 +57,7 @@ export function DashboardApp() {
     "date" | "create" | "settings" | "profile" | null
   >(null);
   const [modal, setModal] = useState<
-    "theme" | "language" | "password" | "create" | "notifications" | null
+    "theme" | "language" | "password" | "notifications" | null
   >(null);
   const [applyHoursPrompt, setApplyHoursPrompt] = useState<{
     dayKey: string;
@@ -76,6 +77,40 @@ export function DashboardApp() {
       router.push("/admin");
     }
   }, [adminBusinessId, router, session, status]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storedTheme = localStorage.getItem("aloyz-theme");
+    const storedLanguage = localStorage.getItem("aloyz-language") || "tr";
+    if (storedTheme) {
+      document.documentElement.classList.toggle("dark", storedTheme === "dark");
+    }
+    document.documentElement.lang = storedLanguage;
+    document.documentElement.dataset.language = storedLanguage;
+    setDashboardLanguage(storedLanguage);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (event: Event) => {
+      const nextLanguage =
+        event instanceof CustomEvent && typeof event.detail === "string"
+          ? event.detail
+          : localStorage.getItem("aloyz-language") || "tr";
+      setDashboardLanguage(nextLanguage);
+    };
+    window.addEventListener("aloyz-language-change", handler);
+    return () => window.removeEventListener("aloyz-language-change", handler);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const timer = window.setTimeout(
+      () => translateDashboardDom(dashboardLanguage),
+      0,
+    );
+    return () => window.clearTimeout(timer);
+  }, [dashboardLanguage, view, business, successMsg, errorMsg, modal, openMenu]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -107,27 +142,9 @@ export function DashboardApp() {
     [business.conversations, business.appointments],
   );
 
-  const filteredContacts = useMemo(() => {
-    const term = searchTerm.trim().toLocaleLowerCase("tr-TR");
-    if (!term) return contacts;
-    return contacts.filter((contact) =>
-      [
-        contact.name,
-        contact.subtitle,
-        contact.phone,
-        contact.username,
-        contact.lastMessage,
-      ]
-        .filter(Boolean)
-        .some((value) =>
-          String(value).toLocaleLowerCase("tr-TR").includes(term),
-        ),
-    );
-  }, [contacts, searchTerm]);
-
   const selectedContact =
-    filteredContacts.find((contact) => contact.id === selectedContactId) ||
-    filteredContacts[0] ||
+    contacts.find((contact) => contact.id === selectedContactId) ||
+    contacts[0] ||
     null;
   const forcedSetup = !savedSetupComplete && !isAdminMode;
 
@@ -317,10 +334,49 @@ export function DashboardApp() {
       const data = await res.json();
       if (res.ok && data.qrBase64) {
         setQrCodeBase64(data.qrBase64);
+        await updateAndSave({
+          botSettings: {
+            ...(business.botSettings || {}),
+            whatsappConnected: true,
+            whatsapp: true,
+          },
+        });
         setSuccessMsg("QR kod yüklendi.");
       } else {
         setErrorMsg(data.error || "QR kod alınamadı.");
       }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function disconnectWhatsApp() {
+    if (!business.slug) return;
+    setSaving(true);
+    setQrCodeBase64(null);
+    setErrorMsg("");
+    setSuccessMsg("");
+    try {
+      const res = await fetch(
+        `/api/instances/delete?slug=${encodeURIComponent(business.slug)}`,
+        { method: "DELETE" },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorMsg(data.error || "WhatsApp bağlantısı kesilemedi.");
+        return;
+      }
+      const nextBotSettings = {
+        ...(business.botSettings || {}),
+        whatsapp: false,
+        whatsappConnected: false,
+      };
+      await updateAndSave({
+        is_active: false,
+        botSettings: nextBotSettings,
+      });
+      setWhatsAppInstance(null);
+      setSuccessMsg("WhatsApp bağlantısı kesildi.");
     } finally {
       setSaving(false);
     }
@@ -406,7 +462,7 @@ export function DashboardApp() {
   }
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#e9edf3] text-slate-800">
+    <div className="dashboard-app min-h-screen overflow-hidden bg-[#e9edf3] text-slate-800 dark:bg-slate-950 dark:text-slate-100">
       <div className="flex min-h-screen">
         {!forcedSetup && (
           <Sidebar
@@ -433,7 +489,12 @@ export function DashboardApp() {
             onOpenMenu={setOpenMenu}
             onBack={goBack}
             onDateChange={setSelectedDate}
-            onSearchChange={setSearchTerm}
+            onSearchChange={(value) => {
+              setSearchTerm(value);
+              if (value.trim() && view !== "client/list") {
+                selectView("client/list");
+              }
+            }}
             onSelectView={selectView}
             onOpenModal={setModal}
           />
@@ -464,7 +525,7 @@ export function DashboardApp() {
                 business={business}
                 selectedDate={selectedDate}
                 onDateChange={setSelectedDate}
-                contacts={filteredContacts}
+                contacts={contacts}
                 selectedContact={selectedContact}
                 searchTerm={searchTerm}
                 saving={saving}
@@ -478,6 +539,7 @@ export function DashboardApp() {
                 onSelectContact={setSelectedContactId}
                 onTogglePatch={togglePatch}
                 onReconnectWhatsApp={reconnectWhatsApp}
+                onDisconnectWhatsApp={disconnectWhatsApp}
               />
             )}
           </main>
@@ -504,4 +566,137 @@ export function DashboardApp() {
       )}
     </div>
   );
+}
+
+const dashboardTranslations: Record<string, string> = {
+  "Özet": "Overview",
+  "Randevu takvimi": "Appointment calendar",
+  "Randevular": "Appointments",
+  "Adisyonlar": "Checkouts",
+  "Müşteriler": "Customers",
+  "Ürün satışları": "Product sales",
+  "Paket satışları": "Package sales",
+  "Raporlar": "Reports",
+  "Kasa raporu": "Cashier report",
+  "Personel raporu": "Staff report",
+  "Satış raporu": "Sales report",
+  "Mesajlaşma": "Messaging",
+  "WhatsApp": "WhatsApp",
+  "Instagram": "Instagram",
+  "Otomatik Mesajlar": "Automatic messages",
+  "WhatsApp Kurulumu": "WhatsApp setup",
+  "Hatırlatma Yanıtları": "Reminder replies",
+  "Mesajlar": "Messages",
+  "Diğer": "Other",
+  "Randevu Komisyonları": "Appointment commissions",
+  "Yorumlar": "Reviews",
+  "Arama kayıtları": "Call logs",
+  "Masraflar": "Expenses",
+  "Tahsilatlar": "Collections",
+  "Alacaklar": "Receivables",
+  "Borçlar": "Debts",
+  "Üyelik": "Subscription",
+  "Faturalar": "Invoices",
+  "Kurulum": "Setup",
+  "Bilgileri": "Information",
+  "Çalışma saatleri": "Working hours",
+  "Dönemsel çalışma saatleri": "Special working hours",
+  "Personeller": "Staff",
+  "Hizmetler": "Services",
+  "Hizmet süreleri": "Service durations",
+  "Hizmet fiyatları": "Service prices",
+  "Ürünler": "Products",
+  "Paketler": "Packages",
+  "Randevu ayarları": "Appointment settings",
+  "Etiket ayarları": "Tag settings",
+  "Salon BOT Ayarları": "Salon bot settings",
+  "Bağlantılar / Entegrasyonlar": "Connections / Integrations",
+  "Yeni": "New",
+  "Kaydet": "Save",
+  "Kaydediliyor...": "Saving...",
+  "Düzenle": "Edit",
+  "Sil": "Delete",
+  "Detay": "Details",
+  "Geri": "Back",
+  "Bugün": "Today",
+  "Tümü": "All",
+  "Tüm personel": "All staff",
+  "Müşteri": "Customer",
+  "Telefon": "Phone",
+  "E-posta": "Email",
+  "Notlar": "Notes",
+  "Tarih": "Date",
+  "Saat": "Time",
+  "Durum": "Status",
+  "Tutar": "Amount",
+  "Toplam tutar": "Total amount",
+  "Ödenen tutar": "Paid amount",
+  "Kalan ödeme": "Remaining payment",
+  "Filtrele / Sırala": "Filter / Sort",
+  "İndir": "Download",
+  "İçe aktar": "Import",
+  "Bağlantıyı Kes": "Disconnect",
+  "Giriş yap": "Sign in",
+  "Test modu": "Test mode",
+  "Aktif": "Active",
+  "Pasif": "Passive",
+  "Açık": "Open",
+  "Kapalı": "Closed",
+  "Kayıt bulunamadı": "No records found",
+  "Bildirim yok": "No notifications",
+  "Yeni bildirimler burada görünecek.": "New notifications will appear here.",
+  "Tema ayarları": "Theme settings",
+  "Dil değiştir": "Change language",
+  "Şifre değiştir": "Change password",
+  "Çıkış": "Sign out",
+  "Türkçe": "Turkish",
+  "Koyu tema": "Dark theme",
+  "Açık tema": "Light theme",
+  "Müşteri ara...": "Search customers...",
+};
+
+function translateDashboardDom(language: string) {
+  if (typeof document === "undefined") return;
+  const root = document.querySelector(".dashboard-app");
+  if (!root) return;
+  const textNodes: Text[] = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    textNodes.push(node as Text);
+    node = walker.nextNode();
+  }
+  for (const textNode of textNodes) {
+    const original = ((textNode as any).__aloyzSourceText ||
+      textNode.nodeValue ||
+      "") as string;
+    if (!(textNode as any).__aloyzSourceText) {
+      (textNode as any).__aloyzSourceText = original;
+    }
+    if (language === "en") {
+      const trimmed = original.trim();
+      const translated = dashboardTranslations[trimmed];
+      if (translated) {
+        textNode.nodeValue = original.replace(trimmed, translated);
+      }
+    } else {
+      textNode.nodeValue = original;
+    }
+  }
+  const elements = root.querySelectorAll<HTMLElement>(
+    "[placeholder], [title], [aria-label]",
+  );
+  for (const element of elements) {
+    for (const attr of ["placeholder", "title", "aria-label"]) {
+      const current = element.getAttribute(attr);
+      if (!current) continue;
+      const sourceAttr = `data-i18n-source-${attr.replace(/[^a-z]/g, "-")}`;
+      const source = element.getAttribute(sourceAttr) || current;
+      element.setAttribute(sourceAttr, source);
+      element.setAttribute(
+        attr,
+        language === "en" ? dashboardTranslations[source] || source : source,
+      );
+    }
+  }
 }

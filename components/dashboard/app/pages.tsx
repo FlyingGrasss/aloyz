@@ -5,6 +5,10 @@ import { OverviewPage } from "./overview";
 import { CalendarPage, AppointmentsPage } from "./calendar";
 import { CheckoutsPage } from "./checkouts";
 import { ContactsPage } from "./customers";
+import { PackageSalesPage, ProductSalesPage } from "./sales";
+import { FinancePage } from "./finance";
+import { ReportPage } from "./reports";
+import { AccountPage } from "./account";
 import { AutomaticMessagesPage, MessagingPage, ReminderRepliesPage, WhatsappRegisterPage } from "./whatsapp";
 import { InstagramMessagesPage } from "./instagram";
 import { SetupPage } from "./setup";
@@ -28,6 +32,7 @@ export function ContentRouter({
   onSelectContact,
   onTogglePatch,
   onReconnectWhatsApp,
+  onDisconnectWhatsApp,
 }: {
   view: ViewId;
   business: Business;
@@ -47,12 +52,14 @@ export function ContentRouter({
   onSelectContact: (id: string) => void;
   onTogglePatch: (field: "is_active" | "test_mode", value: boolean) => void;
   onReconnectWhatsApp: () => void;
+  onDisconnectWhatsApp: () => void;
 }) {
   if (view === "dashboard") {
     return (
       <OverviewPage
         business={business}
         contacts={contacts}
+        onUpdateAndSave={onUpdateAndSave}
         onSelectView={onSelectView}
       />
     );
@@ -95,8 +102,47 @@ export function ContentRouter({
       />
     );
   }
+  if (view === "product_sale/list") {
+    return (
+      <ProductSalesPage
+        business={business}
+        saving={saving}
+        onUpdateAndSave={onUpdateAndSave}
+      />
+    );
+  }
+  if (view === "package_sale/list") {
+    return (
+      <PackageSalesPage
+        business={business}
+        saving={saving}
+        onUpdateAndSave={onUpdateAndSave}
+      />
+    );
+  }
+  if (view.startsWith("report/")) {
+    return <ReportPage view={view} business={business} />;
+  }
+  if (view.startsWith("other/")) {
+    return (
+      <FinancePage
+        view={view}
+        business={business}
+        saving={saving}
+        onUpdateAndSave={onUpdateAndSave}
+      />
+    );
+  }
+  if (view === "subscription" || view === "invoice/list") {
+    return <AccountPage view={view} business={business} />;
+  }
   if (view === "messaging/whatsapp/sent-reminders") {
-    return <AutomaticMessagesPage onSelectView={onSelectView} />;
+    return (
+      <AutomaticMessagesPage
+        contacts={contacts}
+        onSelectView={onSelectView}
+      />
+    );
   }
   if (view === "messaging/whatsapp/register") {
     return (
@@ -109,7 +155,12 @@ export function ContentRouter({
     );
   }
   if (view === "messaging/whatsapp/reminder-messages") {
-    return <ReminderRepliesPage onSelectView={onSelectView} />;
+    return (
+      <ReminderRepliesPage
+        contacts={contacts}
+        onSelectView={onSelectView}
+      />
+    );
   }
   if (view === "messaging/instagram/list") {
     return <InstagramMessagesPage business={business} contacts={contacts} />;
@@ -139,6 +190,7 @@ export function ContentRouter({
         onUpdateAndSave={onUpdateAndSave}
         onTogglePatch={onTogglePatch}
         onReconnectWhatsApp={onReconnectWhatsApp}
+        onDisconnectWhatsApp={onDisconnectWhatsApp}
         onSelectView={onSelectView}
       />
     );
