@@ -42,6 +42,8 @@ export default function AdminPage() {
   const [localChanges, setLocalChanges] = useState<Record<string, { calendarId: string; slug: string; is_active: boolean; test_mode: boolean; instagram_page_id: string; instagram_access_token: string }>>({})
   const [rowLoading, setRowLoading] = useState<Record<string, boolean>>({})
   const [showInstagramToken, setShowInstagramToken] = useState<Record<string, boolean>>({})
+  const [passwordInputs, setPasswordInputs] = useState<Record<string, string>>({})
+  const [passwordLoading, setPasswordLoading] = useState<Record<string, boolean>>({})
 
   // Action status triggers
   const [actionSuccess, setActionSuccess] = useState('')
@@ -352,6 +354,42 @@ export default function AdminPage() {
       setActionError('Bağlantı hatası.')
     } finally {
       setRowLoading(prev => ({ ...prev, [businessId]: false }))
+    }
+  }
+
+  async function handleAdminPasswordChange(userId: string, email: string) {
+    const newPassword = passwordInputs[userId] || ''
+    setActionSuccess('')
+    setActionError('')
+
+    if (!newPassword || newPassword.length < 8) {
+      setActionError('Yeni şifre en az 8 karakter olmalı.')
+      return
+    }
+
+    if (!window.confirm(`${email} hesabının şifresini değiştirmek istediğinizden emin misiniz?`)) {
+      return
+    }
+
+    setPasswordLoading(prev => ({ ...prev, [userId]: true }))
+    try {
+      const res = await fetch('/api/admin/password', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, newPassword }),
+      })
+      const data = await res.json()
+
+      if (res.ok) {
+        setPasswordInputs(prev => ({ ...prev, [userId]: '' }))
+        setActionSuccess(`${data.email || email} hesabının şifresi güncellendi.`)
+      } else {
+        setActionError(data.error || 'Şifre güncellenemedi.')
+      }
+    } catch (err) {
+      setActionError('Şifre güncellenirken bağlantı hatası oluştu.')
+    } finally {
+      setPasswordLoading(prev => ({ ...prev, [userId]: false }))
     }
   }
 
@@ -713,6 +751,35 @@ export default function AdminPage() {
                             />
                           </div>
                         </div>
+
+                        {b.owner?.id && (
+                          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 bg-amber-50 p-3 rounded-xl border border-amber-200/70">
+                            <div className="flex items-center gap-3">
+                              <Label className="text-xs font-bold text-amber-800 shrink-0 w-28">Yeni Şifre:</Label>
+                              <Input
+                                type="text"
+                                placeholder={`${b.owner?.email || 'hesap'} için yeni şifre`}
+                                value={passwordInputs[b.owner.id] || ''}
+                                onChange={e =>
+                                  setPasswordInputs(prev => ({
+                                    ...prev,
+                                    [b.owner.id]: e.target.value,
+                                  }))
+                                }
+                                className="h-8 text-xs bg-white flex-1"
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={!!passwordLoading[b.owner.id] || !(passwordInputs[b.owner.id] || '').trim()}
+                              onClick={() => handleAdminPasswordChange(b.owner.id, b.owner?.email || 'hesap')}
+                              className="h-8 border-amber-300 bg-white text-xs font-bold text-amber-900 hover:bg-amber-100"
+                            >
+                              {passwordLoading[b.owner.id] ? 'Güncelleniyor...' : 'Şifreyi Değiştir'}
+                            </Button>
+                          </div>
+                        )}
 
                         {/* Instagram Integration Fields */}
                         <div className="bg-neutral-50 p-3 rounded-xl border border-neutral-200/60 space-y-2">

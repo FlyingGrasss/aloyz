@@ -41,7 +41,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { getContactDisplayName, getContactSubtitle } from "@/lib/contactDisplay";
+import {
+  getContactDisplayName,
+  getContactSubtitle,
+} from "@/lib/contactDisplay";
 
 export type ViewId =
   | "dashboard"
@@ -57,6 +60,7 @@ export type ViewId =
   | "messaging/whatsapp/sent-reminders"
   | "messaging/whatsapp/register"
   | "messaging/whatsapp/reminder-messages"
+  | "messaging/instagram/setup"
   | "messaging/instagram/list"
   | "other/commissions"
   | "other/review/list"
@@ -566,7 +570,7 @@ export const navGroups: NavGroup[] = [
           },
           {
             id: "messaging/whatsapp/register",
-            label: "WhatsApp Kurulumu",
+            label: "WP Kurulumu",
             icon: MessageCircle,
           },
           {
@@ -581,6 +585,11 @@ export const navGroups: NavGroup[] = [
         label: "Instagram",
         icon: MessageCircle,
         children: [
+          {
+            id: "messaging/instagram/setup",
+            label: "IG Kurulumu",
+            icon: MessageCircle,
+          },
           {
             id: "messaging/instagram/list",
             label: "Mesajlar",
@@ -799,7 +808,9 @@ export function UtilityModal({
   useEffect(() => {
     if (typeof window === "undefined") return;
     const storedTheme = localStorage.getItem("aloyz-theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const prefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)",
+    ).matches;
     const nextDarkMode = storedTheme ? storedTheme === "dark" : prefersDark;
     document.documentElement.classList.toggle("dark", nextDarkMode);
     setDarkMode(nextDarkMode);
@@ -989,7 +1000,9 @@ export function UtilityModal({
                 placeholder="Yeni şifre tekrar"
               />
               {passwordMessage && (
-                <p className="text-sm text-slate-600 dark:text-slate-300">{passwordMessage}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  {passwordMessage}
+                </p>
               )}
               <Button
                 type="button"
@@ -1148,7 +1161,13 @@ export function NativeSelect({
   );
 }
 
-export function Metric({ label, value }: { label: string; value: string | number }) {
+export function Metric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
   return (
     <div className="rounded bg-white p-4 shadow-sm">
       <div className="text-xs font-semibold uppercase text-slate-400">
@@ -1216,7 +1235,7 @@ export function ChannelBadge({ channel }: { channel: string }) {
     <span
       className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold ${channel === "instagram" ? "bg-pink-50 text-pink-700" : "bg-emerald-50 text-emerald-700"}`}
     >
-      {channel === "instagram" ? "IG" : "WA"}
+      {channel === "instagram" ? "IG" : "WP"}
     </span>
   );
 }
@@ -1365,7 +1384,9 @@ export function contactToCustomerProfile(contact: ContactRow): CustomerProfile {
   };
 }
 
-export function isNavSubGroup(item: NavItem | NavSubGroup): item is NavSubGroup {
+export function isNavSubGroup(
+  item: NavItem | NavSubGroup,
+): item is NavSubGroup {
   return "children" in item;
 }
 
@@ -1424,9 +1445,9 @@ export function normalizeArray<T = any>(value: unknown): T[] {
   return [];
 }
 
-export function normalizeObject<T extends Record<string, any> = Record<string, any>>(
-  value: unknown,
-): T {
+export function normalizeObject<
+  T extends Record<string, any> = Record<string, any>,
+>(value: unknown): T {
   if (value && typeof value === "object" && !Array.isArray(value))
     return value as T;
   if (typeof value === "string") {

@@ -23,6 +23,11 @@ This project uses **pnpm** exclusively. Never use `npm` or `yarn`.
 ## FAQ field shape
 Business `faqs` JSON array uses `{ question: string, answer: string }` keys.
 
+## Text Encoding and Turkish UI Copy
+- Preserve files as UTF-8.
+- Turkish UI text must use real Turkish characters (`ç`, `ğ`, `ı`, `İ`, `ö`, `ş`, `ü`) and must never be committed as mojibake or replacement characters.
+- When editing Turkish copy, verify suspicious text with a UTF-8-aware reader before finishing.
+
 ## Verification Discipline
 - Keep verification lightweight and proportional to the change.
 - Do not run `pnpm build` for routine checks unless explicitly requested or the change genuinely needs a production build.

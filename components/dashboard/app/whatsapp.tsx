@@ -213,7 +213,9 @@ export function WhatsappRegisterPage({
   const connected = whatsAppStatus === "open" || whatsAppStatus === "connected";
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-slate-700">İşletme Kaydı</h1>
+      <h1 className="text-2xl font-semibold text-slate-700">
+        WhatsApp Kurulumu
+      </h1>
       <section className="rounded bg-white p-4 shadow-sm">
         <div className="grid grid-cols-3 border-b border-slate-200 pb-3 text-center text-xs text-slate-500">
           <div>
@@ -226,7 +228,7 @@ export function WhatsappRegisterPage({
           </div>
           <div className="font-semibold text-slate-900">
             3<br />
-            WhatsApp Kaydı
+            WhatsApp Kurulumu
           </div>
         </div>
 

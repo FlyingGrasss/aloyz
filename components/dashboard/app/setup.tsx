@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -184,13 +184,11 @@ export function SetupPage({
               business={business}
               saving={saving}
               whatsAppStatus={whatsAppStatus}
-              qrCodeBase64={qrCodeBase64}
               onChange={onChange}
               onSave={onSave}
               onUpdateAndSave={onUpdateAndSave}
-              onTogglePatch={onTogglePatch}
-              onReconnectWhatsApp={onReconnectWhatsApp}
               onDisconnectWhatsApp={onDisconnectWhatsApp}
+              onSelectView={onSelectView}
             />
           )}
           {view === "setup/staff" && (
@@ -710,13 +708,13 @@ function StaffServicesModal({
   onClose: () => void;
 }) {
   const [search, setSearch] = useState("");
-  const linked = services.filter((service) =>
-    service.staffIds.includes(member.id),
-  ).filter((service) =>
-    service.name
-      .toLocaleLowerCase("tr-TR")
-      .includes(search.trim().toLocaleLowerCase("tr-TR")),
-  );
+  const linked = services
+    .filter((service) => service.staffIds.includes(member.id))
+    .filter((service) =>
+      service.name
+        .toLocaleLowerCase("tr-TR")
+        .includes(search.trim().toLocaleLowerCase("tr-TR")),
+    );
   return (
     <div className="fixed inset-0 z-50 grid place-items-start bg-slate-950/35 p-6">
       <section className="mx-auto mt-4 w-full max-w-2xl rounded bg-white shadow-xl">
@@ -747,7 +745,8 @@ function StaffServicesModal({
             />
           )}
           <p className="text-xs text-slate-500">
-            Hizmet atamaları Hizmetler sayfasındaki personel seçimlerinden yönetilir.
+            Hizmet atamaları Hizmetler sayfasındaki personel seçimlerinden
+            yönetilir.
           </p>
         </div>
       </section>
@@ -1293,7 +1292,10 @@ function BookingSettingsPage({
       title="Randevu ayarları"
       saving={saving}
       onSave={() =>
-        onUpdateAndSave({ bookingSettings: form, calendarId: calendarId.trim() })
+        onUpdateAndSave({
+          bookingSettings: form,
+          calendarId: calendarId.trim(),
+        })
       }
     >
       <SettingsSelect
@@ -1563,29 +1565,41 @@ function WorkingHoursForm({
                   onChange={(start) =>
                     saveBreakHours(
                       breakHours.map((breakHour) =>
-                        breakHour.id === item.id ? { ...breakHour, start } : breakHour,
+                        breakHour.id === item.id
+                          ? { ...breakHour, start }
+                          : breakHour,
                       ),
                     )
                   }
-                  options={TIME_OPTIONS.map((time) => ({ value: time, label: time }))}
+                  options={TIME_OPTIONS.map((time) => ({
+                    value: time,
+                    label: time,
+                  }))}
                 />
                 <NativeSelect
                   value={item.end}
                   onChange={(end) =>
                     saveBreakHours(
                       breakHours.map((breakHour) =>
-                        breakHour.id === item.id ? { ...breakHour, end } : breakHour,
+                        breakHour.id === item.id
+                          ? { ...breakHour, end }
+                          : breakHour,
                       ),
                     )
                   }
-                  options={TIME_OPTIONS.map((time) => ({ value: time, label: time }))}
+                  options={TIME_OPTIONS.map((time) => ({
+                    value: time,
+                    label: time,
+                  }))}
                 />
                 <Button
                   type="button"
                   variant="destructive"
                   onClick={() =>
                     saveBreakHours(
-                      breakHours.filter((breakHour) => breakHour.id !== item.id),
+                      breakHours.filter(
+                        (breakHour) => breakHour.id !== item.id,
+                      ),
                     )
                   }
                 >
@@ -1631,22 +1645,18 @@ function ConnectionsPanel({
   business,
   saving,
   whatsAppStatus,
-  qrCodeBase64,
   onUpdateAndSave,
-  onTogglePatch,
-  onReconnectWhatsApp,
   onDisconnectWhatsApp,
+  onSelectView,
 }: {
   business: Business;
   saving: boolean;
   whatsAppStatus: string | null;
-  qrCodeBase64: string | null;
   onChange: <K extends keyof Business>(field: K, value: Business[K]) => void;
   onSave: () => void;
   onUpdateAndSave: (fields: Partial<Business>) => Promise<boolean>;
-  onTogglePatch: (field: "is_active" | "test_mode", value: boolean) => void;
-  onReconnectWhatsApp: () => void;
   onDisconnectWhatsApp: () => void;
+  onSelectView: (view: ViewId) => void;
 }) {
   const whatsAppConnected =
     whatsAppStatus === "open" ||
@@ -1654,9 +1664,7 @@ function ConnectionsPanel({
     !!business.botSettings?.whatsappConnected;
   const instagramConnected =
     !!business.instagram_page_id || !!business.botSettings?.instagramConnected;
-  async function connectInstagram() {
-    window.location.href = "/api/integrations/instagram/connect";
-  }
+
   async function disconnectInstagram() {
     const res = await fetch("/api/integrations/instagram/disconnect", {
       method: "POST",
@@ -1673,6 +1681,7 @@ function ConnectionsPanel({
       });
     }
   }
+
   return (
     <section className="rounded bg-white p-4 shadow-sm">
       <h1 className="mb-8 text-2xl font-semibold text-slate-700">
@@ -1685,7 +1694,11 @@ function ConnectionsPanel({
           connected={instagramConnected}
           actionLabel="Giriş yap"
           disabled={saving}
-          onAction={instagramConnected ? disconnectInstagram : connectInstagram}
+          onAction={
+            instagramConnected
+              ? disconnectInstagram
+              : () => onSelectView("messaging/instagram/setup")
+          }
         />
         {instagramConnected && business.botSettings?.instagramUsername && (
           <div className="flex items-center gap-3 px-3 py-3 text-sm">
@@ -1701,7 +1714,7 @@ function ConnectionsPanel({
                 @{business.botSettings.instagramUsername}
               </div>
               <div className="text-xs text-slate-500">
-                Instagram professional account connected
+                Instagram profesyonel hesabı bağlı
               </div>
             </div>
           </div>
@@ -1712,7 +1725,11 @@ function ConnectionsPanel({
           connected={whatsAppConnected}
           actionLabel="Giriş yap"
           disabled={saving || !business.slug}
-          onAction={whatsAppConnected ? onDisconnectWhatsApp : onReconnectWhatsApp}
+          onAction={
+            whatsAppConnected
+              ? onDisconnectWhatsApp
+              : () => onSelectView("messaging/whatsapp/register")
+          }
         />
       </div>
       <GoogleCalendarIntegrationPanel
@@ -1721,37 +1738,9 @@ function ConnectionsPanel({
         onSave={(calendarId) => onUpdateAndSave({ calendarId })}
         onDisconnect={() => onUpdateAndSave({ calendarId: "" })}
       />
-      <div className="mt-5 rounded border border-slate-200 p-3">
-        <ToggleRow
-          label="Bot aktif"
-          description="Kapalıyken bağlı kanallar mesaj alsa bile otomatik yanıt vermez."
-          checked={business.is_active}
-          onChange={(value) => onTogglePatch("is_active", value)}
-        />
-        <ToggleRow
-          label="Test modu"
-          description="Açıkken bot yalnızca işletme telefonundan gelen test mesajlarına yanıt verir."
-          checked={business.test_mode}
-          onChange={(value) => onTogglePatch("test_mode", value)}
-        />
-      </div>
-      {qrCodeBase64 && (
-        <div className="mt-4 inline-flex rounded border border-slate-200 bg-white p-3">
-          <img
-            src={
-              qrCodeBase64.startsWith("data:")
-                ? qrCodeBase64
-                : `data:image/png;base64,${qrCodeBase64}`
-            }
-            alt="WhatsApp QR kodu"
-            className="size-44"
-          />
-        </div>
-      )}
     </section>
   );
 }
-
 function GoogleCalendarIntegrationPanel({
   calendarId,
   saving,

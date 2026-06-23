@@ -1,68 +1,169 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Bell,
-  CalendarDays,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  MessageCircle,
-  Pencil,
-  Plus,
-  Search,
-  Settings,
-  X,
-} from "lucide-react";
+import { ChevronDown, MessageCircle, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  ActionPanel,
-  Appointment,
-  BotSettings,
   Breadcrumb,
   Business,
-  ChannelBadge,
-  CheckoutItem,
   ContactRow,
-  CustomerProfile,
-  DAYS,
-  EmptyState,
-  InfoRow,
-  Metric,
-  ModalHeader,
-  NativeSelect,
-  PlaceholderPage,
-  PromotionsSettings,
-  ServiceItem,
-  SettingsPanel,
-  SettingsSelect,
-  SettingsToggle,
   StatusBanner,
-  StaffMember,
-  ToggleRow,
   ViewId,
-  SetupViewId,
-  BookingSettings,
-  formatDateLong,
-  formatInputDate,
-  formatLastUpdate,
-  formatServicePrice,
   getConversationMessages,
-  getViewLabel,
-  normalizeContactKey,
-  parseHourValue,
-  formatHourValue,
-  parseLooseNumber,
-  emptyStaff,
-  emptyService,
-  sanitizeStaffMember,
-  contactToCustomerProfile,
-  setupItems,
-  TIME_OPTIONS,
-  GOOGLE_SERVICE_ACCOUNT_EMAIL,
 } from "./shared";
+
+export function InstagramSetupPage({
+  business,
+  saving,
+  onUpdateAndSave,
+  onSelectView,
+}: {
+  business: Business;
+  saving: boolean;
+  onUpdateAndSave: (fields: Partial<Business>) => Promise<boolean>;
+  onSelectView: (view: ViewId) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const connected =
+    !!business.instagram_page_id || !!business.botSettings?.instagramConnected;
+  const username =
+    business.botSettings?.instagramUsername || business.instagram_page_id || "";
+
+  function connectInstagram() {
+    window.location.href = "/api/integrations/instagram/connect";
+  }
+
+  async function disconnectInstagram() {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/integrations/instagram/disconnect", {
+        method: "POST",
+      });
+      if (res.ok) {
+        await onUpdateAndSave({
+          botSettings: {
+            ...(business.botSettings || {}),
+            instagramConnected: false,
+            instagram: false,
+            instagramUsername: "",
+            instagramProfilePicture: "",
+          },
+        });
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Breadcrumb
+        items={[
+          { label: "Aloyz", view: "dashboard" },
+          { label: "Instagram", view: "messaging/instagram/setup" },
+          { label: "IG Kurulumu", view: "messaging/instagram/setup" },
+        ]}
+        onSelectView={onSelectView}
+      />
+      <section className="rounded bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-700">
+              Instagram Kurulumu
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Instagram profesyonel hesabınızı Aloyz mesaj kutusuna bağlayın.
+            </p>
+          </div>
+          {connected ? (
+            <Button
+              type="button"
+              disabled={busy || saving}
+              onClick={disconnectInstagram}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              Bağlantıyı Kes
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              disabled={busy || saving}
+              onClick={connectInstagram}
+              className="bg-[#24a647] text-white hover:bg-[#1f913e]"
+            >
+              Instagram ile Giriş Yap
+            </Button>
+          )}
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_320px]">
+          <div className="rounded border border-slate-200">
+            {[
+              "Instagram profesyonel hesabınızı seçin",
+              "Mesaj ve profil izinlerini onaylayın",
+              "Aloyz'a geri dönün",
+              "Mesajlarınızı Instagram > Mesajlar sayfasından yönetin",
+            ].map((step, index) => (
+              <div
+                key={step}
+                className="flex items-center gap-3 border-b border-slate-200 p-4 last:border-b-0"
+              >
+                <span className="grid size-8 place-items-center rounded-full bg-[#24a647] text-sm font-semibold text-white">
+                  {index + 1}
+                </span>
+                <span className="font-semibold text-slate-700">{step}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded border border-slate-200 p-4">
+            <div className="text-sm font-semibold text-slate-700">
+              Bağlantı durumu
+            </div>
+            {connected ? (
+              <div className="mt-4 space-y-4">
+                <div className="flex items-center gap-3">
+                  {business.botSettings?.instagramProfilePicture ? (
+                    <img
+                      src={business.botSettings.instagramProfilePicture}
+                      alt=""
+                      className="size-12 rounded-full"
+                    />
+                  ) : (
+                    <div className="grid size-12 place-items-center rounded-full bg-pink-100 text-pink-700">
+                      <MessageCircle className="size-5" />
+                    </div>
+                  )}
+                  <div>
+                    <div className="font-semibold">
+                      {username ? `@${username}` : "Instagram hesabı"}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Instagram professional account connected
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => onSelectView("messaging/instagram/list")}
+                  className="w-full bg-[#5f86b6] text-white"
+                >
+                  Mesajlara Git
+                </Button>
+              </div>
+            ) : (
+              <StatusBanner tone="warning">
+                Bağlantı için Instagram tarafından açılan izin ekranını
+                onaylamanız gerekir. Aloyz erişim kodunu sunucuda access token'a
+                çevirir ve hesabı işletmenize kaydeder.
+              </StatusBanner>
+            )}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
 
 export function InstagramMessagesPage({
   business,
@@ -83,7 +184,23 @@ export function InstagramMessagesPage({
     instagramContacts[0] ||
     null;
   const messages = active ? getConversationMessages(active.conversation) : [];
-  const account = business.instagram_page_id || business.slug || "emre.bozqurt";
+  const account =
+    business.botSettings?.instagramUsername ||
+    business.instagram_page_id ||
+    business.slug ||
+    "instagram";
+
+  function reconnectInstagram() {
+    window.location.href = "/api/integrations/instagram/connect";
+  }
+
+  async function disconnectInstagram() {
+    const res = await fetch("/api/integrations/instagram/disconnect", {
+      method: "POST",
+    });
+    if (res.ok) window.location.reload();
+  }
+
   return (
     <div className="min-h-[calc(100vh-96px)] rounded bg-white shadow-sm">
       <div className="grid min-h-[620px] md:grid-cols-[286px_1fr]">
@@ -92,23 +209,42 @@ export function InstagramMessagesPage({
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
-              className="font-semibold"
+              className="flex items-center gap-1 font-semibold"
             >
-              Instagram {account}⌄
+              Instagram @{account}
+              <ChevronDown className="size-4" />
             </button>
             <Search className="size-5" />
             {menuOpen && (
-              <div className="absolute left-0 top-8 z-20 w-48 rounded border border-slate-200 bg-white py-1 text-sm shadow">
-                <button className="block w-full px-3 py-2 text-left hover:bg-slate-50">
+              <div className="absolute left-0 top-8 z-20 w-56 rounded border border-slate-200 bg-white py-1 text-sm shadow">
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-left hover:bg-slate-50"
+                  onClick={() =>
+                    account &&
+                    window.open(`https://instagram.com/${account}`, "_blank")
+                  }
+                >
                   Instagram profilini görüntüle
                 </button>
-                <button className="block w-full px-3 py-2 text-left hover:bg-slate-50">
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-left hover:bg-slate-50"
+                >
                   Salon DM ayarları
                 </button>
-                <button className="block w-full px-3 py-2 text-left hover:bg-slate-50">
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-left hover:bg-slate-50"
+                  onClick={reconnectInstagram}
+                >
                   Instagram'a Yeniden Bağlan
                 </button>
-                <button className="block w-full px-3 py-2 text-left text-red-600 hover:bg-slate-50">
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-left text-red-600 hover:bg-slate-50"
+                  onClick={disconnectInstagram}
+                >
                   Instagram bağlantısını kes
                 </button>
               </div>
@@ -119,6 +255,7 @@ export function InstagramMessagesPage({
             {["Tümü", "Okunmamış", "Diğer"].map((tab) => (
               <button
                 key={tab}
+                type="button"
                 className="rounded-full border border-slate-300 px-4 py-1"
               >
                 {tab}
@@ -161,7 +298,9 @@ export function InstagramMessagesPage({
                 {messages.map((message, index) => (
                   <div
                     key={index}
-                    className={`mb-3 flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                    className={`mb-3 flex ${
+                      message.role === "user" ? "justify-end" : "justify-start"
+                    }`}
                   >
                     <div
                       className={`max-w-[76%] rounded px-3 py-2 text-sm leading-relaxed ${
