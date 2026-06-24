@@ -80,12 +80,13 @@ export function CheckoutsPage({
 }) {
   const [modal, setModal] = useState<"checkout" | "customer" | null>(null);
   const [newCustomerName, setNewCustomerName] = useState("");
+  const [newCustomerId, setNewCustomerId] = useState<string | undefined>();
   const [selectedCheckout, setSelectedCheckout] = useState<CheckoutItem | null>(
     null,
   );
   const [openActionMenu, setOpenActionMenu] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("Tümü");
-  const [dateFilter, setDateFilter] = useState("Bugün");
+  const [dateFilter, setDateFilter] = useState("Tümü");
   const [sortDesc, setSortDesc] = useState(true);
   const checkouts = business.checkouts || [];
   const filteredCheckouts = filterByPeriod(
@@ -97,7 +98,9 @@ export function CheckoutsPage({
   ).sort((a, b) => {
     const aValue = `${a.date}T${a.hour}:${a.minute}:00`;
     const bValue = `${b.date}T${b.hour}:${b.minute}:00`;
-    return sortDesc ? bValue.localeCompare(aValue) : aValue.localeCompare(bValue);
+    return sortDesc
+      ? bValue.localeCompare(aValue)
+      : aValue.localeCompare(bValue);
   });
 
   async function createCheckout(checkout: CheckoutItem) {
@@ -107,10 +110,12 @@ export function CheckoutsPage({
   }
 
   async function createCustomer(customer: CustomerProfile) {
-    await onUpdateAndSave({
+    setNewCustomerName(customer.name);
+    setNewCustomerId(customer.id);
+    setModal("checkout");
+    onUpdateAndSave({
       customers: [customer, ...(business.customers || [])],
     });
-    setModal("checkout");
   }
 
   async function updateCheckout(checkout: CheckoutItem) {
@@ -168,9 +173,9 @@ export function CheckoutsPage({
               value={dateFilter}
               onChange={setDateFilter}
               options={[
+                { value: "Tümü", label: "Tümü" },
                 { value: "Bugün", label: "Bugün" },
                 { value: "Bu ay", label: "Bu ay" },
-                { value: "Tümü", label: "Tümü" },
               ]}
             />
             <Button
@@ -246,7 +251,9 @@ export function CheckoutsPage({
                     <td className="px-3 py-3">{checkout.amount} TL</td>
                     <td className="px-3 py-3">{checkout.discount} TL</td>
                     <td className="px-3 py-3">{paid} TL</td>
-                    <td className="px-3 py-3">{Math.max(0, total - paid)} TL</td>
+                    <td className="px-3 py-3">
+                      {Math.max(0, total - paid)} TL
+                    </td>
                     <td className="px-3 py-3">
                       {formatLastUpdate(checkout.createdAt)}
                     </td>
@@ -324,9 +331,12 @@ export function CheckoutsPage({
           business={business}
           contacts={contacts}
           saving={saving}
+          initialCustomerName={newCustomerName}
+          initialCustomerId={newCustomerId}
           onClose={() => setModal(null)}
           onCreateCustomer={(name) => {
             setNewCustomerName(name);
+            setNewCustomerId(undefined);
             setModal("customer");
           }}
           onSubmit={createCheckout}
@@ -350,6 +360,7 @@ export function CheckoutModal({
   saving,
   initialDate,
   initialCustomerName,
+  initialCustomerId,
   onClose,
   onCreateCustomer,
   onSubmit,
@@ -359,6 +370,7 @@ export function CheckoutModal({
   saving: boolean;
   initialDate?: string;
   initialCustomerName?: string;
+  initialCustomerId?: string;
   onClose: () => void;
   onCreateCustomer: (name: string) => void;
   onSubmit: (checkout: CheckoutItem) => void;
@@ -368,7 +380,9 @@ export function CheckoutModal({
   const staff = business.staff || [];
   const services = business.services || [];
   const [customerName, setCustomerName] = useState(initialCustomerName || "");
-  const [customerId, setCustomerId] = useState<string | undefined>();
+  const [customerId, setCustomerId] = useState<string | undefined>(
+    initialCustomerId,
+  );
   const [date, setDate] = useState(
     initialDate || now.toISOString().slice(0, 10),
   );
@@ -398,7 +412,9 @@ export function CheckoutModal({
   ]);
   function selectCustomer(selection: CustomerSelection) {
     setCustomerName(selection.name);
-    setCustomerId(selection.id?.startsWith("contact:") ? undefined : selection.id);
+    setCustomerId(
+      selection.id?.startsWith("contact:") ? undefined : selection.id,
+    );
   }
   const completedLines = lines
     .map((line) => {
@@ -734,10 +750,23 @@ function CheckoutDetailsPage({
 }) {
   const [form, setForm] = useState<CheckoutItem>(checkout);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [localSaving, setLocalSaving] = useState(false);
   const lines = getCheckoutLines(form);
   const payments = form.payments || [];
   const paid = payments.reduce((sum, payment) => sum + payment.amount, 0);
   const total = Math.max(0, form.amount - form.discount);
+  const remaining = Math.max(0, total - paid);
+  const isSaving = saving || localSaving;
+
+  async function saveDetails() {
+    setLocalSaving(true);
+    try {
+      await onSave(form);
+    } finally {
+      setLocalSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Breadcrumb
@@ -749,16 +778,16 @@ function CheckoutDetailsPage({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-slate-700">Adisyon</h1>
         <div className="flex gap-2">
-          <Button type="button" variant="outline">
+          <Button type="button" variant="outline" onClick={() => window.print()}>
             Yazdır
           </Button>
           <Button
             type="button"
-            disabled={saving}
-            onClick={() => onSave(form)}
+            disabled={isSaving}
+            onClick={saveDetails}
             className="bg-[#24a647] text-white"
           >
-            {saving ? "Kaydediliyor..." : "Değişiklikleri kaydet"}
+            {isSaving ? "Kaydediliyor..." : "Değişiklikleri kaydet"}
           </Button>
           <Button type="button" variant="outline" onClick={onBack}>
             Listeye dön
@@ -775,7 +804,9 @@ function CheckoutDetailsPage({
               <Input
                 type="date"
                 value={form.date}
-                onChange={(event) => setForm({ ...form, date: event.target.value })}
+                onChange={(event) =>
+                  setForm({ ...form, date: event.target.value })
+                }
               />
               <NativeSelect
                 value={form.hour}
@@ -796,24 +827,28 @@ function CheckoutDetailsPage({
             </div>
             <Input
               value={form.notes || ""}
-              onChange={(event) => setForm({ ...form, notes: event.target.value })}
+              onChange={(event) =>
+                setForm({ ...form, notes: event.target.value })
+              }
               className="mt-3"
             />
             <div className="mt-3 grid grid-cols-3 overflow-hidden rounded text-sm text-white">
-              {(["Belirtilmemiş", "Geldi", "Gelmedi"] as const).map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => setForm({ ...form, attendance: status })}
-                  className={`px-3 py-2 ${
-                    (form.attendance || "Belirtilmemiş") === status
-                      ? "bg-slate-800"
-                      : "bg-slate-600"
-                  }`}
-                >
-                  {status}
-                </button>
-              ))}
+              {(["Belirtilmemiş", "Geldi", "Gelmedi"] as const).map(
+                (status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => setForm({ ...form, attendance: status })}
+                    className={`px-3 py-2 ${
+                      (form.attendance || "Belirtilmemiş") === status
+                        ? "bg-slate-800"
+                        : "bg-slate-600"
+                    }`}
+                  >
+                    {status}
+                  </button>
+                ),
+              )}
             </div>
           </section>
           <section className="rounded bg-white p-4 shadow-sm">
@@ -996,7 +1031,10 @@ function CheckoutDetailsPage({
               value={String(form.discount || 0)}
               inputMode="decimal"
               onChange={(event) =>
-                setForm({ ...form, discount: parseLooseNumber(event.target.value) })
+                setForm({
+                  ...form,
+                  discount: parseLooseNumber(event.target.value),
+                })
               }
               className="mt-3"
             />
@@ -1006,6 +1044,7 @@ function CheckoutDetailsPage({
               Tahsilatlar
               <Button
                 type="button"
+                disabled={remaining <= 0}
                 onClick={() => setPaymentOpen(true)}
                 className="bg-[#5f86b6] text-white"
               >
@@ -1037,23 +1076,23 @@ function CheckoutDetailsPage({
               </div>
               <div className="flex justify-between">
                 <span>Tahsil edilecek kalan tutar</span>
-                <span>{Math.max(0, total - paid)} TL</span>
+                <span>{remaining} TL</span>
               </div>
             </div>
           </section>
           <Button
             type="button"
-            disabled={saving}
-            onClick={() => onSave(form)}
+            disabled={isSaving}
+            onClick={saveDetails}
             className="w-full bg-[#24a647] text-white"
           >
-            {saving ? "Kaydediliyor..." : "Değişiklikleri kaydet"}
+            {isSaving ? "Kaydediliyor..." : "Değişiklikleri kaydet"}
           </Button>
         </aside>
       </div>
       {paymentOpen && (
         <PaymentModal
-          maxAmount={Math.max(0, total - paid)}
+          maxAmount={remaining}
           onClose={() => setPaymentOpen(false)}
           onSubmit={(payment) => {
             setForm((prev) => ({
@@ -1080,6 +1119,9 @@ function PaymentModal({
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [amount, setAmount] = useState(String(maxAmount || ""));
   const [method, setMethod] = useState("");
+  const amountValue = parseLooseNumber(amount);
+  const overLimit = amountValue > maxAmount;
+  const canSubmit = !!method && amountValue > 0 && !overLimit && maxAmount > 0;
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-start bg-slate-950/35 p-6">
@@ -1114,17 +1156,23 @@ function PaymentModal({
               { value: "Diğer", label: "Diğer" },
             ]}
           />
+          {overLimit && (
+            <p className="text-xs font-medium text-rose-600">
+              Kalan tutardan fazla tahsilat yapılamaz.
+            </p>
+          )}
           <Button
             type="button"
-            disabled={!method || parseLooseNumber(amount) <= 0}
-            onClick={() =>
+            disabled={!canSubmit}
+            onClick={() => {
+              if (!canSubmit) return;
               onSubmit({
                 id: crypto.randomUUID(),
                 date,
-                amount: parseLooseNumber(amount),
+                amount: amountValue,
                 method,
-              })
-            }
+              });
+            }}
             className="bg-[#5f86b6] text-white"
           >
             Kaydet
@@ -1135,7 +1183,11 @@ function PaymentModal({
   );
 }
 
-function filterByPeriod<T>(rows: T[], period: string, getDate: (item: T) => string) {
+function filterByPeriod<T>(
+  rows: T[],
+  period: string,
+  getDate: (item: T) => string,
+) {
   if (period === "Tümü") return [...rows];
   const today = new Date();
   const todayKey = today.toISOString().slice(0, 10);
@@ -1173,35 +1225,43 @@ function getCheckoutLines(checkout: CheckoutItem) {
   ];
 }
 
-function syncCheckoutToGoogleCalendar(business: Business, checkout: CheckoutItem) {
+export function syncCheckoutToGoogleCalendar(
+  business: Business,
+  checkout: CheckoutItem,
+) {
   if (!business.calendarId) return;
   const lines = getCheckoutLines(checkout);
   for (const line of lines) {
     const service = (business.services || []).find(
       (item) => item.id === line.serviceId,
     );
-    const staff = (business.staff || []).find((item) => item.id === line.staffId);
+    const staff = (business.staff || []).find(
+      (item) => item.id === line.staffId,
+    );
     const start = new Date(
       `${checkout.date}T${checkout.hour}:${checkout.minute}:00+03:00`,
     );
     const end = new Date(start.getTime() + line.duration * 60 * 1000);
-    fetch(`/api/calendar/events?businessId=${encodeURIComponent(business.id)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        summary: `${checkout.customerName} - ${service?.name || "Hizmet"}`,
-        description: [
-          checkout.notes,
-          staff ? `Personel: ${staff.name}` : null,
-          `Adisyon: ${checkout.id}`,
-        ]
-          .filter(Boolean)
-          .join("\n"),
-        start: start.toISOString(),
-        end: end.toISOString(),
-        checkoutId: checkout.id,
-        lineId: line.id,
-      }),
-    }).catch(() => undefined);
+    fetch(
+      `/api/calendar/events?businessId=${encodeURIComponent(business.id)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          summary: `${checkout.customerName} - ${service?.name || "Hizmet"}`,
+          description: [
+            checkout.notes,
+            staff ? `Personel: ${staff.name}` : null,
+            `Adisyon: ${checkout.id}`,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          start: start.toISOString(),
+          end: end.toISOString(),
+          checkoutId: checkout.id,
+          lineId: line.id,
+        }),
+      },
+    ).catch(() => undefined);
   }
 }

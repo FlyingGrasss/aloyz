@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { hash } from 'bcryptjs'
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { defaultAccessTill } from '@/lib/access'
 
 export async function POST(request: Request) {
   try {
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
       const slugBase = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'business'
       const uniqueSlug = `${slugBase}-${user.id.slice(-6)}`
 
+      const hasAccessTill = defaultAccessTill(user.createdAt).toISOString()
       const business = await tx.business.create({
         data: {
           ownerId: user.id,
@@ -63,6 +65,11 @@ export async function POST(request: Request) {
           hours: {}, // Empty hours object (no default hours)
           menu_or_services: '',
           faqs: [],
+          botSettings: {
+            instagram: false,
+            whatsapp: false,
+            hasAccessTill,
+          },
           is_active: false, // Default to false (WhatsApp inactive)
           test_mode: false
         }

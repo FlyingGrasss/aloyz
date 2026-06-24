@@ -4,6 +4,7 @@ import { Download, FileText, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Breadcrumb, Business, ViewId } from "./shared";
+import { getAccessTill, hasDashboardAccess } from "@/lib/access";
 
 const MONTHLY_PRICE = 500;
 const PAYMENT_IBAN = "0000";
@@ -15,8 +16,8 @@ export function AccountPage({
   view: ViewId;
   business: Business;
 }) {
-  const trial = getTrialState(business.createdAt);
-  const invoices = buildInvoices(trial);
+  const access = getAccessState(business);
+  const invoices = buildInvoices(access);
 
   if (view === "invoice/list") {
     return (
@@ -47,40 +48,44 @@ export function AccountPage({
 
   return (
     <SimpleAccountShell title="Üyelik">
-      <SubscriptionPanel business={business} trial={trial} />
+        <SubscriptionPanel
+          business={business}
+          access={access}
+        />
     </SimpleAccountShell>
   );
 }
 
 function SubscriptionPanel({
   business,
-  trial,
+  access,
 }: {
   business: Business;
-  trial: TrialState;
+  access: AccessState;
 }) {
-  const [paymentOpen, setPaymentOpen] = useState(trial.expired);
+  const paymentRequired = !access.active;
+  const [paymentOpen, setPaymentOpen] = useState(paymentRequired);
   return (
     <>
       <div className="grid gap-3 md:grid-cols-4">
-        <InfoCard label="İşletme" value={business.name || business.slug || "-"} />
+        <InfoCard
+          label="İşletme"
+          value={business.name || business.slug || "-"}
+        />
         <InfoCard label="Plan" value={`Aloyz - ${MONTHLY_PRICE} TL / ay`} />
         <InfoCard
           label="Durum"
-          value={trial.expired ? "Ödeme bekleniyor" : "Deneme süresi"}
+          value={access.active ? "Aktif" : "Ödeme bekleniyor"}
         />
-        <InfoCard
-          label="Deneme bitişi"
-          value={formatDate(trial.trialEndsAt)}
-        />
+        <InfoCard label="Erişim bitişi" value={formatDate(access.accessTill)} />
       </div>
 
       <div className="mt-4 rounded border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-        {trial.expired ? (
+        {paymentRequired ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              Deneme süreniz sona erdi. Devam etmek için aylık {MONTHLY_PRICE} TL
-              ödemeyi aşağıdaki IBAN'a gönderebilirsiniz.
+              Deneme süreniz sona erdi. Devam etmek için aylık {MONTHLY_PRICE}{" "}
+              TL ödemeyi aşağıdaki IBAN'a gönderebilirsiniz.
             </div>
             <Button
               type="button"
@@ -90,10 +95,15 @@ function SubscriptionPanel({
               Ödeme bilgileri
             </Button>
           </div>
+        ) : access.trialActive ? (
+          <div>
+            Deneme sürenizde {access.daysLeft} gün kaldı. Deneme süresi bittikten
+            sonra abonelik aylık {MONTHLY_PRICE} TL olarak devam eder.
+          </div>
         ) : (
           <div>
-            Deneme sürenizde {trial.daysLeft} gün kaldı. Deneme süresi bittikten
-            sonra abonelik aylık {MONTHLY_PRICE} TL olarak devam eder.
+            Üyeliğiniz aktif. Erişim bitiş tarihiniz:{" "}
+            <strong>{formatDate(access.accessTill)}</strong>.
           </div>
         )}
       </div>
@@ -133,17 +143,22 @@ function PaymentInfoModal({
             <div className="text-xs font-semibold uppercase text-slate-500">
               IBAN
             </div>
-            <div className="mt-1 font-mono text-lg font-semibold">{PAYMENT_IBAN}</div>
+            <div className="mt-1 font-mono text-lg font-semibold">
+              {PAYMENT_IBAN}
+            </div>
           </div>
           <p>
             Açıklama kısmına hesap e-postanızı yazın:
             <strong> {email}</strong>
           </p>
           <p>
-            Ödeme kontrolü şimdilik manuel yapılır. Ödeme görüldükten sonra
-            hesabın durumu admin panelinden güncellenir.
+            Ödemenizi yapmanızla beraber en fazla 1 gün içinde erişiminiz güncellenir.
           </p>
-          <Button type="button" onClick={onClose} className="bg-[#5f86b6] text-white">
+          <Button
+            type="button"
+            onClick={onClose}
+            className="bg-[#5f86b6] text-white"
+          >
             Tamam
           </Button>
         </div>
@@ -166,7 +181,11 @@ function SimpleAccountShell({
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <h1 className="text-xl font-semibold text-slate-700">{title}</h1>
           <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={() => window.print()}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => window.print()}
+            >
               <FileText className="size-4" />
               Detay
             </Button>
@@ -195,33 +214,52 @@ function InfoCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-type TrialState = {
+type AccessState = {
   createdAt: Date;
   trialEndsAt: Date;
+  accessTill: Date;
   daysLeft: number;
-  expired: boolean;
+  active: boolean;
+  trialActive: boolean;
 };
 
-function getTrialState(createdAtValue?: string): TrialState {
+function getAccessState(business: Business): AccessState {
+  const createdAtValue = business.createdAt;
   const createdAt = createdAtValue ? new Date(createdAtValue) : new Date();
-  const safeCreatedAt = Number.isNaN(createdAt.getTime()) ? new Date() : createdAt;
+  const safeCreatedAt = Number.isNaN(createdAt.getTime())
+    ? new Date()
+    : createdAt;
   const trialEndsAt = new Date(safeCreatedAt);
   trialEndsAt.setDate(safeCreatedAt.getDate() + 14);
-  const diffDays = Math.ceil((trialEndsAt.getTime() - Date.now()) / 86_400_000);
+  const accessTill = getAccessTill(business.botSettings, business.createdAt);
+  const diffDays = Math.ceil((accessTill.getTime() - Date.now()) / 86_400_000);
   return {
     createdAt: safeCreatedAt,
     trialEndsAt,
+    accessTill,
     daysLeft: Math.max(0, diffDays),
-    expired: diffDays <= 0,
+    active: hasDashboardAccess(business.botSettings, business.createdAt),
+    trialActive: Date.now() <= trialEndsAt.getTime(),
   };
 }
 
-function buildInvoices(trial: TrialState) {
-  if (!trial.expired) {
+function buildInvoices(access: AccessState) {
+  if (access.active && !access.trialActive) {
+    return [
+      {
+        id: "active-subscription",
+        date: formatDate(new Date()),
+        description: "Aloyz aylık abonelik",
+        amount: MONTHLY_PRICE,
+        status: "Aktif",
+      },
+    ];
+  }
+  if (access.trialActive && access.active) {
     return [
       {
         id: "trial",
-        date: formatDate(trial.createdAt),
+        date: formatDate(access.createdAt),
         description: "14 günlük ücretsiz deneme",
         amount: 0,
         status: "Aktif",
@@ -231,7 +269,7 @@ function buildInvoices(trial: TrialState) {
   return [
     {
       id: "monthly-current",
-      date: formatDate(trial.trialEndsAt),
+      date: formatDate(access.accessTill),
       description: "Aloyz aylık abonelik",
       amount: MONTHLY_PRICE,
       status: "Ödeme bekleniyor",
@@ -259,13 +297,16 @@ function collectVisibleRows() {
   const table = document.querySelector("section table");
   if (table) {
     return Array.from(table.querySelectorAll("tr")).map((row) =>
-      Array.from(row.querySelectorAll("th,td")).map((cell) =>
-        cell.textContent?.trim() || "",
+      Array.from(row.querySelectorAll("th,td")).map(
+        (cell) => cell.textContent?.trim() || "",
       ),
     );
   }
-  return Array.from(document.querySelectorAll("section .rounded.border")).map((card) =>
-    Array.from(card.querySelectorAll("div")).map((node) => node.textContent?.trim() || ""),
+  return Array.from(document.querySelectorAll("section .rounded.border")).map(
+    (card) =>
+      Array.from(card.querySelectorAll("div")).map(
+        (node) => node.textContent?.trim() || "",
+      ),
   );
 }
 

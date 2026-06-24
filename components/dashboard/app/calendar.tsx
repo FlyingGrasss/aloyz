@@ -156,7 +156,11 @@ export function CalendarPage({
     )
       .then((res) => (res.ok ? res.json() : { events: [] }))
       .then((data) => {
-        const events = data.events || [];
+        const events = (data.events || []).filter(
+          (event: any) =>
+            !event.extendedProperties?.private?.checkoutId &&
+            !String(event.description || "").includes("Adisyon:"),
+        );
         setGoogleAppointments(
           events.map((event: any) => {
             const startValue = event.start?.dateTime || event.start?.date;
@@ -580,7 +584,43 @@ export function CalendarPage({
   );
 }
 
-export function AppointmentsPage({ appointments }: { appointments: Appointment[] }) {
+export function AppointmentsPage({
+  appointments,
+  business,
+}: {
+  appointments: Appointment[];
+  business: Business;
+}) {
+  const checkoutRows = (business.checkouts || []).map((checkout) => {
+    const customer = (business.customers || []).find(
+      (item) =>
+        item.id === checkout.customerId || item.name === checkout.customerName,
+    );
+    return {
+      id: `checkout-${checkout.id}`,
+      customerName: checkout.customerName,
+      phone: customer?.phone || "-",
+      date: checkout.date,
+      time: `${checkout.hour}:${checkout.minute}`,
+      description: getCheckoutServiceSummary(business, checkout) || "Adisyon",
+      status: checkout.attendance || checkout.status || "-",
+      source: "Adisyon",
+    };
+  });
+  const appointmentRows = appointments.map((appointment) => ({
+    id: `appointment-${appointment.id}`,
+    customerName: appointment.customerName,
+    phone: appointment.phone || "-",
+    date: appointment.date,
+    time: appointment.time,
+    description: appointment.description,
+    status: appointment.status,
+    source: "Bot / Google",
+  }));
+  const rows = [...checkoutRows, ...appointmentRows].sort((a, b) =>
+    `${b.date}T${b.time}`.localeCompare(`${a.date}T${a.time}`),
+  );
+
   return (
     <div className="space-y-4">
       <Breadcrumb
@@ -591,7 +631,7 @@ export function AppointmentsPage({ appointments }: { appointments: Appointment[]
       />
       <section className="rounded bg-white p-4 shadow-sm">
         <h1 className="text-xl font-semibold text-slate-700">
-          Randevular ({appointments.length})
+          Randevular ({rows.length})
         </h1>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
@@ -603,10 +643,11 @@ export function AppointmentsPage({ appointments }: { appointments: Appointment[]
                 <th className="px-3 py-3">Saat</th>
                 <th className="px-3 py-3">Not</th>
                 <th className="px-3 py-3">Durum</th>
+                <th className="px-3 py-3">Kaynak</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {appointments.map((appointment) => (
+              {rows.map((appointment) => (
                 <tr key={appointment.id}>
                   <td className="px-3 py-3 font-medium">
                     {appointment.customerName}
@@ -616,12 +657,13 @@ export function AppointmentsPage({ appointments }: { appointments: Appointment[]
                   <td className="px-3 py-3">{appointment.time}</td>
                   <td className="px-3 py-3">{appointment.description}</td>
                   <td className="px-3 py-3">{appointment.status}</td>
+                  <td className="px-3 py-3">{appointment.source}</td>
                 </tr>
               ))}
-              {appointments.length === 0 && (
+              {rows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-3 py-10 text-center text-slate-400"
                   >
                     Randevu yok.

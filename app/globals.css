@@ -154,6 +154,130 @@
 }
 .fade-in { animation: fadeIn 0.3s ease forwards; }
 
+@layer components {
+  .dashboard-app {
+    --dashboard-bg: rgb(244 247 251);
+    --dashboard-panel: rgb(255 255 255);
+    --dashboard-panel-border: rgb(226 232 240);
+    --dashboard-muted-panel: rgb(248 250 252);
+    --dashboard-primary: rgb(37 99 235);
+    background-color: var(--dashboard-bg);
+  }
+
+  .dashboard-app main {
+    background:
+      linear-gradient(180deg, rgb(248 250 252) 0%, var(--dashboard-bg) 100%);
+  }
+
+  .dashboard-app section.rounded.bg-white,
+  .dashboard-app aside.rounded.bg-white,
+  .dashboard-app div.rounded.bg-white,
+  .dashboard-app .rounded.bg-white.shadow-sm,
+  .dashboard-app .rounded.bg-white.shadow,
+  .dashboard-app .rounded.bg-white.shadow-lg,
+  .dashboard-app .rounded.bg-white.shadow-xl {
+    border: 1px solid var(--dashboard-panel-border);
+    border-radius: 8px;
+    background-color: var(--dashboard-panel);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+  }
+
+  .dashboard-app table {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .dashboard-app thead {
+    background-color: var(--dashboard-muted-panel);
+  }
+
+  .dashboard-app th {
+    height: 40px;
+    color: rgb(71 85 105);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+
+  .dashboard-app td {
+    height: 44px;
+    color: rgb(30 41 59);
+  }
+
+  .dashboard-app tbody tr {
+    transition:
+      background-color 140ms ease,
+      box-shadow 140ms ease;
+  }
+
+  .dashboard-app tbody tr:hover {
+    background-color: rgb(248 250 252);
+  }
+
+  .dashboard-app input,
+  .dashboard-app textarea,
+  .dashboard-app select {
+    border-radius: 8px;
+    border-color: rgb(203 213 225);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+  }
+
+  .dashboard-app input:focus-visible,
+  .dashboard-app textarea:focus-visible,
+  .dashboard-app select:focus-visible {
+    border-color: var(--dashboard-primary);
+    box-shadow:
+      0 0 0 3px rgb(37 99 235 / 0.14),
+      0 1px 2px rgb(15 23 42 / 0.04);
+    outline: none;
+  }
+
+  .dashboard-app button {
+    border-radius: 8px;
+  }
+
+  .dashboard-app .bg-\[\#5f86b6\] {
+    background-color: var(--dashboard-primary);
+  }
+
+  .dashboard-app .hover\:bg-\[\#4f75a5\]:hover,
+  .dashboard-app .bg-\[\#5f86b6\]:hover {
+    background-color: rgb(29 78 216);
+  }
+
+  .dashboard-app .bg-\[\#24a647\],
+  .dashboard-app .bg-\[\#27a844\] {
+    background-color: rgb(22 163 74);
+  }
+
+  .dashboard-app .bg-\[\#24a647\]:hover,
+  .dashboard-app .bg-\[\#27a844\]:hover {
+    background-color: rgb(21 128 61);
+  }
+
+  .dashboard-app .text-\[\#5f86b6\] {
+    color: var(--dashboard-primary);
+  }
+
+  .dashboard-app .border-\[\#5f86b6\] {
+    border-color: var(--dashboard-primary);
+  }
+
+  .dashboard-app [class*="fixed"][class*="inset-0"] > section,
+  .dashboard-app [class*="fixed"][class*="inset-0"] > div {
+    border: 1px solid var(--dashboard-panel-border);
+    border-radius: 8px;
+    box-shadow:
+      0 24px 60px rgb(15 23 42 / 0.20),
+      0 2px 8px rgb(15 23 42 / 0.08);
+  }
+
+  .dashboard-app .divide-y > :not([hidden]) ~ :not([hidden]) {
+    border-color: rgb(226 232 240);
+  }
+}
+
 .dark .dashboard-app .bg-white {
   background-color: rgb(15 23 42);
   color: rgb(226 232 240);

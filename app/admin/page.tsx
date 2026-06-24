@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { getContactDisplayName, getContactSubtitle } from '@/lib/contactDisplay'
+import { defaultAccessTill, formatAccessInputDate } from '@/lib/access'
 
 function getMessageText(m: any): string {
   if (!m) return ''
@@ -18,6 +19,23 @@ function getMessageText(m: any): string {
     return m.parts.map((p: any) => p.text || '').join('\n')
   }
   return m.content || m.text || ''
+}
+
+function getAdminAccessTill(business: any) {
+  const explicit = business?.botSettings?.hasAccessTill
+    ? new Date(business.botSettings.hasAccessTill)
+    : null
+  if (explicit && !Number.isNaN(explicit.getTime())) {
+    return formatAccessInputDate(explicit)
+  }
+  return formatAccessInputDate(defaultAccessTill(business?.createdAt))
+}
+
+function addOneMonthToAccessDate(value: string) {
+  const source = value ? new Date(`${value}T12:00:00`) : new Date()
+  const safeSource = Number.isNaN(source.getTime()) ? new Date() : source
+  safeSource.setMonth(safeSource.getMonth() + 1)
+  return formatAccessInputDate(safeSource)
 }
 
 export default function AdminPage() {
@@ -39,7 +57,7 @@ export default function AdminPage() {
   const [instancesLoading, setInstancesLoading] = useState(false)
 
   // Row changes state tracking
-  const [localChanges, setLocalChanges] = useState<Record<string, { calendarId: string; slug: string; is_active: boolean; test_mode: boolean; instagram_page_id: string; instagram_access_token: string }>>({})
+  const [localChanges, setLocalChanges] = useState<Record<string, { calendarId: string; slug: string; is_active: boolean; test_mode: boolean; hasAccessTill: string; instagram_page_id: string; instagram_access_token: string }>>({})
   const [rowLoading, setRowLoading] = useState<Record<string, boolean>>({})
   const [showInstagramToken, setShowInstagramToken] = useState<Record<string, boolean>>({})
   const [passwordInputs, setPasswordInputs] = useState<Record<string, string>>({})
@@ -141,6 +159,7 @@ export default function AdminPage() {
         slug: biz?.slug || '',
         is_active: !!biz?.is_active,
         test_mode: !!biz?.test_mode,
+        hasAccessTill: getAdminAccessTill(biz),
         instagram_page_id: biz?.instagram_page_id || '',
         instagram_access_token: biz?.instagram_access_token || '',
       }
@@ -317,6 +336,7 @@ export default function AdminPage() {
       slug: biz?.slug || '',
       is_active: !!biz?.is_active,
       test_mode: !!biz?.test_mode,
+      hasAccessTill: getAdminAccessTill(biz),
       instagram_page_id: biz?.instagram_page_id || '',
       instagram_access_token: biz?.instagram_access_token || '',
     }
@@ -331,6 +351,12 @@ export default function AdminPage() {
           is_active: current.is_active,
           test_mode: current.test_mode,
           slug: current.slug,
+          botSettings: {
+            ...(biz?.botSettings || {}),
+            hasAccessTill: current.hasAccessTill
+              ? new Date(`${current.hasAccessTill}T23:59:59`).toISOString()
+              : undefined,
+          },
           instagram_page_id: current.instagram_page_id,
           instagram_access_token: current.instagram_access_token,
         }),
@@ -341,7 +367,21 @@ export default function AdminPage() {
         setBusinesses(prev =>
           prev.map(b =>
             b.id === businessId
-              ? { ...b, calendarId: current.calendarId, is_active: current.is_active, test_mode: current.test_mode, slug: current.slug, instagram_page_id: current.instagram_page_id, instagram_access_token: current.instagram_access_token }
+              ? {
+                  ...b,
+                  calendarId: current.calendarId,
+                  is_active: current.is_active,
+                  test_mode: current.test_mode,
+                  slug: current.slug,
+                  botSettings: {
+                    ...(b.botSettings || {}),
+                    hasAccessTill: current.hasAccessTill
+                      ? new Date(`${current.hasAccessTill}T23:59:59`).toISOString()
+                      : undefined,
+                  },
+                  instagram_page_id: current.instagram_page_id,
+                  instagram_access_token: current.instagram_access_token,
+                }
               : b
           )
         )
@@ -647,6 +687,7 @@ export default function AdminPage() {
                       slug: b.slug || '',
                       is_active: !!b.is_active,
                       test_mode: !!b.test_mode,
+                      hasAccessTill: getAdminAccessTill(b),
                       instagram_page_id: b.instagram_page_id || '',
                       instagram_access_token: b.instagram_access_token || '',
                     }
@@ -726,6 +767,27 @@ export default function AdminPage() {
                               <option value="disabled">Kapalı</option>
                               <option value="enabled">Açık</option>
                             </select>
+                            <span className="text-xs font-semibold text-neutral-500">Erişim Bitişi:</span>
+                            <Input
+                              type="date"
+                              value={rowChanges.hasAccessTill}
+                              onChange={e => updateLocalField(b.id, 'hasAccessTill', e.target.value)}
+                              className="h-8 w-36 text-xs bg-white"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() =>
+                                updateLocalField(
+                                  b.id,
+                                  'hasAccessTill',
+                                  addOneMonthToAccessDate(rowChanges.hasAccessTill),
+                                )
+                              }
+                              className="h-8 px-2 text-xs font-bold"
+                            >
+                              +1 Ay
+                            </Button>
                           </div>
                         </div>
 

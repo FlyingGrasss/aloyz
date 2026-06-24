@@ -385,7 +385,7 @@ function SalesShell({
   );
 }
 
-function ProductSaleModal({
+export function ProductSaleModal({
   business,
   products,
   saving,
@@ -560,7 +560,7 @@ function ProductSaleModal({
   );
 }
 
-function PackageSaleModal({
+export function PackageSaleModal({
   business,
   packages,
   saving,

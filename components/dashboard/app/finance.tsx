@@ -315,7 +315,7 @@ function LedgerTable({
           <Trash2 className="size-4" />
         </Button>,
       ])}
-      footer={`${label} toplamı: ${money(sum(rows, "amount"))}`}
+      footer={`${label === "Alacak" ? "Toplam alacak" : "Toplam borç"}: ${money(sum(rows, "amount"))}`}
     />
   );
 }
@@ -337,7 +337,7 @@ function CommissionTable({
         money(item.amount),
         item.status,
       ])}
-      footer={`Komisyon toplamı: ${money(sum(rows, "amount"))}`}
+      footer={`Toplam komisyon: ${money(sum(rows, "amount"))}`}
     />
   );
 }
@@ -425,7 +425,7 @@ function DataTable({
   );
 }
 
-function ExpenseModal({
+export function ExpenseModal({
   saving,
   onClose,
   onSubmit,
@@ -471,7 +471,7 @@ function ExpenseModal({
   );
 }
 
-function PaymentModal({
+export function PaymentModal({
   business,
   saving,
   onCreateCustomer,
@@ -555,7 +555,7 @@ function PaymentModal({
   );
 }
 
-function LedgerModal({
+export function LedgerModal({
   business,
   title,
   saving,
@@ -645,7 +645,7 @@ function LedgerModal({
   );
 }
 
-function CommissionModal({
+export function CommissionModal({
   business,
   saving,
   onClose,

@@ -9,7 +9,13 @@ import { PackageSalesPage, ProductSalesPage } from "./sales";
 import { FinancePage } from "./finance";
 import { ReportPage } from "./reports";
 import { AccountPage } from "./account";
-import { AutomaticMessagesPage, MessagingPage, ReminderRepliesPage, WhatsappRegisterPage } from "./whatsapp";
+import {
+  AutomaticMessagesPage,
+  MessagingPage,
+  ReminderRepliesPage,
+  WhatsappMessagesPage,
+  WhatsappRegisterPage,
+} from "./whatsapp";
 import { InstagramMessagesPage, InstagramSetupPage } from "./instagram";
 import { SetupPage } from "./setup";
 
@@ -79,7 +85,12 @@ export function ContentRouter({
       />
     );
   if (view === "booking/list") {
-    return <AppointmentsPage appointments={business.appointments || []} />;
+    return (
+      <AppointmentsPage
+        appointments={business.appointments || []}
+        business={business}
+      />
+    );
   }
   if (view === "visit/list") {
     return (
@@ -147,10 +158,21 @@ export function ContentRouter({
   if (view === "messaging/whatsapp/register") {
     return (
       <WhatsappRegisterPage
+        business={business}
         whatsAppStatus={whatsAppStatus}
         qrCodeBase64={qrCodeBase64}
         saving={saving}
+        onUpdateAndSave={onUpdateAndSave}
+        onSelectView={onSelectView}
         onReconnectWhatsApp={onReconnectWhatsApp}
+      />
+    );
+  }
+  if (view === "messaging/whatsapp/list") {
+    return (
+      <WhatsappMessagesPage
+        business={business}
+        contacts={contacts}
       />
     );
   }

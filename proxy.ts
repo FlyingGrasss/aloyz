@@ -1,35 +1,47 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { hasDashboardAccess } from "@/lib/access";
 
-// In Next.js 16, middleware is renamed to "proxy".
-// We can't call the NextAuth `auth()` helper here (requires Node.js runtime),
-// so we check for the NextAuth session cookie directly.
-export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl
+const ALLOWED_EXPIRED_VIEWS = new Set(["subscription", "invoice/list"]);
 
-  // NextAuth v5 uses an "authjs.session-token" cookie in production
-  // and "__Secure-authjs.session-token" on HTTPS
-  const sessionCookie =
-    request.cookies.get('authjs.session-token') ??
-    request.cookies.get('__Secure-authjs.session-token')
+export async function proxy(request: NextRequest) {
+  const session = await auth();
+  const user = session?.user as { id?: string; role?: string } | undefined;
 
-  const isLoggedIn = Boolean(sessionCookie)
-
-  // Protect dashboard routes
-  if (pathname.startsWith('/dashboard')) {
-    if (!isLoggedIn) {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
+  if (!user?.id || user.role === "admin") {
+    return NextResponse.next();
   }
 
-  // Redirect logged-in users away from login
-  if (pathname === '/login' && isLoggedIn) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  const view = request.nextUrl.searchParams.get("view");
+  if (view && ALLOWED_EXPIRED_VIEWS.has(view)) {
+    return NextResponse.next();
   }
 
-  return NextResponse.next()
+  const business = await prisma.business.findFirst({
+    where: { ownerId: user.id },
+    select: { createdAt: true, botSettings: true },
+  });
+
+  if (!business) {
+    return NextResponse.next();
+  }
+
+  const botSettings = business.botSettings as
+    | { hasAccessTill?: string }
+    | null;
+
+  if (!hasDashboardAccess(botSettings, business.createdAt)) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    url.searchParams.set("view", "subscription");
+    url.searchParams.set("billing", "expired");
+    return NextResponse.redirect(url);
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login'],
-}
+  matcher: ["/dashboard", "/dashboard/:path*"],
+};

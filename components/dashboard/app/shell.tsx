@@ -6,7 +6,6 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronLeft,
-  Eye,
   FileText,
   Languages,
   LockKeyhole,
@@ -55,11 +54,10 @@ export function Sidebar({
 }) {
   return (
     <aside
-      className={`relative hidden shrink-0 border-r border-white/10 text-white shadow-xl transition-[width] duration-200 md:flex md:flex-col ${
+      className={`relative hidden shrink-0 border-r border-slate-800/80 bg-[#111827] text-white shadow-xl shadow-slate-950/10 transition-[width] duration-200 md:flex md:flex-col ${
         collapsed ? "w-[70px]" : "w-[204px]"
-      } bg-[linear-gradient(180deg,#293247_0%,#4a3b3c_42%,#9b6849_64%,#2d2832_100%)]`}
+      }`}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_55%,rgba(255,189,110,0.23),transparent_25%),linear-gradient(180deg,rgba(5,10,20,0.15),rgba(5,10,20,0.42))]" />
       <div
         className={`relative flex h-16 items-center gap-2 px-3 ${collapsed ? "justify-center" : ""}`}
       >
@@ -76,7 +74,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={onToggleCollapsed}
-          className={`${collapsed ? "" : "ml-auto"} grid size-8 place-items-center rounded-md bg-white/12 text-white hover:bg-white/20`}
+          className={`${collapsed ? "" : "ml-auto"} grid size-8 place-items-center rounded-lg bg-white/8 text-white ring-1 ring-white/10 hover:bg-white/14`}
           title={collapsed ? "Menüyü aç" : "Menüyü daralt"}
         >
           {collapsed ? (
@@ -115,10 +113,10 @@ export function Sidebar({
                 <button
                   type="button"
                   onClick={() => onToggleGroup(group.key)}
-                  className={`flex h-9 items-center gap-2 rounded-sm text-left text-sm font-medium transition ${
+                  className={`flex h-9 items-center gap-2 rounded-lg text-left text-sm font-medium transition ${
                     groupActive
-                      ? "bg-[#b4cf9d] text-slate-800"
-                      : "text-white hover:bg-white/12"
+                      ? "bg-white text-slate-950 shadow-sm"
+                      : "text-slate-300 hover:bg-white/8 hover:text-white"
                   } ${collapsed ? "w-9 justify-center px-0" : "w-full px-2"}`}
                   title={group.label}
                 >
@@ -132,7 +130,9 @@ export function Sidebar({
                       BETA
                     </span>
                   )}
-                  <Icon className="size-4 shrink-0" />
+                  <Icon
+                    className={`size-4 shrink-0 ${group.iconClassName || ""}`}
+                  />
                   {!collapsed && (
                     <ChevronDown
                       className={`size-4 transition ${open ? "rotate-180" : ""}`}
@@ -199,11 +199,11 @@ function SidebarSubGroup({
         type="button"
         onClick={onToggle}
         className={`flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left text-xs font-medium transition ${
-          active ? "bg-white/16 text-[#b4cf9d]" : "text-white hover:bg-white/12"
+          active ? "bg-white/12 text-white" : "text-slate-300 hover:bg-white/8 hover:text-white"
         }`}
       >
         <span className="min-w-0 flex-1 truncate">{group.label}</span>
-        <Icon className="size-4 shrink-0" />
+        <Icon className={`size-4 shrink-0 ${group.iconClassName || ""}`} />
         <ChevronDown
           className={`size-4 transition ${open ? "rotate-180" : ""}`}
         />
@@ -244,8 +244,8 @@ function SidebarItem({
     <button
       type="button"
       onClick={() => onSelect(item.id)}
-      className={`flex h-9 items-center gap-2 rounded-sm text-left text-sm font-medium transition ${
-        active ? "bg-[#b4cf9d] text-slate-800" : "text-white hover:bg-white/12"
+      className={`flex h-9 items-center gap-2 rounded-lg text-left text-sm font-medium transition ${
+        active ? "bg-white text-slate-950 shadow-sm" : "text-slate-300 hover:bg-white/8 hover:text-white"
       } ${compact ? "text-xs" : ""} ${collapsed ? "w-9 justify-center px-0" : "w-full px-2"}`}
       title={item.label}
     >
@@ -257,7 +257,7 @@ function SidebarItem({
           BETA
         </span>
       )}
-      <Icon className="size-4 shrink-0" />
+      <Icon className={`size-4 shrink-0 ${item.iconClassName || ""}`} />
     </button>
   );
 }
@@ -276,6 +276,7 @@ export function Topbar({
   onSearchChange,
   onSelectView,
   onOpenModal,
+  onCreateItem,
 }: {
   business: Business;
   selectedDate: string;
@@ -292,15 +293,16 @@ export function Topbar({
   onOpenModal: (
     modal: "theme" | "language" | "password" | "notifications",
   ) => void;
+  onCreateItem: (label: string) => void;
 }) {
   return (
-    <header className="z-20 h-16 shrink-0 border-b border-slate-300 bg-[#eef2f7] shadow-sm">
-      <div className="flex h-full items-center gap-3 px-3 md:px-6">
+    <header className="z-20 h-16 shrink-0 border-b border-slate-200/80 bg-white/90 shadow-sm shadow-slate-900/5 backdrop-blur supports-[backdrop-filter]:bg-white/75">
+      <div className="flex h-full items-center gap-2 px-3 md:gap-3 md:px-6">
         <Button
           type="button"
           variant="outline"
           onClick={onBack}
-          className="h-8 bg-white"
+          className="h-9 border-slate-200 bg-white text-slate-700 shadow-sm"
         >
           <ChevronLeft className="size-4" />
           Geri
@@ -310,7 +312,7 @@ export function Topbar({
           <button
             type="button"
             onClick={() => onOpenMenu(openMenu === "date" ? null : "date")}
-            className="grid size-9 place-items-center rounded-md text-slate-600 hover:bg-white"
+            className="grid size-9 place-items-center rounded-lg text-slate-600 hover:bg-slate-100"
             title="Takvim tarihi"
           >
             <CalendarDays className="size-5" />
@@ -341,14 +343,14 @@ export function Topbar({
             value={searchTerm}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Müşteri ara..."
-            className="h-9 rounded-none border-0 bg-white pr-10 shadow-none"
+            className="h-9 rounded-lg border-slate-200 bg-slate-50 pr-10 shadow-none hover:bg-white focus-visible:bg-white"
           />
         </div>
 
         <button
           type="button"
           onClick={() => onOpenModal("notifications")}
-          className="grid size-9 place-items-center rounded-md text-slate-600 hover:bg-white"
+          className="grid size-9 place-items-center rounded-lg text-slate-600 hover:bg-slate-100"
           title="Bildirimler"
         >
           <Bell className="size-5" />
@@ -358,7 +360,7 @@ export function Topbar({
           <button
             type="button"
             onClick={() => onOpenMenu(openMenu === "create" ? null : "create")}
-            className="grid size-9 place-items-center rounded-md text-slate-600 hover:bg-white"
+            className="grid size-9 place-items-center rounded-lg bg-slate-900 text-white shadow-sm hover:bg-slate-800"
             title="Yeni oluştur"
           >
             <Plus className="size-6" />
@@ -371,11 +373,8 @@ export function Topbar({
                   icon={item.icon}
                   label={item.label}
                   onClick={() => {
-                    const target = createItemView(item.label);
-                    if (target) {
-                      onSelectView(target);
-                      onOpenMenu(null);
-                    }
+                    onCreateItem(item.label);
+                    onOpenMenu(null);
                   }}
                 />
               ))}
@@ -389,7 +388,7 @@ export function Topbar({
             onClick={() =>
               onOpenMenu(openMenu === "settings" ? null : "settings")
             }
-            className="grid size-9 place-items-center rounded-md text-slate-600 hover:bg-white"
+            className="grid size-9 place-items-center rounded-lg text-slate-600 hover:bg-slate-100"
             title="Ayarlar"
           >
             <Settings className="size-5" />
@@ -417,7 +416,7 @@ export function Topbar({
             onClick={() =>
               onOpenMenu(openMenu === "profile" ? null : "profile")
             }
-            className="flex h-12 items-center gap-3 rounded-md px-2 text-left hover:bg-white"
+            className="flex h-12 items-center gap-3 rounded-xl px-2 text-left hover:bg-slate-100"
           >
             {userImage ? (
               <Image
@@ -428,7 +427,7 @@ export function Topbar({
                 className="rounded-full"
               />
             ) : (
-              <UserCircle className="size-10 text-slate-950" />
+              <UserCircle className="size-10 text-slate-500" />
             )}
             <span className="hidden min-w-0 md:block">
               <span className="block truncate text-sm font-semibold text-slate-600">
@@ -447,15 +446,6 @@ export function Topbar({
                 label="Üyelik"
                 onClick={() => onSelectView("subscription")}
               />
-              <Link
-                href=""
-                target="_self"
-                rel="noreferrer"
-                className="flex h-9 items-center gap-3 px-3 text-sm text-slate-600 hover:bg-slate-50"
-              >
-                <Eye className="size-4 text-[#5f86b6]" />
-                Sayfam nasıl görünüyor
-              </Link>
               <DropdownButton
                 icon={Settings}
                 label="Tema ayarları"
@@ -487,16 +477,4 @@ export function Topbar({
       </div>
     </header>
   );
-}
-
-function createItemView(label: string): ViewId | null {
-  if (label === "Yeni randevu") return "calendar";
-  if (label === "Yeni adisyon") return "visit/list";
-  if (label === "Yeni müşteri") return "client/list";
-  if (label === "Yeni ürün satışı") return "product_sale/list";
-  if (label === "Yeni paket satışı") return "package_sale/list";
-  if (label === "Yeni masraf") return "other/expense/list";
-  if (label === "Yeni alacak") return "other/receivable/list";
-  if (label === "Yeni borç") return "other/debt/list";
-  return null;
 }

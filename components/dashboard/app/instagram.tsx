@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, MessageCircle, Search } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Breadcrumb,
   Business,
   ContactRow,
   StatusBanner,
+  ToggleRow,
   ViewId,
+  InstagramBrandIcon,
   getConversationMessages,
 } from "./shared";
 
@@ -24,6 +26,10 @@ export function InstagramSetupPage({
   onSelectView: (view: ViewId) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [instagramActive, setInstagramActive] = useState(
+    !!business.botSettings?.instagram,
+  );
+  const [testMode, setTestMode] = useState(business.test_mode);
   const connected =
     !!business.instagram_page_id || !!business.botSettings?.instagramConnected;
   const username =
@@ -50,6 +56,29 @@ export function InstagramSetupPage({
           },
         });
       }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveChannelSettings(next: {
+    instagram?: boolean;
+    testMode?: boolean;
+  }) {
+    const nextInstagram = next.instagram ?? instagramActive;
+    const nextTestMode = next.testMode ?? testMode;
+    setInstagramActive(nextInstagram);
+    setTestMode(nextTestMode);
+    setBusy(true);
+    try {
+      await onUpdateAndSave({
+        botSettings: {
+          ...(business.botSettings || {}),
+          instagram: nextInstagram,
+          instagramConnected: connected,
+        },
+        test_mode: nextTestMode,
+      });
     } finally {
       setBusy(false);
     }
@@ -99,7 +128,7 @@ export function InstagramSetupPage({
         <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_320px]">
           <div className="rounded border border-slate-200">
             {[
-              "Instagram profesyonel hesabınızı seçin",
+              "Instagram profesyonel hesabınıza giriş yapın",
               "Mesaj ve profil izinlerini onaylayın",
               "Aloyz'a geri dönün",
               "Mesajlarınızı Instagram > Mesajlar sayfasından yönetin",
@@ -131,7 +160,7 @@ export function InstagramSetupPage({
                     />
                   ) : (
                     <div className="grid size-12 place-items-center rounded-full bg-pink-100 text-pink-700">
-                      <MessageCircle className="size-5" />
+                      <InstagramBrandIcon className="size-5" />
                     </div>
                   )}
                   <div>
@@ -139,7 +168,7 @@ export function InstagramSetupPage({
                       {username ? `@${username}` : "Instagram hesabı"}
                     </div>
                     <div className="text-xs text-slate-500">
-                      Instagram professional account connected
+                      Profesyonel Instagram hesabı bağlandı
                     </div>
                   </div>
                 </div>
@@ -153,12 +182,24 @@ export function InstagramSetupPage({
               </div>
             ) : (
               <StatusBanner tone="warning">
-                Bağlantı için Instagram tarafından açılan izin ekranını
-                onaylamanız gerekir. Aloyz erişim kodunu sunucuda access token'a
-                çevirir ve hesabı işletmenize kaydeder.
+                Bağlantı için Instagram tarafından açılan izin ekranını onaylamanız gerekir. Aloyz bu şekilde hesabı işletmenize kaydeder.
               </StatusBanner>
             )}
           </div>
+        </div>
+        <div className="mt-5 rounded border border-slate-200 p-3">
+          <ToggleRow
+            label="Instagram aktif"
+            description="Kapalıyken bot gelen mesajlara otomatik yanıt vermez."
+            checked={instagramActive}
+            onChange={(checked) => saveChannelSettings({ instagram: checked })}
+          />
+          <ToggleRow
+            label="Test modu"
+            description="Açıkken bot yalnızca işletmenin kendi kendine gönderdiği mesajlara yanıt verir."
+            checked={testMode}
+            onChange={(checked) => saveChannelSettings({ testMode: checked })}
+          />
         </div>
       </section>
     </div>
@@ -251,17 +292,6 @@ export function InstagramMessagesPage({
             )}
           </div>
           <h2 className="mt-5 font-semibold">Mesajlar</h2>
-          <div className="mt-4 flex gap-2 text-sm">
-            {["Tümü", "Okunmamış", "Diğer"].map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                className="rounded-full border border-slate-300 px-4 py-1"
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
           <div className="mt-6 space-y-1">
             {instagramContacts.map((contact) => (
               <button
@@ -321,7 +351,7 @@ export function InstagramMessagesPage({
           ) : (
             <div className="grid flex-1 place-items-center">
               <div className="text-center">
-                <MessageCircle className="mx-auto size-12 text-pink-600" />
+                <InstagramBrandIcon className="mx-auto size-12 text-pink-600" />
                 <h2 className="mt-3 font-semibold">Mesajlar</h2>
                 <p className="mt-2 text-sm text-slate-500">
                   Instagram hesabınıza gelen mesajları Aloyz üzerinden yönetin

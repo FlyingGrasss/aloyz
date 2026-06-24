@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import {
   Business,
   ClientTagItem,
+  DAYS,
   ModalHeader,
   NativeSelect,
   PackageCatalogItem,
@@ -84,15 +85,14 @@ function SpecialWorkingHoursPage({
     setModalOpen(false);
     await onUpdateAndSave({ promotions: { ...promotions, specialWorkingHours: rowsNext } });
   }
+  const normalizedRows = rows.map(normalizeSpecialWorkingHour);
   return (
     <SetupTableShell title="Dönemsel çalışma saatleri" onNew={() => setModalOpen(true)}>
       <DataTable
-        headers={["Başlık", "Tarih", "Durum", "Saat", "Personel", ""]}
-        rows={rows.map((item) => [
-          item.title,
-          displayDate(item.date),
-          item.open ? "Açık" : "Kapalı",
-          item.open ? `${item.start} - ${item.end}` : "-",
+        headers={["Geçerlilik", "Çalışma saatleri", "Personel", ""]}
+        rows={normalizedRows.map((item) => [
+          `${displayDate(item.valid_from)} - ${displayDate(item.valid_until)}`,
+          summarizeWorkingHours(item.working_hours),
           item.staffIds.length
             ? item.staffIds
                 .map((id) => business.staff?.find((staff) => staff.id === id)?.name)
@@ -447,12 +447,13 @@ function SpecialWorkingHourModal({
   onClose: () => void;
   onSubmit: (item: SpecialWorkingHourItem) => void;
 }) {
+  const defaultHours = Object.fromEntries(
+    DAYS.map((day) => [day.key, "open|09:00|18:00"]),
+  );
   const [form, setForm] = useState({
-    title: "",
-    date: todayInput(),
-    open: "true",
-    start: "09:00",
-    end: "18:00",
+    valid_from: todayInput(),
+    valid_until: todayInput(),
+    working_hours: defaultHours,
     staffId: "all",
   });
   return (
@@ -463,28 +464,96 @@ function SpecialWorkingHourModal({
       onSave={() =>
         onSubmit({
           id: createId(),
-          title: form.title || "Dönemsel saat",
-          date: form.date,
-          open: form.open === "true",
-          start: form.start,
-          end: form.end,
+          valid_from: form.valid_from,
+          valid_until: form.valid_until || form.valid_from,
+          working_hours: form.working_hours,
           staffIds: form.staffId === "all" ? [] : [form.staffId],
         })
       }
     >
-      <Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Başlık" />
-      <Input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />
-      <NativeSelect
-        value={form.open}
-        onChange={(open) => setForm({ ...form, open })}
-        options={[
-          { value: "true", label: "Açık" },
-          { value: "false", label: "Kapalı" },
-        ]}
-      />
       <div className="grid grid-cols-2 gap-2">
-        <Input value={form.start} onChange={(event) => setForm({ ...form, start: event.target.value })} />
-        <Input value={form.end} onChange={(event) => setForm({ ...form, end: event.target.value })} />
+        <Input
+          type="date"
+          value={form.valid_from}
+          onChange={(event) =>
+            setForm({ ...form, valid_from: event.target.value })
+          }
+        />
+        <Input
+          type="date"
+          value={form.valid_until}
+          onChange={(event) =>
+            setForm({ ...form, valid_until: event.target.value })
+          }
+        />
+      </div>
+      <div className="grid gap-2 rounded border border-slate-200 p-2">
+        {DAYS.map((day) => {
+          const parsed = parseWorkingHourValue(form.working_hours[day.key]);
+          return (
+            <div key={day.key} className="grid grid-cols-[90px_1fr_1fr_1fr] gap-2">
+              <span className="self-center text-xs font-semibold text-slate-600">
+                {day.label}
+              </span>
+              <NativeSelect
+                value={parsed.status}
+                onChange={(status) =>
+                  setForm({
+                    ...form,
+                    working_hours: {
+                      ...form.working_hours,
+                      [day.key]: formatWorkingHourValue(
+                        status,
+                        parsed.start,
+                        parsed.end,
+                      ),
+                    },
+                  })
+                }
+                options={[
+                  { value: "open", label: "Açık" },
+                  { value: "closed", label: "Kapalı" },
+                ]}
+              />
+              <Input
+                type="time"
+                value={parsed.start}
+                disabled={parsed.status === "closed"}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    working_hours: {
+                      ...form.working_hours,
+                      [day.key]: formatWorkingHourValue(
+                        parsed.status,
+                        event.target.value,
+                        parsed.end,
+                      ),
+                    },
+                  })
+                }
+              />
+              <Input
+                type="time"
+                value={parsed.end}
+                disabled={parsed.status === "closed"}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    working_hours: {
+                      ...form.working_hours,
+                      [day.key]: formatWorkingHourValue(
+                        parsed.status,
+                        parsed.start,
+                        event.target.value,
+                      ),
+                    },
+                  })
+                }
+              />
+            </div>
+          );
+        })}
       </div>
       <NativeSelect
         value={form.staffId}
@@ -568,6 +637,63 @@ function emptyPackage(business: Business): PackageCatalogItem {
 
 function emptyTag(): ClientTagItem {
   return { id: createId(), name: "", color: "#5f86b6", discountRate: 0 };
+}
+
+function normalizeSpecialWorkingHour(
+  item: SpecialWorkingHourItem,
+): SpecialWorkingHourItem {
+  if (item.valid_from && item.valid_until && item.working_hours) {
+    return item;
+  }
+  const date = item.date || todayInput();
+  const status = item.open === false ? "closed" : "open";
+  const start = item.start || "09:00";
+  const end = item.end || "18:00";
+  return {
+    id: item.id,
+    valid_from: date,
+    valid_until: date,
+    working_hours: Object.fromEntries(
+      DAYS.map((day) => [day.key, formatWorkingHourValue(status, start, end)]),
+    ),
+    staffIds: item.staffIds || [],
+  };
+}
+
+function summarizeWorkingHours(hours: Record<string, string>) {
+  const openDays = DAYS.map((day) => ({
+    day,
+    hours: parseWorkingHourValue(hours[day.key]),
+  })).filter((item) => item.hours.status !== "closed");
+
+  if (openDays.length === 0) return "Kapalı";
+
+  const uniqueHours = Array.from(
+    new Set(openDays.map((item) => `${item.hours.start} - ${item.hours.end}`)),
+  );
+
+  if (openDays.length === DAYS.length && uniqueHours.length === 1) {
+    return `Her gün ${uniqueHours[0]}`;
+  }
+
+  return openDays
+    .map((item) => `${item.day.short} ${item.hours.start}-${item.hours.end}`)
+    .join(", ");
+}
+
+function parseWorkingHourValue(value?: string) {
+  const [status = "open", start = "09:00", end = "18:00"] = (value || "").split(
+    "|",
+  );
+  return {
+    status: status === "closed" ? "closed" : "open",
+    start: start || "09:00",
+    end: end || "18:00",
+  };
+}
+
+function formatWorkingHourValue(status: string, start: string, end: string) {
+  return `${status === "closed" ? "closed" : "open"}|${start || "09:00"}|${end || "18:00"}`;
 }
 
 function displayDate(value: string) {

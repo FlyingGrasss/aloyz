@@ -14,6 +14,7 @@ export function compileSystemPrompt(
     address?: string | null;
     website?: string | null;
     hours: any;
+    bookingSettings?: { breakHours?: unknown[] } | null;
     menu_or_services: string;
     faqs: any;
     special_instructions?: string | null;
@@ -31,6 +32,9 @@ export function compileSystemPrompt(
         .map(faq => `Soru: ${faq.question}\nCevap: ${faq.answer}`)
         .join('\n\n')
     : business.faqs || ''
+  const breakHoursText = business.bookingSettings?.breakHours?.length
+    ? JSON.stringify(business.bookingSettings.breakHours)
+    : 'Belirtilmemiş'
 
   return `CORE OBJECTIVE: You are an AI assistant for this business. Detect incoming language and match it perfectly.
 
@@ -41,6 +45,7 @@ BUSINESS CONFIGURATION & KNOWLEDGE BASE:
 - Adres: ${business.address || 'Belirtilmemiş'}
 - Web Sitesi: ${business.website || 'Bulunmuyor'}
 - Çalışma Saatleri: ${hoursValue}
+- Öğle arası / mola saatleri: ${breakHoursText}
 
 MENÜ VE HİZMETLER:
 ${business.menu_or_services}

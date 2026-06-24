@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { useState } from "react";
+import type React from "react";
+import { useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
@@ -1195,6 +1196,42 @@ function ServiceAttributeModal({
   );
 }
 
+const aiReadableInputClass =
+  "border-emerald-300 bg-emerald-50/40 focus-visible:ring-emerald-500";
+
+function AiReadableBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+      Bot okuyabilir
+    </span>
+  );
+}
+
+function AiReadableNotice() {
+  return (
+    <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+      Yeşil işaretli alanlar Bot tarafından cevap üretirken okunabilir.
+    </div>
+  );
+}
+
+function AiReadableField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="grid gap-1 text-sm font-semibold text-slate-700">
+      <span className="flex items-center gap-2">
+        {label} <AiReadableBadge />
+      </span>
+      {children}
+    </label>
+  );
+}
+
 function SalonBotSettingsPage({
   business,
   saving,
@@ -1209,6 +1246,18 @@ function SalonBotSettingsPage({
   const [form, setForm] = useState<BotSettings>(business.botSettings || {});
   const [active, setActive] = useState(business.is_active);
   const [testMode, setTestMode] = useState(business.test_mode);
+  const [menuOrServices, setMenuOrServices] = useState(
+    business.menu_or_services || "",
+  );
+  const [welcomeMessage, setWelcomeMessage] = useState(
+    business.welcome_message || "",
+  );
+  const [specialInstructions, setSpecialInstructions] = useState(
+    business.special_instructions || "",
+  );
+  const [faqs, setFaqs] = useState(
+    Array.isArray(business.faqs) ? business.faqs : [],
+  );
   const whatsAppConnected =
     whatsAppStatus === "open" ||
     whatsAppStatus === "connected" ||
@@ -1217,7 +1266,7 @@ function SalonBotSettingsPage({
     !!business.instagram_page_id || !!form.instagramConnected;
   return (
     <SettingsPanel
-      title="Salon BOT Ayarları"
+      title="Bot Ayarları"
       saving={saving}
       onSave={() =>
         onUpdateAndSave({
@@ -1229,9 +1278,14 @@ function SalonBotSettingsPage({
           },
           is_active: active,
           test_mode: testMode,
+          menu_or_services: menuOrServices,
+          welcome_message: welcomeMessage,
+          special_instructions: specialInstructions,
+          faqs,
         })
       }
     >
+      <AiReadableNotice />
       <div className="grid gap-3 md:grid-cols-2">
         <div className="rounded border border-slate-200 p-3">
           <div className="text-sm font-semibold">WhatsApp bağlantısı</div>
@@ -1254,22 +1308,125 @@ function SalonBotSettingsPage({
       />
       <ToggleRow
         label="Test modu"
-        description="Açıkken bot yalnızca işletmenin kendi test mesajlarına yanıt verir."
+        description="Açıkken bot yalnızca işletmenin kendi kendine gönderdiği mesajlara yanıt verir."
         checked={testMode}
         onChange={setTestMode}
       />
       <ToggleRow
-        label="Instagram Salon BOT Aktif/Pasif"
+        label="Instagram Bot Aktif/Pasif"
         description=""
         checked={!!form.instagram && instagramConnected}
         onChange={(checked) => setForm({ ...form, instagram: checked })}
       />
       <ToggleRow
-        label="WhatsApp Salon BOT Aktif/Pasif"
+        label="WhatsApp Bot Aktif/Pasif"
         description=""
         checked={!!form.whatsapp && whatsAppConnected}
         onChange={(checked) => setForm({ ...form, whatsapp: checked })}
       />
+      <div className="grid gap-3">
+        <label className="grid gap-1 text-sm font-semibold text-slate-700">
+          <span className="flex items-center gap-2">
+            Hizmetler / menü <AiReadableBadge />
+          </span>
+          <Textarea
+            value={menuOrServices}
+            onChange={(event) => setMenuOrServices(event.target.value)}
+            rows={5}
+            className={aiReadableInputClass}
+          />
+        </label>
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            <span className="flex items-center gap-2">
+              Karşılama mesajı <AiReadableBadge />
+            </span>
+            <Textarea
+              value={welcomeMessage}
+              onChange={(event) => setWelcomeMessage(event.target.value)}
+              rows={3}
+              className={aiReadableInputClass}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            <span className="flex items-center gap-2">
+              Özel talimatlar <AiReadableBadge />
+            </span>
+            <Textarea
+              value={specialInstructions}
+              onChange={(event) => setSpecialInstructions(event.target.value)}
+              rows={3}
+              className={aiReadableInputClass}
+            />
+          </label>
+        </div>
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              Sık sorulan sorular <AiReadableBadge />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setFaqs([...faqs, { question: "", answer: "" }])}
+            >
+              <Plus className="size-4" />
+              Yeni soru
+            </Button>
+          </div>
+          <div className="grid gap-3">
+            {faqs.map((item, index) => (
+              <div
+                key={index}
+                className="grid gap-2 rounded border border-emerald-200 bg-white p-3 md:grid-cols-[1fr_1fr_auto]"
+              >
+                <Input
+                  value={item.question}
+                  onChange={(event) =>
+                    setFaqs(
+                      faqs.map((faq, faqIndex) =>
+                        faqIndex === index
+                          ? { ...faq, question: event.target.value }
+                          : faq,
+                      ),
+                    )
+                  }
+                  placeholder="Soru"
+                  className={aiReadableInputClass}
+                />
+                <Input
+                  value={item.answer}
+                  onChange={(event) =>
+                    setFaqs(
+                      faqs.map((faq, faqIndex) =>
+                        faqIndex === index
+                          ? { ...faq, answer: event.target.value }
+                          : faq,
+                      ),
+                    )
+                  }
+                  placeholder="Cevap"
+                  className={aiReadableInputClass}
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() =>
+                    setFaqs(faqs.filter((_, faqIndex) => faqIndex !== index))
+                  }
+                >
+                  Sil
+                </Button>
+              </div>
+            ))}
+            {faqs.length === 0 && (
+              <div className="rounded border border-dashed border-emerald-200 bg-white px-3 py-6 text-center text-sm text-slate-500">
+                Henüz sık sorulan soru eklenmedi.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </SettingsPanel>
   );
 }
@@ -1322,30 +1479,6 @@ function BookingSettingsPage({
         checked={!!form.reminder}
         onChange={(checked) => setForm({ ...form, reminder: checked })}
       />
-      <SettingsToggle
-        label="Randevu oluşturuldu bildirimi"
-        checked={!!form.createdNotification}
-        onChange={(checked) =>
-          setForm({ ...form, createdNotification: checked })
-        }
-      />
-      <SettingsToggle
-        label="Otomatik yeni paket kullanımı penceresi"
-        checked={!!form.packageWindow}
-        onChange={(checked) => setForm({ ...form, packageWindow: checked })}
-      />
-      <SettingsToggle
-        label="Otomatik bekleme listesi penceresi"
-        checked={!!form.waitingListWindow}
-        onChange={(checked) => setForm({ ...form, waitingListWindow: checked })}
-      />
-      <SettingsToggle
-        label="Google online randevu"
-        checked={!!form.googleOnlineBooking}
-        onChange={(checked) =>
-          setForm({ ...form, googleOnlineBooking: checked })
-        }
-      />
       <GoogleCalendarIntegrationPanel
         calendarId={calendarId}
         saving={saving}
@@ -1372,75 +1505,73 @@ function SetupGeneralForm({
       <h1 className="mb-4 text-2xl font-semibold text-slate-700">
         Temel ayarlar
       </h1>
+      <AiReadableNotice />
       <div className="grid gap-3">
-        <Input
-          value={business.name}
-          onChange={(event) => onChange("name", event.target.value)}
-          placeholder="İşletme adı"
-        />
-        <Input
-          value={business.address || ""}
-          onChange={(event) => onChange("address", event.target.value)}
-          placeholder="Adres"
-        />
+        <AiReadableField label="İşletme adı">
+          <Input
+            value={business.name}
+            onChange={(event) => onChange("name", event.target.value)}
+            placeholder="İşletme adı"
+            className={aiReadableInputClass}
+          />
+        </AiReadableField>
+        <AiReadableField label="Adres">
+          <Input
+            value={business.address || ""}
+            onChange={(event) => onChange("address", event.target.value)}
+            placeholder="Adres"
+            className={aiReadableInputClass}
+          />
+        </AiReadableField>
         <Input
           type="email"
           value={business.email || ""}
           onChange={(event) => onChange("email", event.target.value)}
           placeholder="E-posta"
         />
-        <Input
-          value={business.type}
-          onChange={(event) => onChange("type", event.target.value)}
-          placeholder="Kategori"
-        />
+        <AiReadableField label="Kategori">
+          <Input
+            value={business.type}
+            onChange={(event) => onChange("type", event.target.value)}
+            placeholder="Kategori"
+            className={aiReadableInputClass}
+          />
+        </AiReadableField>
         <div className="grid gap-3 md:grid-cols-2">
-          <Input
-            value={business.city || ""}
-            onChange={(event) => onChange("city", event.target.value)}
-            placeholder="İl"
-          />
-          <Input
-            value={business.district || ""}
-            onChange={(event) => onChange("district", event.target.value)}
-            placeholder="İlçe"
-          />
+          <AiReadableField label="İl">
+            <Input
+              value={business.city || ""}
+              onChange={(event) => onChange("city", event.target.value)}
+              placeholder="İl"
+              className={aiReadableInputClass}
+            />
+          </AiReadableField>
+          <AiReadableField label="İlçe">
+            <Input
+              value={business.district || ""}
+              onChange={(event) => onChange("district", event.target.value)}
+              placeholder="İlçe"
+              className={aiReadableInputClass}
+            />
+          </AiReadableField>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
-          <Input
-            value={business.phone || ""}
-            onChange={(event) => onChange("phone", event.target.value)}
-            placeholder="Telefon"
-          />
-          <Input
-            value={business.website || ""}
-            onChange={(event) => onChange("website", event.target.value)}
-            placeholder="Web sitesi"
-          />
-        </div>
-        <Textarea
-          value={business.menu_or_services || ""}
-          onChange={(event) => onChange("menu_or_services", event.target.value)}
-          placeholder="Hizmetler / menü"
-          rows={5}
-        />
-        <div className="grid gap-3 md:grid-cols-2">
-          <Textarea
-            value={business.welcome_message || ""}
-            onChange={(event) =>
-              onChange("welcome_message", event.target.value)
-            }
-            placeholder="Karşılama mesajı"
-            rows={3}
-          />
-          <Textarea
-            value={business.special_instructions || ""}
-            onChange={(event) =>
-              onChange("special_instructions", event.target.value)
-            }
-            placeholder="Özel talimatlar"
-            rows={3}
-          />
+          <AiReadableField label="Telefon">
+            <Input
+              value={business.phone || ""}
+              onChange={(event) => onChange("phone", event.target.value)}
+              placeholder="Telefon"
+              className={aiReadableInputClass}
+            />
+          </AiReadableField>
+          <AiReadableField label="Web sitesi">
+            <Input
+              value={business.website || ""}
+              onChange={(event) => onChange("website", event.target.value)}
+              placeholder="Web sitesi"
+              className={aiReadableInputClass}
+            />
+          </AiReadableField>
         </div>
         <Button
           type="button"
@@ -1468,8 +1599,13 @@ function WorkingHoursForm({
   onSave: () => void;
   onUpdateAndSave?: (fields: Partial<Business>) => Promise<boolean>;
 }) {
-  const [breaksOpen, setBreaksOpen] = useState(false);
+  const [breaksOpen, setBreaksOpen] = useState(
+    () => (business.bookingSettings?.breakHours || []).length > 0,
+  );
   const breakHours = business.bookingSettings?.breakHours || [];
+  useEffect(() => {
+    if (breakHours.length > 0) setBreaksOpen(true);
+  }, [breakHours.length]);
   async function saveBreakHours(nextBreakHours: typeof breakHours) {
     if (!onUpdateAndSave) return;
     await onUpdateAndSave({
@@ -1482,8 +1618,11 @@ function WorkingHoursForm({
   return (
     <section className="rounded bg-white p-5 shadow-sm">
       <h1 className="mb-4 text-2xl font-semibold text-slate-700">
-        Çalışma saatleri
+        <span className="flex items-center gap-2">
+          Çalışma saatleri <AiReadableBadge />
+        </span>
       </h1>
+      <AiReadableNotice />
       <div className="space-y-2">
         {DAYS.map((day) => {
           const parsed = parseHourValue(business.hours[day.key]);
@@ -1497,6 +1636,7 @@ function WorkingHoursForm({
               </div>
               <NativeSelect
                 value={parsed.status}
+                className={aiReadableInputClass}
                 onChange={(value) =>
                   onHourChange(
                     day.key,
@@ -1512,6 +1652,7 @@ function WorkingHoursForm({
               <NativeSelect
                 value={parsed.start}
                 disabled={parsed.status === "Kapalı"}
+                className={aiReadableInputClass}
                 onChange={(value) =>
                   onHourChange(
                     day.key,
@@ -1527,6 +1668,7 @@ function WorkingHoursForm({
               <NativeSelect
                 value={parsed.end}
                 disabled={parsed.status === "Kapalı"}
+                className={aiReadableInputClass}
                 onChange={(value) =>
                   onHourChange(
                     day.key,
@@ -1550,7 +1692,7 @@ function WorkingHoursForm({
           onClick={() => setBreaksOpen((value) => !value)}
         >
           <Plus className="size-4" />
-          Öğle arası mola saatleri
+          Öğle arası mola saatleri{breakHours.length ? ` (${breakHours.length})` : ""}
         </Button>
         {breaksOpen && (
           <div className="mt-3 grid gap-2">
@@ -1559,9 +1701,22 @@ function WorkingHoursForm({
                 key={item.id}
                 className="grid gap-2 md:grid-cols-[1fr_120px_120px_auto]"
               >
-                <Input value={item.label} readOnly />
+                <Input
+                  value={item.label}
+                  className={aiReadableInputClass}
+                  onChange={(event) =>
+                    saveBreakHours(
+                      breakHours.map((breakHour) =>
+                        breakHour.id === item.id
+                          ? { ...breakHour, label: event.target.value }
+                          : breakHour,
+                      ),
+                    )
+                  }
+                />
                 <NativeSelect
                   value={item.start}
+                  className={aiReadableInputClass}
                   onChange={(start) =>
                     saveBreakHours(
                       breakHours.map((breakHour) =>
@@ -1578,6 +1733,7 @@ function WorkingHoursForm({
                 />
                 <NativeSelect
                   value={item.end}
+                  className={aiReadableInputClass}
                   onChange={(end) =>
                     saveBreakHours(
                       breakHours.map((breakHour) =>
@@ -1611,7 +1767,8 @@ function WorkingHoursForm({
               type="button"
               variant="outline"
               disabled={!onUpdateAndSave}
-              onClick={() =>
+              onClick={() => {
+                setBreaksOpen(true);
                 saveBreakHours([
                   ...breakHours,
                   {
@@ -1621,8 +1778,8 @@ function WorkingHoursForm({
                     end: "13:00",
                     days: DAYS.map((day) => day.key),
                   },
-                ])
-              }
+                ]);
+              }}
             >
               Mola saati ekle
             </Button>
