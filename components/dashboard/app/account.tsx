@@ -290,7 +290,7 @@ function downloadAccountCsv(title: string) {
   const csv = rows.length
     ? rows.map((row) => row.map(escapeCsv).join(",")).join("\n")
     : `Başlık,${escapeCsv(title)}\nTarih,${escapeCsv(new Date().toISOString())}`;
-  downloadBlob(`${slugify(title)}.csv`, csv);
+  downloadBlob(`${accountDownloadTitle(title)} - ${todayFileDate()}.csv`, csv);
 }
 
 function collectVisibleRows() {
@@ -324,6 +324,15 @@ function downloadBlob(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
-function slugify(value: string) {
-  return value.toLocaleLowerCase("tr-TR").replaceAll(" ", "-");
+function accountDownloadTitle(title: string) {
+  return (
+    {
+      "Üyelik": "Subscription",
+      "Faturalar": "Invoices",
+    }[title] || title
+  );
+}
+
+function todayFileDate() {
+  return new Date().toISOString().slice(0, 10);
 }

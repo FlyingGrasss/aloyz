@@ -283,6 +283,13 @@
   color: rgb(226 232 240);
 }
 
+.dark body,
+.dark .dashboard-app,
+.dark .dashboard-app main {
+  background:
+    linear-gradient(180deg, rgb(15 23 42) 0%, rgb(2 6 23) 100%) !important;
+}
+
 .dark .dashboard-app .bg-slate-50,
 .dark .dashboard-app .bg-slate-100 {
   background-color: rgb(30 41 59);
@@ -392,4 +399,105 @@
 .dark .dashboard-app .shadow-lg,
 .dark .dashboard-app .shadow-xl {
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+}
+
+.dark .dashboard-app th {
+  color: rgb(226 232 240);
+}
+
+.dark .dashboard-app td {
+  color: rgb(241 245 249);
+}
+
+.dark .dashboard-app tbody tr.bg-slate-50,
+.dark .dashboard-app tbody tr.bg-slate-100 {
+  background-color: rgb(30 41 59);
+}
+
+.dark .dashboard-app .dashboard-nav-active {
+  background-color: rgb(226 232 240) !important;
+  color: rgb(15 23 42) !important;
+  box-shadow: 0 0 0 1px rgb(148 163 184 / 0.25);
+}
+
+.dark .dashboard-app [data-current-time-slot="true"] > div {
+  background-color: rgb(120 53 15 / 0.58) !important;
+  color: rgb(254 243 199) !important;
+}
+
+.dashboard-app [class*="absolute"][class*="top-full"] {
+  max-width: calc(100vw - 1rem);
+}
+
+@media (max-width: 767px) {
+  .dashboard-app {
+    min-width: 0;
+    font-size: 14px;
+  }
+
+  .dashboard-app main {
+    width: 100%;
+    min-width: 0;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .dashboard-app section,
+  .dashboard-app aside,
+  .dashboard-app article,
+  .dashboard-app div {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .dashboard-app .overflow-x-auto {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .dashboard-app main > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .dashboard-app section:has(> table),
+  .dashboard-app div:has(> table),
+  .dashboard-app aside:has(> table) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dashboard-app table {
+    width: max-content;
+    max-width: none;
+    font-size: 0.78rem;
+  }
+
+  .dashboard-app th {
+    height: 34px;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    font-size: 0.66rem;
+  }
+
+  .dashboard-app td {
+    height: 38px;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .dashboard-app :not(table)[class*="min-w-["] {
+    max-width: 100%;
+  }
+
+  .dashboard-app [class*="fixed"][class*="inset-0"] {
+    align-items: start;
+    overflow-y: auto;
+  }
+
+  .dashboard-app [class*="fixed"][class*="inset-0"] > section,
+  .dashboard-app [class*="fixed"][class*="inset-0"] > div {
+    max-height: calc(100vh - 1.5rem);
+    overflow-y: auto;
+  }
 }

@@ -75,6 +75,7 @@ export function AutomaticMessagesPage({
   const [customerQuery, setCustomerQuery] = useState("");
   const [period, setPeriod] = useState("Bu ay");
   const [status, setStatus] = useState("Tümü");
+  const [latestFirst, setLatestFirst] = useState(true);
   const rows = contacts.flatMap((contact) =>
     getConversationMessages(contact.conversation).map((message, index) => ({
       id: `${contact.id}-${index}`,
@@ -89,15 +90,19 @@ export function AutomaticMessagesPage({
       errorCode: "-",
       error: "-",
     })),
-  );
-  const filteredRows = rows.filter((row) => {
-    const query = customerQuery.trim().toLocaleLowerCase("tr-TR");
-    const matchesCustomer =
-      !query || row.customer.toLocaleLowerCase("tr-TR").startsWith(query);
-    const matchesStatus = status === "Tümü" || row.status === status;
-    const matchesPeriod = period === "Tümü" || isInPeriod(row.date, period);
-    return matchesCustomer && matchesStatus && matchesPeriod;
+  ).sort((left, right) => {
+    const diff = new Date(right.readAt).getTime() - new Date(left.readAt).getTime();
+    return latestFirst ? diff : -diff;
   });
+  const filteredRows = rows
+    .filter((row) => {
+      const query = customerQuery.trim().toLocaleLowerCase("tr-TR");
+      const matchesCustomer =
+        !query || row.customer.toLocaleLowerCase("tr-TR").startsWith(query);
+      const matchesStatus = status === "Tümü" || row.status === status;
+      const matchesPeriod = period === "Tümü" || isInPeriod(row.date, period);
+      return matchesCustomer && matchesStatus && matchesPeriod;
+    });
   const counts = {
     Tümü: filteredRows.length,
     Gönderildi: filteredRows.filter((row) => row.status === "Gönderildi")
@@ -141,7 +146,17 @@ export function AutomaticMessagesPage({
               placeholder="Tümü"
             />
           </label>
-          <div />
+          <label className="grid gap-1 text-xs text-slate-600">
+            Sıralama
+            <NativeSelect
+              value={latestFirst ? "latest" : "oldest"}
+              onChange={(value) => setLatestFirst(value === "latest")}
+              options={[
+                { value: "latest", label: "En yeni önce" },
+                { value: "oldest", label: "En eski önce" },
+              ]}
+            />
+          </label>
           <label className="grid gap-1 text-xs text-slate-600">
             Tarih Aralığı
             <NativeSelect
@@ -226,9 +241,8 @@ export function WhatsappRegisterPage({
   );
   const [testMode, setTestMode] = useState(business.test_mode);
   const connected =
-    whatsAppStatus === "open" ||
-    whatsAppStatus === "connected" ||
-    !!business.botSettings?.whatsappConnected;
+    whatsAppStatus === "open" || whatsAppStatus === "connected";
+  const connecting = whatsAppStatus === "connecting";
 
   async function saveChannelSettings(next: {
     whatsapp?: boolean;
@@ -275,11 +289,15 @@ export function WhatsappRegisterPage({
           </div>
           <Button
             type="button"
-            disabled={saving || busy || connected}
+            disabled={saving || busy || connected || connecting}
             onClick={onReconnectWhatsApp}
             className="bg-[#25D366] text-white hover:bg-[#1fb85a]"
           >
-            {connected ? "WhatsApp bağlı" : "QR Kodu Getir"}
+            {connected
+              ? "WhatsApp bağlı"
+              : connecting
+                ? "Bağlantı bekleniyor"
+                : "QR Kodu Getir"}
           </Button>
         </div>
 
@@ -312,11 +330,17 @@ export function WhatsappRegisterPage({
               </div>
               <div>
                 <div className="font-semibold">
-                  {connected ? "WhatsApp bağlı" : "WhatsApp bağlı değil"}
+                  {connected
+                    ? "WhatsApp bağlı"
+                    : connecting
+                      ? "Bağlantı bekleniyor"
+                      : "WhatsApp bağlı değil"}
                 </div>
                 <div className="text-xs text-slate-500">
                   {connected
                     ? "Mesajlar bot tarafından alınabilir."
+                    : connecting
+                      ? "QR kod okutulmayı bekliyor."
                     : "QR kodu okutunca bağlantı tamamlanır."}
                 </div>
               </div>
@@ -530,31 +554,14 @@ function MessageTable({
   rows: Array<Array<string | number>>;
 }) {
   const [page, setPage] = useState(0);
-  const [sortDesc, setSortDesc] = useState(true);
   const pageSize = 50;
-  const sortedRows = [...rows].sort((a, b) => {
-    const left = String(a[0] || "");
-    const right = String(b[0] || "");
-    return sortDesc
-      ? right.localeCompare(left, "tr")
-      : left.localeCompare(right, "tr");
-  });
-  const pageRows = sortedRows.slice(
+  const pageRows = rows.slice(
     page * pageSize,
     page * pageSize + pageSize,
   );
   const maxPage = Math.max(0, Math.ceil(rows.length / pageSize) - 1);
   return (
     <div className="mt-6">
-      <div className="bg-slate-100 p-3">
-        <Button
-          type="button"
-          className="bg-[#5f86b6] text-white"
-          onClick={() => setSortDesc((value) => !value)}
-        >
-          {sortDesc ? "Z → A" : "A → Z"}
-        </Button>
-      </div>
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b border-slate-200">

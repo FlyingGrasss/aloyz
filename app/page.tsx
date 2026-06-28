@@ -1,8 +1,13 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { auth } from '@/auth'
 import { buttonVariants } from '@/components/ui/button'
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await auth()
+  if (session?.user) redirect('/dashboard')
+
   return (
     <main className="relative z-10 flex-1 max-w-6xl mx-auto w-full px-6 py-12">
       <div className="grid min-h-[calc(100vh-180px)] grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] items-center gap-12">

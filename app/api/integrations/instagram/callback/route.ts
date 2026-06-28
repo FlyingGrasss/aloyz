@@ -39,7 +39,8 @@ function parseState(state: string | null) {
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   const parsedState = parseState(request.nextUrl.searchParams.get("state"));
-  const dashboardUrl = new URL("/dashboard#/setup/connections", request.url);
+  const dashboardUrl = new URL("/dashboard", request.url);
+  dashboardUrl.searchParams.set("view", "messaging/instagram/setup");
 
   if (!code || !parsedState) {
     dashboardUrl.searchParams.set("instagram", "invalid-callback");

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown, ExternalLink, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Breadcrumb,
@@ -128,21 +128,33 @@ export function InstagramSetupPage({
         <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_320px]">
           <div className="rounded border border-slate-200">
             {[
-              "Instagram profesyonel hesabınıza giriş yapın",
-              "Mesaj ve profil izinlerini onaylayın",
-              "Aloyz'a geri dönün",
-              "Mesajlarınızı Instagram > Mesajlar sayfasından yönetin",
+              "Instagram'da Ayarlar > İnternet Sitesi İzinleri bölümünü açın",
+              "Uygulamalar ve internet siteleri > Test Kullanıcısı Davetleri sekmesine gidin",
+              "Aloyz davetini Kabul Et seçeneğiyle onaylayın",
+              "Aloyz'a dönün ve Instagram ile Giriş Yap butonuna basın",
+              "Instagram izin ekranını onaylayın; bağlantı tamamlandığında bu sayfaya geri dönersiniz",
             ].map((step, index) => (
               <div
                 key={step}
                 className="flex items-center gap-3 border-b border-slate-200 p-4 last:border-b-0"
               >
-                <span className="grid size-8 place-items-center rounded-full bg-[#24a647] text-sm font-semibold text-white">
+                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#24a647] text-sm font-semibold leading-none text-white">
                   {index + 1}
                 </span>
                 <span className="font-semibold text-slate-700">{step}</span>
               </div>
             ))}
+            <div className="border-t border-slate-200 p-4">
+              <a
+                href="https://www.instagram.com/accounts/manage_access/"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                Test Kullanıcısı Davetlerini Aç
+                <ExternalLink className="size-4" />
+              </a>
+            </div>
           </div>
 
           <div className="rounded border border-slate-200 p-4">

@@ -482,7 +482,7 @@ export function CheckoutModal({
   return (
     <div className="fixed inset-0 z-50 grid place-items-start bg-slate-950/35 p-6">
       <section className="mx-auto mt-4 w-full max-w-3xl rounded bg-white shadow-xl">
-        <ModalHeader title="Yeni" onClose={onClose} />
+        <ModalHeader title="Yeni adisyon" onClose={onClose} />
         <div className="max-h-[78vh] space-y-3 overflow-y-auto p-5">
           <CustomerPicker
             value={customerName}

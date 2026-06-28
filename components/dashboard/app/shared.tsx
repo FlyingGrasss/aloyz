@@ -1267,7 +1267,11 @@ export function ToggleRow({
 export function ChannelBadge({ channel }: { channel: string }) {
   return (
     <span
-      className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold ${channel === "instagram" ? "bg-pink-50 text-pink-700" : "bg-emerald-50 text-emerald-700"}`}
+      className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold ${
+        channel === "instagram"
+          ? "bg-pink-50 text-pink-700 dark:bg-pink-500/20 dark:text-pink-100"
+          : "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-100"
+      }`}
     >
       {channel === "instagram" ? "IG" : "WP"}
     </span>
@@ -1333,7 +1337,12 @@ export function Breadcrumb({
     <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
       {items.map((item, index) => {
         const label = typeof item === "string" ? item : item.label;
-        const view = typeof item === "string" ? undefined : item.view;
+        const view =
+          typeof item === "string"
+            ? item === "Aloyz"
+              ? "dashboard"
+              : undefined
+            : item.view;
         return (
           <span key={`${label}-${index}`} className="flex items-center gap-2">
             {index > 0 && <ChevronRight className="size-3 text-slate-400" />}
@@ -1345,6 +1354,10 @@ export function Breadcrumb({
               >
                 {label}
               </button>
+            ) : view === "dashboard" ? (
+              <a href="/dashboard?view=dashboard" className="hover:underline">
+                {label}
+              </a>
             ) : (
               label
             )}
@@ -1639,7 +1652,7 @@ export function formatLastUpdate(value: string) {
 export function formatDateLong(value: string) {
   const date = new Date(`${value}T12:00:00`);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("tr-TR", {
+  return date.toLocaleDateString(getDashboardLocale(), {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -1651,11 +1664,16 @@ export function formatInputDate(value: string) {
   if (!value) return "-";
   const date = new Date(`${value}T12:00:00`);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("tr-TR", {
+  return date.toLocaleDateString(getDashboardLocale(), {
     day: "numeric",
     month: "long",
     year: "numeric",
   });
+}
+
+function getDashboardLocale() {
+  if (typeof document === "undefined") return "tr-TR";
+  return document.documentElement.dataset.language === "en" ? "en-US" : "tr-TR";
 }
 
 export function getWhatsAppInstanceStatus(instance: any) {

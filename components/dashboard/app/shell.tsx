@@ -10,6 +10,7 @@ import {
   Languages,
   LockKeyhole,
   LogOut,
+  Menu,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
@@ -17,6 +18,7 @@ import {
   Settings,
   ShoppingBag,
   UserCircle,
+  X,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -62,15 +64,22 @@ export function Sidebar({
         className={`relative flex h-16 items-center gap-2 px-3 ${collapsed ? "justify-center" : ""}`}
       >
         {!collapsed && (
-          <Image
-            src="/logo.jpg"
-            alt="Aloyz"
-            width={34}
-            height={34}
-            className="rounded-md shadow-sm"
-          />
+          <button
+            type="button"
+            onClick={() => onSelect("dashboard")}
+            className="flex min-w-0 items-center gap-2 rounded-lg text-left"
+            title="Özet"
+          >
+            <Image
+              src="/logo.jpg"
+              alt="Aloyz"
+              width={34}
+              height={34}
+              className="rounded-md shadow-sm"
+            />
+            <span className="text-lg font-semibold">Aloyz</span>
+          </button>
         )}
-        {!collapsed && <span className="text-lg font-semibold">Aloyz</span>}
         <button
           type="button"
           onClick={onToggleCollapsed}
@@ -115,7 +124,7 @@ export function Sidebar({
                   onClick={() => onToggleGroup(group.key)}
                   className={`flex h-9 items-center gap-2 rounded-lg text-left text-sm font-medium transition ${
                     groupActive
-                      ? "bg-white text-slate-950 shadow-sm"
+                      ? "dashboard-nav-active bg-white text-slate-950 shadow-sm"
                       : "text-slate-300 hover:bg-white/8 hover:text-white"
                   } ${collapsed ? "w-9 justify-center px-0" : "w-full px-2"}`}
                   title={group.label}
@@ -175,6 +184,196 @@ export function Sidebar({
         </div>
       </nav>
     </aside>
+  );
+}
+
+export function MobileNavDrawer({
+  activeView,
+  open,
+  groupsOpen,
+  onClose,
+  onToggleGroup,
+  onSelect,
+}: {
+  activeView: ViewId;
+  open: boolean;
+  groupsOpen: Record<string, boolean>;
+  onClose: () => void;
+  onToggleGroup: (key: string) => void;
+  onSelect: (view: ViewId) => void;
+}) {
+  if (!open) return null;
+
+  const selectAndClose = (view: ViewId) => {
+    onSelect(view);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 md:hidden">
+      <button
+        type="button"
+        aria-label="Menüyü kapat"
+        className="absolute inset-0 bg-slate-950/45"
+        onClick={onClose}
+      />
+      <aside className="relative flex h-full w-[min(88vw,360px)] flex-col bg-[#111827] text-white shadow-2xl">
+        <div className="flex h-16 items-center gap-3 border-b border-white/10 px-4">
+          <button
+            type="button"
+            onClick={() => selectAndClose("dashboard")}
+            className="flex min-w-0 items-center gap-3 rounded-lg text-left"
+          >
+            <Image
+              src="/logo.jpg"
+              alt="Aloyz"
+              width={34}
+              height={34}
+              className="rounded-md shadow-sm"
+            />
+            <span className="text-lg font-semibold">Aloyz</span>
+          </button>
+          <button
+            type="button"
+            aria-label="Menüyü kapat"
+            onClick={onClose}
+            className="ml-auto grid size-9 place-items-center rounded-lg bg-white/8 text-white ring-1 ring-white/10"
+          >
+            <X className="size-5" />
+          </button>
+        </div>
+        <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+          <div className="space-y-1">
+            {primaryNav.map((item) => (
+              <SidebarItem
+                key={item.id}
+                item={item}
+                active={activeView === item.id}
+                collapsed={false}
+                onSelect={selectAndClose}
+              />
+            ))}
+          </div>
+
+          <div className="mt-4 space-y-2">
+            {navGroups.map((group) => {
+              const groupActive = group.children.some((item) =>
+                isNavSubGroup(item)
+                  ? item.children.some((child) => child.id === activeView)
+                  : item.id === activeView,
+              );
+              const openGroup = !!groupsOpen[group.key] || groupActive;
+              const Icon = group.icon;
+              return (
+                <div key={group.key} className="rounded-lg bg-white/5 p-1">
+                  <button
+                    type="button"
+                    onClick={() => onToggleGroup(group.key)}
+                    className="flex h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-semibold text-white"
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {group.label}
+                    </span>
+                    <Icon className={`size-4 shrink-0 ${group.iconClassName || ""}`} />
+                    <ChevronDown
+                      className={`size-4 transition ${openGroup ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  {openGroup && (
+                    <div className="mt-1 space-y-1">
+                      {group.children.map((item) =>
+                        isNavSubGroup(item) ? (
+                          <MobileSubGroup
+                            key={item.key}
+                            group={item}
+                            activeView={activeView}
+                            groupsOpen={groupsOpen}
+                            onToggleGroup={onToggleGroup}
+                            onSelect={selectAndClose}
+                          />
+                        ) : (
+                          <SidebarItem
+                            key={item.id}
+                            item={item}
+                            active={activeView === item.id}
+                            collapsed={false}
+                            onSelect={selectAndClose}
+                            compact
+                          />
+                        ),
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 rounded-lg bg-white/5 p-1">
+            <div className="px-2 py-2 text-xs font-semibold uppercase text-slate-400">
+              Kurulum
+            </div>
+            {setupItems.map((item) => (
+              <SidebarItem
+                key={item.id}
+                item={item}
+                active={activeView === item.id}
+                collapsed={false}
+                onSelect={selectAndClose}
+                compact
+              />
+            ))}
+          </div>
+        </nav>
+      </aside>
+    </div>
+  );
+}
+
+function MobileSubGroup({
+  group,
+  activeView,
+  groupsOpen,
+  onToggleGroup,
+  onSelect,
+}: {
+  group: NavSubGroup;
+  activeView: ViewId;
+  groupsOpen: Record<string, boolean>;
+  onToggleGroup: (key: string) => void;
+  onSelect: (view: ViewId) => void;
+}) {
+  const Icon = group.icon;
+  const active = group.children.some((item) => item.id === activeView);
+  const open = !!groupsOpen[group.key] || active;
+  return (
+    <div className="rounded-lg">
+      <button
+        type="button"
+        onClick={() => onToggleGroup(group.key)}
+        className={`flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-xs font-semibold ${
+          active ? "bg-white/12 text-white" : "text-slate-300"
+        }`}
+      >
+        <span className="min-w-0 flex-1 truncate">{group.label}</span>
+        <Icon className={`size-4 shrink-0 ${group.iconClassName || ""}`} />
+        <ChevronDown className={`size-4 transition ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="ml-2 mt-1 space-y-1 border-l border-white/10 pl-2">
+          {group.children.map((item) => (
+            <SidebarItem
+              key={item.id}
+              item={item}
+              active={activeView === item.id}
+              collapsed={false}
+              onSelect={onSelect}
+              compact
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -245,7 +444,7 @@ function SidebarItem({
       type="button"
       onClick={() => onSelect(item.id)}
       className={`flex h-9 items-center gap-2 rounded-lg text-left text-sm font-medium transition ${
-        active ? "bg-white text-slate-950 shadow-sm" : "text-slate-300 hover:bg-white/8 hover:text-white"
+        active ? "dashboard-nav-active bg-white text-slate-950 shadow-sm" : "text-slate-300 hover:bg-white/8 hover:text-white"
       } ${compact ? "text-xs" : ""} ${collapsed ? "w-9 justify-center px-0" : "w-full px-2"}`}
       title={item.label}
     >
@@ -277,6 +476,8 @@ export function Topbar({
   onSelectView,
   onOpenModal,
   onCreateItem,
+  onOpenMobileNav,
+  mobileNavEnabled = true,
 }: {
   business: Business;
   selectedDate: string;
@@ -294,15 +495,28 @@ export function Topbar({
     modal: "theme" | "language" | "password" | "notifications",
   ) => void;
   onCreateItem: (label: string) => void;
+  onOpenMobileNav: () => void;
+  mobileNavEnabled?: boolean;
 }) {
   return (
     <header className="z-20 h-16 shrink-0 border-b border-slate-200/80 bg-white/90 shadow-sm shadow-slate-900/5 backdrop-blur supports-[backdrop-filter]:bg-white/75">
       <div className="flex h-full items-center gap-2 px-3 md:gap-3 md:px-6">
+        {mobileNavEnabled && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onOpenMobileNav}
+            className="h-9 border-slate-200 bg-white text-slate-700 shadow-sm md:hidden"
+          >
+            <Menu className="size-4" />
+            Menü
+          </Button>
+        )}
         <Button
           type="button"
           variant="outline"
           onClick={onBack}
-          className="h-9 border-slate-200 bg-white text-slate-700 shadow-sm"
+          className="hidden h-9 border-slate-200 bg-white text-slate-700 shadow-sm sm:inline-flex"
         >
           <ChevronLeft className="size-4" />
           Geri
@@ -318,7 +532,7 @@ export function Topbar({
             <CalendarDays className="size-5" />
           </button>
           {openMenu === "date" && (
-            <Dropdown className="w-64 p-3">
+            <Dropdown className="w-[calc(100vw-2rem)] max-w-64 p-3 sm:w-64">
               <Label className="text-xs text-slate-500">Takvim tarihi</Label>
               <Input
                 type="date"

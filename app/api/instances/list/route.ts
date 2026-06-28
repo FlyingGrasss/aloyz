@@ -9,6 +9,7 @@ function getInstanceName(instance: any) {
 export async function GET(request: NextRequest) {
   const session = await auth()
   const userRole = (session?.user as any)?.role
+  const requestedName = request.nextUrl.searchParams.get('name')?.trim() || null
 
   if (!session) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), {
@@ -32,6 +33,9 @@ export async function GET(request: NextRequest) {
       })
 
       allowedSlug = business?.slug || null
+      if (requestedName && requestedName !== allowedSlug) {
+        return NextResponse.json({ success: true, instances: [] })
+      }
     }
 
     const evolutionUrl = process.env.EVOLUTION_URL || 'http://localhost:8080'
@@ -51,14 +55,16 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await listRes.json()
-    console.log('Evolution API fetchInstances response:', JSON.stringify(data))
     const instances = Array.isArray(data) ? data : []
+    const nameFilter = requestedName || allowedSlug
+    const filteredInstances = nameFilter
+      ? instances.filter((instance: any) => getInstanceName(instance) === nameFilter)
+      : instances
+    console.log(`Evolution API fetchInstances returned ${instances.length} instance(s), responding with ${filteredInstances.length}.`)
 
     return NextResponse.json({
       success: true,
-      instances: allowedSlug
-        ? instances.filter((instance: any) => getInstanceName(instance) === allowedSlug)
-        : instances
+      instances: filteredInstances
     })
 
   } catch (error: any) {

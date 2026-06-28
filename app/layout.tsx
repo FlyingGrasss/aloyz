@@ -47,8 +47,14 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="tr" className={cn("h-full", "font-sans", geist.variable)}>
+    <html lang="tr" suppressHydrationWarning className={cn("h-full", "font-sans", geist.variable)}>
       <body className="h-full bg-slate-50/50">
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('aloyz-theme');var l=localStorage.getItem('aloyz-language')||'tr';document.documentElement.classList.toggle('dark',t==='dark');document.documentElement.lang=l;document.documentElement.dataset.language=l;}catch(e){}",
+          }}
+        />
         <Providers>
           <div className="min-h-screen flex flex-col justify-between">
             <Navbar />

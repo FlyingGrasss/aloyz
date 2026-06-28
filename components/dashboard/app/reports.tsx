@@ -100,9 +100,23 @@ function downloadReportSnapshot(title: string, period: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${title.toLocaleLowerCase("tr-TR").replaceAll(" ", "-")}.csv`;
+  link.download = `${reportDownloadTitle(title)} - ${todayFileDate()}.csv`;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function reportDownloadTitle(title: string) {
+  return (
+    {
+      "Kasa raporu": "Cashier Report",
+      "Personel raporu": "Staff Report",
+      "Satış raporu": "Sales Report",
+    }[title] || title
+  );
+}
+
+function todayFileDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function collectVisibleReportRows(title: string, period: string) {

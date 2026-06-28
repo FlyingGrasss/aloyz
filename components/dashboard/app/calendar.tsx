@@ -238,11 +238,12 @@ export function CalendarPage({
         onSelectView={onSelectView}
       />
       <section className="rounded bg-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-3 sm:px-4">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <NativeSelect
               value={selectedStaffId}
               onChange={setSelectedStaffId}
+              className="w-full sm:w-44"
               options={[
                 { value: "all", label: "Tüm personel" },
                 ...staff.map((member) => ({
@@ -259,7 +260,7 @@ export function CalendarPage({
             >
               <ChevronLeft className="size-4" />
             </Button>
-            <div className="min-w-[260px] rounded border border-slate-300 px-3 py-1.5 text-center text-sm font-medium">
+            <div className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-1.5 text-center text-sm font-medium sm:min-w-[260px] sm:flex-none">
               {formatDateLong(selectedDate)}
             </div>
             <Button
@@ -274,7 +275,7 @@ export function CalendarPage({
               type="date"
               value={selectedDate}
               onChange={(event) => onDateChange(event.target.value)}
-              className="h-8 w-36"
+              className="h-8 w-full sm:w-36"
             />
             <Button
               type="button"
@@ -286,7 +287,7 @@ export function CalendarPage({
               Bugün
             </Button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <Button
               type="button"
               variant="outline"
@@ -295,7 +296,7 @@ export function CalendarPage({
             >
               <Settings className="size-4" />
             </Button>
-            <span className="rounded border border-slate-200 px-3 py-1.5 text-xs text-slate-500">
+            <span className="min-w-0 flex-1 truncate rounded border border-slate-200 px-3 py-1.5 text-xs text-slate-500 sm:flex-none">
               {calendarId
                 ? `Google Takvim bağlı: ${calendarId}`
                 : "Google Takvim bağlı değil"}
@@ -314,7 +315,7 @@ export function CalendarPage({
             )}
             <Button
               type="button"
-              className="bg-[#24a647] text-white"
+              className="w-full bg-[#24a647] text-white sm:w-auto"
               onClick={() => setModal("checkout")}
             >
               <Plus className="size-4" />
@@ -327,13 +328,13 @@ export function CalendarPage({
             {googleSyncMessage}
           </div>
         )}
-        <div ref={calendarScrollRef} className="max-h-[calc(100vh-180px)] overflow-auto">
+        <div ref={calendarScrollRef} className="max-h-[calc(100vh-220px)] overflow-auto sm:max-h-[calc(100vh-180px)]">
           {calendarView === "Aylık görünüm" ? (
             <div
               className="grid"
               style={{
-                minWidth: Math.round(1120 * (calendarWidth / 100)),
-                gridTemplateColumns: "repeat(7, minmax(150px, 1fr))",
+                minWidth: Math.round(840 * (calendarWidth / 100)),
+                gridTemplateColumns: "repeat(7, minmax(116px, 1fr))",
               }}
             >
               {["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((day) => (
@@ -402,11 +403,11 @@ export function CalendarPage({
               className="grid"
               style={{
                 minWidth: Math.round(
-                  (calendarView === "Haftalık görünüm" ? 1240 : 860) *
+                  (calendarView === "Haftalık görünüm" ? 980 : 680) *
                     (calendarWidth / 100),
                 ),
                 gridTemplateColumns:
-                  "64px repeat(" + visibleDates.length + ", minmax(160px, 1fr))",
+                  "52px repeat(" + visibleDates.length + ", minmax(128px, 1fr))",
               }}
             >
               <div className="border-r border-slate-200 bg-slate-50" />
@@ -440,7 +441,9 @@ export function CalendarPage({
                     <div
                       className={[
                         "border-r border-b border-slate-200 px-2 py-2 text-right text-xs text-slate-500",
-                        isCurrentSlot ? "bg-[#f4efcf] font-semibold" : "bg-slate-50",
+                        isCurrentSlot
+                          ? "bg-[#f4efcf] font-semibold dark:bg-amber-500/25 dark:text-amber-100"
+                          : "bg-slate-50",
                       ].join(" ")}
                     >
                       {slot.label}
@@ -478,7 +481,7 @@ export function CalendarPage({
                             "min-h-[64px] border-b border-r border-slate-200 py-1",
                             date === today
                               ? isCurrentSlot
-                                ? "bg-[#f7efc0]"
+                                ? "bg-[#f7efc0] dark:bg-amber-500/20"
                                 : "bg-[#fff8d8]"
                               : "bg-[#fffde9]",
                           ].join(" ")}

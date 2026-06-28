@@ -88,7 +88,7 @@ export function ProductSalesPage({
       onRefresh={() => setSortDesc((value) => !value)}
       onDownload={() =>
         downloadCsv(
-          "urun-satislari.csv",
+          `Product Sales - ${todayFileDate()}.csv`,
           ["Satış tarihi", "Müşteri", "Ürün", "Toplam tutar", "Ödenen tutar"],
           sales.map((sale) => [
             sale.date,
@@ -213,7 +213,7 @@ export function PackageSalesPage({
       onRefresh={() => setSortDesc((value) => !value)}
       onDownload={() =>
         downloadCsv(
-          "paket-satislari.csv",
+          `Package Sales - ${todayFileDate()}.csv`,
           ["Satış tarihi", "Müşteri", "Hizmet", "Toplam tutar", "Ödenen tutar"],
           sales.map((sale) => [
             sale.date,
@@ -1272,6 +1272,10 @@ function downloadCsv(
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function todayFileDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function staffName(business: Business, staffId: string) {

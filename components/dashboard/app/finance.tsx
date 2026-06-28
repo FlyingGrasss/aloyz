@@ -84,7 +84,7 @@ export function FinancePage({
   return (
     <div className="space-y-3">
       <Breadcrumb items={[{ label: "Aloyz", view: "dashboard" }, meta.title]} />
-      <section className="rounded bg-white shadow-sm">
+      <section key={kind} className="rounded bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
           <h1 className="text-xl font-semibold text-slate-700">{meta.title}</h1>
           <div className="flex items-center gap-2">
@@ -123,7 +123,7 @@ export function FinancePage({
               variant="outline"
               onClick={() =>
                 exportFinanceCsv(
-                  meta.title,
+                  kind,
                   getFinanceExportRows(kind, {
                     expenses: filteredExpenses,
                     payments: filteredPayments,
@@ -872,7 +872,7 @@ function getFinanceExportRows(
 }
 
 function exportFinanceCsv(
-  title: string,
+  kind: PageKind,
   payload: { headers: Array<string | number>; rows: Array<Array<string | number>> },
 ) {
   const escapeCell = (value: string | number) =>
@@ -884,9 +884,25 @@ function exportFinanceCsv(
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${title.toLocaleLowerCase("tr-TR").replaceAll(" ", "-")}.csv`;
+  link.download = `${downloadTitle(kind)} - ${todayFileDate()}.csv`;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function downloadTitle(kind: PageKind) {
+  return {
+    expenses: "Expenses",
+    payments: "Collections",
+    receivables: "Receivables",
+    debts: "Debts",
+    commissions: "Commissions",
+    reviews: "Reviews",
+    calls: "Call Logs",
+  }[kind];
+}
+
+function todayFileDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function sum<T extends Record<string, unknown>>(rows: T[], key: keyof T) {

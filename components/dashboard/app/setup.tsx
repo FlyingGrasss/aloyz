@@ -82,8 +82,7 @@ export function OnboardingPanel({
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <StatusBanner tone="warning">
-        Devam etmeden önce temel işletme bilgilerini ve çalışma saatlerini
-        tamamlayın.
+        Devam etmeden önce temel işletme bilgilerini ve çalışma saatlerini tamamlayın.
       </StatusBanner>
       <SetupGeneralForm
         business={business}
@@ -153,7 +152,7 @@ export function SetupPage({
                 type="button"
                 onClick={() => onSelectView(item.id)}
                 className={`flex h-10 w-full items-center gap-3 border-b border-slate-200 px-4 text-left text-sm hover:bg-slate-50 ${
-                  view === item.id ? "bg-slate-100 font-semibold" : ""
+                  view === item.id ? "dashboard-nav-active bg-slate-100 font-semibold" : ""
                 }`}
               >
                 <Icon className="size-4" />
@@ -1201,7 +1200,7 @@ const aiReadableInputClass =
 
 function AiReadableBadge() {
   return (
-    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+    <span className="inline-flex shrink-0 whitespace-nowrap items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
       Bot okuyabilir
     </span>
   );
@@ -1224,7 +1223,7 @@ function AiReadableField({
 }) {
   return (
     <label className="grid gap-1 text-sm font-semibold text-slate-700">
-      <span className="flex items-center gap-2">
+      <span className="flex flex-wrap items-center gap-2">
         {label} <AiReadableBadge />
       </span>
       {children}
@@ -1259,9 +1258,7 @@ function SalonBotSettingsPage({
     Array.isArray(business.faqs) ? business.faqs : [],
   );
   const whatsAppConnected =
-    whatsAppStatus === "open" ||
-    whatsAppStatus === "connected" ||
-    !!form.whatsappConnected;
+    whatsAppStatus === "open" || whatsAppStatus === "connected";
   const instagramConnected =
     !!business.instagram_page_id || !!form.instagramConnected;
   return (
@@ -1362,7 +1359,7 @@ function SalonBotSettingsPage({
         </div>
         <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-700">
               Sık sorulan sorular <AiReadableBadge />
             </div>
             <Button
@@ -1816,9 +1813,7 @@ function ConnectionsPanel({
   onSelectView: (view: ViewId) => void;
 }) {
   const whatsAppConnected =
-    whatsAppStatus === "open" ||
-    whatsAppStatus === "connected" ||
-    !!business.botSettings?.whatsappConnected;
+    whatsAppStatus === "open" || whatsAppStatus === "connected";
   const instagramConnected =
     !!business.instagram_page_id || !!business.botSettings?.instagramConnected;
 
@@ -1927,21 +1922,21 @@ function GoogleCalendarIntegrationPanel({
   }
 
   return (
-    <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">
+    <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
         Google Takvim Entegrasyonu
       </h2>
       {calendarId && (
-        <div className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+        <div className="mt-2 inline-flex max-w-full whitespace-normal break-all rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-100">
           Bağlı ve senkronize: {calendarId}
         </div>
       )}
-      <p className="mt-1 text-sm text-slate-600">
+      <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
         Takvim sahibinin e-posta adresini girin.{" "}
         <strong>Aşağıdaki açıklamayı okuyun.</strong>
       </p>
 
-      <div className="mt-5 space-y-1 text-sm leading-6 text-slate-700">
+      <div className="mt-5 space-y-1 text-sm leading-6 text-slate-700 dark:text-slate-200">
         <p>Takvimi bağlamak için:</p>
         <p>1. Google Takvim → Sol menüde takvimin yanındaki 3 nokta</p>
         <p>2. "Ayarlar ve Paylaşım" menüsünü seçin</p>
@@ -1949,7 +1944,7 @@ function GoogleCalendarIntegrationPanel({
           3. "Şunlarla paylaşıldı:" kısmına şu Google servis hesabı e-postasını
           ekleyin:
         </p>
-        <div className="inline-flex max-w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1 font-mono text-xs shadow-sm">
+        <div className="inline-flex max-w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1 font-mono text-xs shadow-sm dark:border-slate-700 dark:bg-slate-950">
           <span className="break-all">{GOOGLE_SERVICE_ACCOUNT_EMAIL}</span>
           <button
             type="button"
@@ -1965,7 +1960,7 @@ function GoogleCalendarIntegrationPanel({
       <div className="mt-5 grid gap-3 md:grid-cols-[200px_1fr_auto_auto] md:items-center">
         <label
           htmlFor="calendar-email"
-          className="text-sm font-semibold text-slate-900"
+          className="text-sm font-semibold text-slate-900 dark:text-slate-100"
         >
           Takvimin bağlı olduğu e-posta
         </label>

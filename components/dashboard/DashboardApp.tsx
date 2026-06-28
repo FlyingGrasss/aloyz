@@ -2,9 +2,9 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { hasDashboardAccess } from "@/lib/access";
-import { Sidebar, Topbar } from "./app/shell";
+import { MobileNavDrawer, Sidebar, Topbar } from "./app/shell";
 import { ContentRouter } from "./app/pages";
 import { OnboardingPanel } from "./app/setup";
 import { CustomerModal } from "./app/customers";
@@ -79,9 +79,15 @@ export function DashboardApp() {
   const [view, setView] = useState<ViewId>("dashboard");
   const [savedSetupComplete, setSavedSetupComplete] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState("");
-  const [dashboardLanguage, setDashboardLanguage] = useState("tr");
+  const [dashboardLanguage, setDashboardLanguage] = useState(() =>
+    typeof window === "undefined"
+      ? "tr"
+      : localStorage.getItem("aloyz-language") || "tr",
+  );
+  const [languageReady, setLanguageReady] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(
     null,
   );
@@ -104,6 +110,7 @@ export function DashboardApp() {
   } | null>(null);
   const [whatsAppInstance, setWhatsAppInstance] = useState<any | null>(null);
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
+  const [instagramNotice, setInstagramNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -126,6 +133,7 @@ export function DashboardApp() {
     document.documentElement.lang = storedLanguage;
     document.documentElement.dataset.language = storedLanguage;
     setDashboardLanguage(storedLanguage);
+    setLanguageReady(true);
   }, []);
 
   useEffect(() => {
@@ -141,13 +149,9 @@ export function DashboardApp() {
     return () => window.removeEventListener("aloyz-language-change", handler);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (typeof window === "undefined") return;
-    const timer = window.setTimeout(
-      () => translateDashboardDom(dashboardLanguage),
-      0,
-    );
-    return () => window.clearTimeout(timer);
+    translateDashboardDom(dashboardLanguage);
   }, [
     dashboardLanguage,
     view,
@@ -157,7 +161,16 @@ export function DashboardApp() {
     modal,
     quickCreate,
     openMenu,
+    openGroup,
+    mobileNavOpen,
   ]);
+
+  useEffect(() => {
+    const statusValue = searchParams.get("instagram");
+    if (!statusValue) return;
+    setInstagramNotice(statusValue);
+    setView("messaging/instagram/setup");
+  }, [searchParams]);
 
   useEffect(() => {
     if (!business.id) return;
@@ -176,20 +189,16 @@ export function DashboardApp() {
     if (typeof window === "undefined" || dashboardLanguage !== "en") return;
     const root = document.querySelector(".dashboard-app");
     if (!root) return;
-    let timer = 0;
     const observer = new MutationObserver(() => {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        observer.disconnect();
-        translateDashboardDom("en");
-        observer.observe(root, {
-          childList: true,
-          subtree: true,
-          characterData: true,
-          attributes: true,
-          attributeFilter: ["placeholder", "title", "aria-label"],
-        });
-      }, 0);
+      observer.disconnect();
+      translateDashboardDom("en");
+      observer.observe(root, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: ["placeholder", "title", "aria-label"],
+      });
     });
     observer.observe(root, {
       childList: true,
@@ -199,7 +208,6 @@ export function DashboardApp() {
       attributeFilter: ["placeholder", "title", "aria-label"],
     });
     return () => {
-      window.clearTimeout(timer);
       observer.disconnect();
     };
   }, [dashboardLanguage]);
@@ -245,6 +253,8 @@ export function DashboardApp() {
     contacts[0] ||
     null;
   const forcedSetup = !savedSetupComplete && !isAdminMode;
+  const t = (text: string) =>
+    dashboardLanguage === "en" ? translateDashboardText(text) : text;
 
   async function fetchBusiness() {
     try {
@@ -252,9 +262,12 @@ export function DashboardApp() {
       const url = isAdminMode
         ? `/api/business?id=${encodeURIComponent(adminBusinessId!)}`
         : "/api/business";
-      const res = await fetch(url);
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 12000);
+      const res = await fetch(url, { signal: controller.signal });
+      window.clearTimeout(timeout);
       if (!res.ok) {
-        setErrorMsg("İşletme bilgileri alınamadı.");
+        setErrorMsg(t("İşletme bilgileri alınamadı."));
         return;
       }
       const data = await res.json();
@@ -278,17 +291,22 @@ export function DashboardApp() {
       };
       setBusiness(nextBusiness);
       setSavedSetupComplete(isSetupComplete(nextBusiness));
-      if (!isAdminMode) fetchWhatsAppInstanceStatus();
-    } catch {
-      setErrorMsg("Sunucu hatası oluştu.");
+      if (!isAdminMode) fetchWhatsAppInstanceStatus(nextBusiness.slug);
+    } catch (error: any) {
+      setErrorMsg(
+        error?.name === "AbortError"
+          ? t("İşletme bilgileri zamanında alınamadı. Lütfen sayfayı yenileyin.")
+          : t("Sunucu hatası oluştu."),
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  async function fetchWhatsAppInstanceStatus() {
+  async function fetchWhatsAppInstanceStatus(slug = business.slug) {
     try {
-      const res = await fetch("/api/instances/list");
+      const instanceName = slug ? `?name=${encodeURIComponent(slug)}` : "";
+      const res = await fetch(`/api/instances/list${instanceName}`);
       if (res.ok) {
         const data = await res.json();
         setWhatsAppInstance(
@@ -328,7 +346,7 @@ export function DashboardApp() {
 
       const data = await res.json();
       if (!res.ok) {
-        setErrorMsg(data.error || "Kaydetme sırasında hata oluştu.");
+        setErrorMsg(t(data.error || "Kaydetme sırasında hata oluştu."));
         return false;
       }
       setBusiness((prev) => ({
@@ -358,10 +376,10 @@ export function DashboardApp() {
         appointments: prev.appointments,
       }));
       setSavedSetupComplete(isSetupComplete(normalizedBusiness));
-      setSuccessMsg("Değişiklikler kaydedildi.");
+      setSuccessMsg(t("Değişiklikler kaydedildi."));
       return true;
     } catch {
-      setErrorMsg("Sunucu hatası oluştu.");
+      setErrorMsg(t("Sunucu hatası oluştu."));
       return false;
     } finally {
       setSaving(false);
@@ -388,7 +406,7 @@ export function DashboardApp() {
 
       if (res.ok) {
         setBusiness((prev) => ({ ...prev, [field]: value }));
-        setSuccessMsg("Durum güncellendi.");
+        setSuccessMsg(t("Durum güncellendi."));
       }
     } finally {
       setSaving(false);
@@ -402,7 +420,9 @@ export function DashboardApp() {
     setErrorMsg("");
     setSuccessMsg("");
     try {
-      const listRes = await fetch("/api/instances/list");
+      const listRes = await fetch(
+        `/api/instances/list?name=${encodeURIComponent(business.slug)}`,
+      );
       const listData = listRes.ok ? await listRes.json() : null;
       const existingInstance =
         Array.isArray(listData?.instances) &&
@@ -421,7 +441,7 @@ export function DashboardApp() {
           }),
         });
         if (!createRes.ok) {
-          setErrorMsg("WhatsApp bağlantısı hazırlanamadı.");
+          setErrorMsg(t("WhatsApp bağlantısı hazırlanamadı."));
           return;
         }
       }
@@ -435,13 +455,12 @@ export function DashboardApp() {
         await updateAndSave({
           botSettings: {
             ...(business.botSettings || {}),
-            whatsappConnected: true,
             whatsapp: true,
           },
         });
-        setSuccessMsg("QR kod yüklendi.");
+        setSuccessMsg(t("QR kod yüklendi."));
       } else {
-        setErrorMsg("QR kod alınamadı.");
+        setErrorMsg(t("QR kod alınamadı."));
       }
     } finally {
       setSaving(false);
@@ -461,7 +480,7 @@ export function DashboardApp() {
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setErrorMsg(data.error || "WhatsApp bağlantısı kesilemedi.");
+        setErrorMsg(t(data.error || "WhatsApp bağlantısı kesilemedi."));
         return;
       }
       const nextBotSettings = {
@@ -474,7 +493,7 @@ export function DashboardApp() {
         botSettings: nextBotSettings,
       });
       setWhatsAppInstance(null);
-      setSuccessMsg("WhatsApp bağlantısı kesildi.");
+      setSuccessMsg(t("WhatsApp bağlantısı kesildi."));
     } finally {
       setSaving(false);
     }
@@ -496,6 +515,14 @@ export function DashboardApp() {
       if (adminBusinessId) params.set("businessId", adminBusinessId);
       window.history.pushState(null, "", `/dashboard?${params.toString()}`);
     }
+  }
+
+  function dismissInstagramNotice() {
+    setInstagramNotice(null);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("instagram");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   function goBack() {
@@ -564,12 +591,12 @@ export function DashboardApp() {
     setApplyHoursPrompt(null);
   }
 
-  if (status === "loading" || loading) {
+  if (status === "loading" || loading || !languageReady) {
     return (
-      <div className="min-h-screen bg-[#e9edf3] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-sm font-semibold text-slate-600">
+      <div className="min-h-screen bg-[#e9edf3] flex items-center justify-center dark:bg-slate-950">
+        <div className="flex flex-col items-center gap-3 text-sm font-semibold text-slate-600 dark:text-slate-200">
           <div className="size-8 rounded-full border-4 border-[#5f86b6] border-t-transparent animate-spin" />
-          Yükleniyor...
+          Loading...
         </div>
       </div>
     );
@@ -584,6 +611,18 @@ export function DashboardApp() {
             collapsed={sidebarCollapsed}
             groupsOpen={openGroup}
             onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
+            onToggleGroup={(key) =>
+              setOpenGroup((prev) => ({ ...prev, [key]: !prev[key] }))
+            }
+            onSelect={selectView}
+          />
+        )}
+        {!forcedSetup && (
+          <MobileNavDrawer
+            activeView={view}
+            open={mobileNavOpen}
+            groupsOpen={openGroup}
+            onClose={() => setMobileNavOpen(false)}
             onToggleGroup={(key) =>
               setOpenGroup((prev) => ({ ...prev, [key]: !prev[key] }))
             }
@@ -612,6 +651,8 @@ export function DashboardApp() {
             onSelectView={selectView}
             onOpenModal={setModal}
             onCreateItem={openQuickCreate}
+            onOpenMobileNav={() => setMobileNavOpen(true)}
+            mobileNavEnabled={!forcedSetup}
           />
 
           <main className="min-h-0 flex-1 overflow-auto px-4 py-4 md:px-6">
@@ -660,6 +701,34 @@ export function DashboardApp() {
           </main>
         </div>
       </div>
+
+      {instagramNotice === "connected" && (
+        <ConfirmDialog
+          title="Instagram bağlantısı tamamlandı"
+          description="Instagram hesabınız Aloyz'a bağlandı. IG Kurulumu sayfasından botu aktif/pasif yapabilir ve test modunu açarak deneme yapabilirsiniz."
+          confirmLabel="IG Kurulumuna Git"
+          cancelLabel="Kapat"
+          onConfirm={() => {
+            dismissInstagramNotice();
+            selectView("messaging/instagram/setup");
+          }}
+          onCancel={dismissInstagramNotice}
+        />
+      )}
+
+      {instagramNotice && instagramNotice !== "connected" && (
+        <ConfirmDialog
+          title="Instagram bağlantısı tamamlanamadı"
+          description="Lütfen Instagram'da Ayarlar > İnternet Sitesi İzinleri > Uygulamalar ve internet siteleri > Test Kullanıcısı Davetleri sekmesine gidip Aloyz davetini kabul ettiğinizden emin olun. Sonra Aloyz'a dönüp tekrar bağlanmayı deneyin."
+          confirmLabel="Davetleri Aç"
+          cancelLabel="Kapat"
+          onConfirm={() => {
+            window.open("https://www.instagram.com/accounts/manage_access/", "_blank");
+            dismissInstagramNotice();
+          }}
+          onCancel={dismissInstagramNotice}
+        />
+      )}
 
       {applyHoursPrompt && (
         <ConfirmDialog
@@ -956,6 +1025,8 @@ const dashboardTranslations: Record<string, string> = {
   Bilgileri: "Information",
   "Çalışma saatleri": "Working hours",
   "Dönemsel çalışma saatleri": "Special working hours",
+  "Devam etmeden önce temel işletme bilgilerini ve çalışma saatlerini tamamlayın.":
+    "Complete the basic business information and working hours before continuing.",
   Personeller: "Staff",
   Çalışanlar: "Staff",
   Personel: "Staff",
@@ -1051,6 +1122,9 @@ const dashboardTranslations: Record<string, string> = {
   "Ödenen tutar": "Paid amount",
   "Kalan ödeme": "Remaining payment",
   "Filtrele / Sırala": "Filter / Sort",
+  "Sıralama": "Sorting",
+  "En yeni önce": "Newest first",
+  "En eski önce": "Oldest first",
   İndir: "Download",
   "İçe aktar": "Import",
   "Bağlantıyı Kes": "Disconnect",
@@ -1133,8 +1207,12 @@ const dashboardTranslations: Record<string, string> = {
   "Geldi mi": "Attendance",
   "Gelmedi": "No-show",
   "Google Takvim bağlı değil": "Google Calendar is not connected",
+  "Google Takvim bağlı": "Google Calendar connected",
+  "Google Takvim senkronize edildi": "Google Calendar synced",
   "Google Takvim senkronizasyonu başarısız.":
     "Google Calendar sync failed.",
+  etkinlik: "event",
+  etkinlikler: "events",
   "Gönderildi": "Sent",
   "Gönderim tarihi": "Send date",
   "Görüşme": "Conversation",
@@ -1167,6 +1245,8 @@ const dashboardTranslations: Record<string, string> = {
   "İşletme": "Business",
   "İşletme adı": "Business name",
   "İşletme bilgileri alınamadı.": "Business information could not be loaded.",
+  "İşletme bilgileri zamanında alınamadı. Lütfen sayfayı yenileyin.":
+    "Business information could not be loaded in time. Please refresh the page.",
   "Kalan kullanım": "Remaining usage",
   "Kalan": "Remaining",
   "Kalan gün": "Days remaining",
@@ -1195,6 +1275,7 @@ const dashboardTranslations: Record<string, string> = {
   "Mesaj sayısı": "Message count",
   "Menüyü aç": "Expand menu",
   "Menüyü daralt": "Collapse menu",
+  Menü: "Menu",
   "Mesaj ve profil izinlerini onaylayın":
     "Approve message and profile permissions",
   "Mesajlar bot tarafından alınabilir.": "Messages can be received by the bot.",
@@ -1225,6 +1306,7 @@ const dashboardTranslations: Record<string, string> = {
   "Paket düzenle": "Edit package",
   "QR kod alınamadı.": "QR code could not be loaded.",
   "QR kod yüklendi.": "QR code loaded.",
+  "QR kod okutulmayı bekliyor.": "Waiting for the QR code to be scanned.",
   "QR kodu okutunca bağlantı tamamlanır":
     "The connection is completed when you scan the QR code",
   "QR kodu okutunca bağlantı tamamlanır.":
@@ -1330,9 +1412,9 @@ const dashboardTranslations: Record<string, string> = {
   "Alacak": "Receivable",
   "Alacak hatırlatmaları": "Receivable reminders",
   "Asistan": "Assistant",
-  "Aşağıdaki açıklamayı okuyun.": "Read the explanation below.",
   "Ayarlar": "Settings",
   "Bağlantı durumu": "Connection status",
+  "Bağlantı bekleniyor": "Waiting for connection",
   "Bağlantıyı kes": "Disconnect",
   "Bildirimler": "Notifications",
   "Bot": "Bot",
@@ -1341,6 +1423,7 @@ const dashboardTranslations: Record<string, string> = {
   "Bot Ayarlarına Git": "Go to bot settings",
   "Bot durumu": "Bot status",
   "Cmt": "Sat",
+  "Cts": "Sat",
   "Cum": "Fri",
   "Detay yok": "No details",
   "Dinamik": "Dynamic",
@@ -1352,13 +1435,20 @@ const dashboardTranslations: Record<string, string> = {
   "Fiyat tipi": "Price type",
   "Google online randevu": "Google online booking",
   "Google Takvim Entegrasyonu": "Google Calendar Integration",
+  "Bağlı ve senkronize": "Connected and synchronized",
+  "Takvimi bağlamak için:": "To connect the calendar:",
+  "Takvim sahibinin e-posta adresini girin.": "Enter the calendar owner's email address.",
+  "Aşağıdaki açıklamayı okuyun.": "Read the explanation below.",
   "Google Takvim'i yenile": "Refresh Google Calendar",
   "1. Google Takvim → Sol menüde takvimin yanındaki 3 nokta":
     "1. Google Calendar → Click the three dots next to the calendar in the left menu",
   "2. \"Ayarlar ve Paylaşım\" menüsünü seçin":
     "2. Select the \"Settings and sharing\" menu",
+  "3. \"Şunlarla paylaşıldı:\" kısmına şu Google servis hesabı e-postasını ekleyin:":
+    "3. Add this Google service account email under \"Shared with:\":",
   "4. Rol olarak \"Editor\" seçin ve kaydedin.":
     "4. Select \"Editor\" as the role and save.",
+  Kopyala: "Copy",
   "görüşme": "conversation",
   "Hak ediş ayarları": "Commission settings",
   "Hak ediş oranı (%)": "Commission rate (%)",
@@ -1391,7 +1481,6 @@ const dashboardTranslations: Record<string, string> = {
   "Komisyon": "Commission",
   "Komisyon toplamı": "Total commission",
   "Konuşma": "Conversation",
-  "Kopyala": "Copy",
   "Koyu": "Dark",
   "Listeye dön": "Back to list",
   "Mesaj bildirimleri": "Message notifications",
@@ -1426,6 +1515,7 @@ const dashboardTranslations: Record<string, string> = {
   "Profesyonel Instagram hesabı bağlandı":
     "Professional Instagram account connected",
   "Puan": "Points",
+  "Pts": "Mon",
   "Pzt": "Mon",
   "QR kod burada görünecek.": "The QR code will appear here.",
   "QR Kodu Getir": "Get QR Code",
@@ -1446,8 +1536,6 @@ const dashboardTranslations: Record<string, string> = {
   "Takvim genişliği": "Calendar width",
   "Takvim görünümü": "Calendar view",
   "Takvim saat aralığı": "Calendar time interval",
-  "Takvim sahibinin e-posta adresini girin.":
-    "Enter the calendar owner's email address.",
   "Takvim tarihi": "Calendar date",
   "Takvim yazı rengi": "Calendar text color",
   "Takvimi aç": "Open calendar",
@@ -1515,9 +1603,21 @@ function translateDashboardDom(language: string) {
     node = walker.nextNode();
   }
   for (const textNode of textNodes) {
-    const original = ((textNode as any).__aloyzSourceText ||
-      textNode.nodeValue ||
-      "") as string;
+    const current = (textNode.nodeValue || "") as string;
+    let original = ((textNode as any).__aloyzSourceText || current) as string;
+    const sourceTrimmed = original.trim();
+    const translatedFromSource = sourceTrimmed
+      ? dashboardTranslations[sourceTrimmed] || translateDashboardText(sourceTrimmed)
+      : "";
+    const currentTrimmed = current.trim();
+    if (
+      currentTrimmed &&
+      currentTrimmed !== sourceTrimmed &&
+      currentTrimmed !== translatedFromSource
+    ) {
+      original = current;
+      (textNode as any).__aloyzSourceText = current;
+    }
     if (!(textNode as any).__aloyzSourceText) {
       (textNode as any).__aloyzSourceText = original;
     }
@@ -1553,6 +1653,39 @@ function translateDashboardDom(language: string) {
 }
 
 function translateDashboardText(text: string) {
+  const exact = dashboardTranslations[text];
+  if (exact) return exact;
+
+  if (
+    text === "İşletme bilgileri zamanında alınamadı. Lütfen sayfayı yenileyin."
+  ) {
+    return "Business information could not be loaded in time. Please refresh the page.";
+  }
+
+  const mixedGoogleConnectedSyncMatch = text.match(
+    /^Connected ve senkronize: (.+)$/,
+  );
+  if (mixedGoogleConnectedSyncMatch) {
+    return `Connected and synchronized: ${mixedGoogleConnectedSyncMatch[1]}`;
+  }
+
+  const googleConnectedSyncMatch = text.match(/^Bağlı ve senkronize: (.+)$/);
+  if (googleConnectedSyncMatch) {
+    return `Connected and synchronized: ${googleConnectedSyncMatch[1]}`;
+  }
+
+  const googleSyncMatch = text.match(
+    /^Google Takvim senkronize edildi \((\d+) etkinlik\)\.$/,
+  );
+  if (googleSyncMatch) {
+    return `Google Calendar synced (${googleSyncMatch[1]} events).`;
+  }
+
+  const googleConnectedMatch = text.match(/^Google Takvim bağlı: (.+)$/);
+  if (googleConnectedMatch) {
+    return `Google Calendar connected: ${googleConnectedMatch[1]}`;
+  }
+
   let translated = text;
   const entries = Object.entries(dashboardTranslations).sort(
     ([left], [right]) => right.length - left.length,

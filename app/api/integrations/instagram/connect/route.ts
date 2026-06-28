@@ -25,6 +25,9 @@ function signState(value: string) {
 }
 
 export async function GET(request: NextRequest) {
+  const dashboardUrl = new URL("/dashboard", request.url);
+  dashboardUrl.searchParams.set("view", "messaging/instagram/setup");
+
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) {
@@ -36,7 +39,8 @@ export async function GET(request: NextRequest) {
     select: { id: true },
   });
   if (!business) {
-    return Response.redirect(new URL("/dashboard?instagram=missing-business", request.url));
+    dashboardUrl.searchParams.set("instagram", "missing-business");
+    return Response.redirect(dashboardUrl);
   }
 
   const clientId =
@@ -44,7 +48,8 @@ export async function GET(request: NextRequest) {
     process.env.INSTAGRAM_CLIENT_ID ||
     process.env.META_APP_ID;
   if (!clientId) {
-    return Response.redirect(new URL("/dashboard?instagram=missing-client-id", request.url));
+    dashboardUrl.searchParams.set("instagram", "missing-client-id");
+    return Response.redirect(dashboardUrl);
   }
 
   const payload = `${userId}.${business.id}.${Date.now()}`;
