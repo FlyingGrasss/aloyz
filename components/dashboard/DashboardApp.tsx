@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
+import { Building2, UserRound } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { hasDashboardAccess } from "@/lib/access";
 import { MobileNavDrawer, Sidebar, Topbar } from "./app/shell";
@@ -48,6 +49,9 @@ import {
   normalizeView,
   parseHourValue,
 } from "./app/shared";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 type QuickCreateAction =
   | "appointment"
@@ -60,6 +64,17 @@ type QuickCreateAction =
   | "receivable"
   | "debt"
   | "commission";
+
+type PendingInvite = {
+  id: string;
+  role: "owner" | "employee";
+  expiresAt: string;
+  business: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+};
 
 const ACCESS_ALLOWED_VIEWS = new Set<ViewId>(["subscription", "invoice/list"]);
 
@@ -111,6 +126,17 @@ export function DashboardApp() {
   const [whatsAppInstance, setWhatsAppInstance] = useState<any | null>(null);
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [instagramNotice, setInstagramNotice] = useState<string | null>(null);
+  const [accessBlock, setAccessBlock] = useState<
+    "pending" | "no-business" | null
+  >(null);
+  const [ownerRequest, setOwnerRequest] = useState({
+    name: "",
+    type: "",
+    phone: "",
+  });
+  const canManageSetup =
+    isAdminMode || business.currentMembershipRole === "owner";
+  const forcedSetup = canManageSetup && !savedSetupComplete && !isAdminMode;
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -168,9 +194,14 @@ export function DashboardApp() {
   useEffect(() => {
     const statusValue = searchParams.get("instagram");
     if (!statusValue) return;
+    if (!canManageSetup) {
+      setInstagramNotice(null);
+      setView("dashboard");
+      return;
+    }
     setInstagramNotice(statusValue);
     setView("messaging/instagram/setup");
-  }, [searchParams]);
+  }, [canManageSetup, searchParams]);
 
   useEffect(() => {
     if (!business.id) return;
@@ -178,6 +209,12 @@ export function DashboardApp() {
     if (ACCESS_ALLOWED_VIEWS.has(view)) return;
     selectView("subscription");
   }, [business, view]);
+
+  useEffect(() => {
+    if (view.startsWith("setup/") && !canManageSetup) {
+      selectView("dashboard");
+    }
+  }, [canManageSetup, view]);
 
   useEffect(() => {
     if (!successMsg) return;
@@ -225,13 +262,20 @@ export function DashboardApp() {
         !hasDashboardAccess(business.botSettings, business.createdAt) &&
         !ACCESS_ALLOWED_VIEWS.has(requestedView)
           ? "subscription"
+          : requestedView.startsWith("setup/") && !canManageSetup
+            ? "dashboard"
           : requestedView;
       setView(targetView);
     };
     syncViewFromUrl();
     window.addEventListener("popstate", syncViewFromUrl);
     return () => window.removeEventListener("popstate", syncViewFromUrl);
-  }, [business.botSettings, business.createdAt, business.id]);
+  }, [
+    business.botSettings,
+    business.createdAt,
+    business.id,
+    canManageSetup,
+  ]);
 
   useEffect(() => {
     if (
@@ -252,7 +296,6 @@ export function DashboardApp() {
     contacts.find((contact) => contact.id === selectedContactId) ||
     contacts[0] ||
     null;
-  const forcedSetup = !savedSetupComplete && !isAdminMode;
   const t = (text: string) =>
     dashboardLanguage === "en" ? translateDashboardText(text) : text;
 
@@ -267,10 +310,22 @@ export function DashboardApp() {
       const res = await fetch(url, { signal: controller.signal });
       window.clearTimeout(timeout);
       if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.code === "APPROVAL_PENDING") {
+          setAccessBlock("pending");
+          setErrorMsg("");
+          return;
+        }
+        if (data.code === "NO_BUSINESS") {
+          setAccessBlock("no-business");
+          setErrorMsg("");
+          return;
+        }
         setErrorMsg(t("İşletme bilgileri alınamadı."));
         return;
       }
       const data = await res.json();
+      setAccessBlock(null);
       const nextBusiness = {
         ...defaultBusiness,
         ...data,
@@ -295,7 +350,9 @@ export function DashboardApp() {
     } catch (error: any) {
       setErrorMsg(
         error?.name === "AbortError"
-          ? t("İşletme bilgileri zamanında alınamadı. Lütfen sayfayı yenileyin.")
+          ? t(
+              "İşletme bilgileri zamanında alınamadı. Lütfen sayfayı yenileyin.",
+            )
           : t("Sunucu hatası oluştu."),
       );
     } finally {
@@ -505,6 +562,8 @@ export function DashboardApp() {
       !hasDashboardAccess(business.botSettings, business.createdAt) &&
       !ACCESS_ALLOWED_VIEWS.has(nextView)
         ? "subscription"
+        : nextView.startsWith("setup/") && !canManageSetup
+          ? "dashboard"
         : nextView;
     setView(targetView);
     setOpenMenu(null);
@@ -522,7 +581,11 @@ export function DashboardApp() {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
     url.searchParams.delete("instagram");
-    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(
+      null,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
   }
 
   function goBack() {
@@ -591,14 +654,65 @@ export function DashboardApp() {
     setApplyHoursPrompt(null);
   }
 
+  async function submitOwnerRequest(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+    try {
+      const res = await fetch("/api/onboarding/business", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(ownerRequest),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorMsg(data.error || "İşletme başvurusu alınamadı.");
+        return;
+      }
+      setAccessBlock("pending");
+      setSuccessMsg("Başvurunuz alındı.");
+    } catch {
+      setErrorMsg("Sunucu hatası oluştu.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (status === "loading" || loading || !languageReady) {
     return (
       <div className="min-h-screen bg-[#e9edf3] flex items-center justify-center dark:bg-slate-950">
         <div className="flex flex-col items-center gap-3 text-sm font-semibold text-slate-600 dark:text-slate-200">
           <div className="size-8 rounded-full border-4 border-[#5f86b6] border-t-transparent animate-spin" />
-          Loading...
+          Yükleniyor...
         </div>
       </div>
+    );
+  }
+
+  if (accessBlock === "pending") {
+    return (
+      <AccessStateScreen
+        title="Hesabınız onay bekliyor"
+        description="Aloyz ekibi hesabınızı onayladıktan sonra panel erişiminiz açılacak."
+        email={session?.user?.email || ""}
+        actionLabel="Çıkış yap"
+        onAction={() => signOut({ callbackUrl: "/" })}
+      />
+    );
+  }
+
+  if (accessBlock === "no-business") {
+    return (
+      <NoBusinessScreen
+        ownerRequest={ownerRequest}
+        saving={saving}
+        errorMsg={errorMsg}
+        userEmail={session?.user?.email || ""}
+        onChange={setOwnerRequest}
+        onSubmit={submitOwnerRequest}
+        onLogout={() => signOut({ callbackUrl: "/" })}
+      />
     );
   }
 
@@ -622,6 +736,7 @@ export function DashboardApp() {
             activeView={view}
             open={mobileNavOpen}
             groupsOpen={openGroup}
+            canManageSetup={canManageSetup}
             onClose={() => setMobileNavOpen(false)}
             onToggleGroup={(key) =>
               setOpenGroup((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -652,6 +767,7 @@ export function DashboardApp() {
             onOpenModal={setModal}
             onCreateItem={openQuickCreate}
             onOpenMobileNav={() => setMobileNavOpen(true)}
+            canManageSetup={canManageSetup}
             mobileNavEnabled={!forcedSetup}
           />
 
@@ -687,6 +803,7 @@ export function DashboardApp() {
                 saving={saving}
                 whatsAppStatus={getWhatsAppInstanceStatus(whatsAppInstance)}
                 qrCodeBase64={qrCodeBase64}
+                canManageSetup={canManageSetup}
                 onChange={updateBusiness}
                 onHourChange={updateHour}
                 onSave={() => saveBusiness()}
@@ -723,7 +840,10 @@ export function DashboardApp() {
           confirmLabel="Davetleri Aç"
           cancelLabel="Kapat"
           onConfirm={() => {
-            window.open("https://www.instagram.com/accounts/manage_access/", "_blank");
+            window.open(
+              "https://www.instagram.com/accounts/manage_access/",
+              "_blank",
+            );
             dismissInstagramNotice();
           }}
           onCancel={dismissInstagramNotice}
@@ -776,6 +896,359 @@ function quickCreateFromLabel(label: string): QuickCreateAction | null {
   if (label === "Yeni borç") return "debt";
   if (label === "Yeni komisyon") return "commission";
   return null;
+}
+
+function AccessStateScreen({
+  title,
+  description,
+  email,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  description: string;
+  email: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <main className="min-h-screen bg-[#e9edf3] px-4 py-10 text-slate-800">
+      <section className="mx-auto mt-16 w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-semibold">{title}</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
+        {email && (
+          <p className="mt-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+            {email}
+          </p>
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-5 w-full"
+          onClick={onAction}
+        >
+          {actionLabel}
+        </Button>
+      </section>
+    </main>
+  );
+}
+
+function NoBusinessScreen({
+  ownerRequest,
+  saving,
+  errorMsg,
+  userEmail,
+  onChange,
+  onSubmit,
+  onLogout,
+}: {
+  ownerRequest: { name: string; type: string; phone: string };
+  saving: boolean;
+  errorMsg: string;
+  userEmail: string;
+  onChange: (next: { name: string; type: string; phone: string }) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  onLogout: () => void;
+}) {
+  const [mode, setMode] = useState<"owner" | "employee" | null>(null);
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+
+  useEffect(() => {
+    if (mode !== "employee") return;
+    let cancelled = false;
+    async function loadPendingInvites() {
+      setInviteLoading(true);
+      setInviteError("");
+      try {
+        const res = await fetch("/api/invites/pending");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setInviteError(data.error || "Davetler alınamadı.");
+          return;
+        }
+        if (!cancelled) {
+          setPendingInvites(Array.isArray(data.invites) ? data.invites : []);
+        }
+      } catch {
+        if (!cancelled) setInviteError("Davetler alınamadı.");
+      } finally {
+        if (!cancelled) setInviteLoading(false);
+      }
+    }
+    void loadPendingInvites();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
+
+  async function acceptInvite(inviteId: string) {
+    setInviteLoading(true);
+    setInviteError("");
+    try {
+      const res = await fetch("/api/invites/pending", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inviteId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setInviteError(data.error || "Davet kabul edilemedi.");
+        return;
+      }
+      window.location.assign(data.redirectTo || "/dashboard");
+    } catch {
+      setInviteError("Davet kabul edilemedi.");
+    } finally {
+      setInviteLoading(false);
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-[#e9edf3] px-4 py-10 text-slate-800">
+      <section className="mx-auto mt-10 w-full max-w-lg rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        {!mode && (
+          <>
+            <h1 className="text-xl font-semibold">Hesap türünüzü seçin</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Devam etmek için Aloyz'u nasıl kullanacağınızı seçin.
+            </p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-24 flex-col gap-2"
+                onClick={() => setMode("owner")}
+              >
+                <Building2 className="size-5" />
+                İşletme sahibi
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-24 flex-col gap-2"
+                onClick={() => setMode("employee")}
+              >
+                <UserRound className="size-5" />
+                Çalışan
+              </Button>
+            </div>
+            <Button type="button" variant="outline" className="mt-4 w-full" onClick={onLogout}>
+              Çıkış yap
+            </Button>
+          </>
+        )}
+
+        {mode === "owner" && (
+          <>
+            <button
+              type="button"
+              className="mb-4 text-sm font-semibold text-slate-500 hover:text-slate-900"
+              onClick={() => setMode(null)}
+            >
+              Geri
+            </button>
+            <h1 className="text-xl font-semibold">İşletme başvurusu</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              İşletme bilgilerinizi gönderin. Onaylandıktan sonra panel erişiminiz açılır.
+            </p>
+
+            <form onSubmit={onSubmit} className="mt-5 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="owner-business-name">İşletme adı</Label>
+                <Input
+                  id="owner-business-name"
+                  required
+                  value={ownerRequest.name}
+                  onChange={(event) =>
+                    onChange({ ...ownerRequest, name: event.target.value })
+                  }
+                  placeholder="Örn. Lumina Güzellik"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="owner-business-type">İşletme tipi</Label>
+                <Input
+                  id="owner-business-type"
+                  value={ownerRequest.type}
+                  onChange={(event) =>
+                    onChange({ ...ownerRequest, type: event.target.value })
+                  }
+                  placeholder="Örn. Güzellik merkezi"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="owner-business-phone">Telefon</Label>
+                <Input
+                  id="owner-business-phone"
+                  value={ownerRequest.phone}
+                  onChange={(event) =>
+                    onChange({ ...ownerRequest, phone: event.target.value })
+                  }
+                  placeholder="+90..."
+                />
+              </div>
+
+              {errorMsg && (
+                <div className="rounded border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+                  {errorMsg}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 bg-slate-900 text-white"
+                >
+                  {saving ? "Gönderiliyor..." : "Başvuru gönder"}
+                </Button>
+                <Button type="button" variant="outline" onClick={onLogout}>
+                  Çıkış yap
+                </Button>
+              </div>
+            </form>
+          </>
+        )}
+
+        {mode === "employee" && (
+          <>
+            <button
+              type="button"
+              className="mb-4 text-sm font-semibold text-slate-500 hover:text-slate-900"
+              onClick={() => setMode(null)}
+            >
+              Geri
+            </button>
+            <h1 className="text-xl font-semibold">Çalışan hesabı</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              İşletme sahibinizden sizi bu e-posta adresiyle davet etmesini isteyin.
+              Daveti e-posta ile de alırsınız.
+            </p>
+            <div className="mt-3 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+              {userEmail || "Google e-posta adresiniz"}
+            </div>
+
+            <div className="mt-5">
+              <h2 className="text-sm font-semibold text-slate-700">Bekleyen davetler</h2>
+              {inviteLoading && (
+                <p className="mt-3 text-sm text-slate-500">Davetler kontrol ediliyor...</p>
+              )}
+              {inviteError && (
+                <div className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+                  {inviteError}
+                </div>
+              )}
+              {!inviteLoading && pendingInvites.length === 0 && (
+                <p className="mt-3 rounded border border-slate-200 bg-white p-3 text-sm text-slate-500">
+                  Bu e-posta adresi için bekleyen davet yok.
+                </p>
+              )}
+              <div className="mt-3 space-y-2">
+                {pendingInvites.map((invite) => (
+                  <div
+                    key={invite.id}
+                    className="rounded border border-slate-200 bg-white p-3"
+                  >
+                    <div className="text-sm font-semibold text-slate-800">
+                      {invite.business.name || invite.business.slug}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      Yetki: {invite.role === "owner" ? "Owner" : "Çalışan"} · Son gün:{" "}
+                      {new Date(invite.expiresAt).toLocaleDateString("tr-TR")}
+                    </div>
+                    <Button
+                      type="button"
+                      disabled={inviteLoading}
+                      className="mt-3 w-full bg-slate-900 text-white"
+                      onClick={() => acceptInvite(invite.id)}
+                    >
+                      Daveti kabul et
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <Button type="button" variant="outline" className="mt-5 w-full" onClick={onLogout}>
+              Çıkış yap
+            </Button>
+          </>
+        )}
+      </section>
+    </main>
+  );
+
+  return (
+    <main className="min-h-screen bg-[#e9edf3] px-4 py-10 text-slate-800">
+      <section className="mx-auto mt-10 w-full max-w-lg rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-semibold">İşletme başvurusu</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          İşletme sahibiyseniz bilgilerinizi gönderin. Onaylandıktan sonra panel
+          erişiminiz açılır. Çalışansanız davet bağlantınızı kullanmanız
+          gerekir.
+        </p>
+
+        <form onSubmit={onSubmit} className="mt-5 space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="owner-business-name">İşletme adı</Label>
+            <Input
+              id="owner-business-name"
+              required
+              value={ownerRequest.name}
+              onChange={(event) =>
+                onChange({ ...ownerRequest, name: event.target.value })
+              }
+              placeholder="Örn. Lumina Güzellik"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="owner-business-type">İşletme tipi</Label>
+            <Input
+              id="owner-business-type"
+              value={ownerRequest.type}
+              onChange={(event) =>
+                onChange({ ...ownerRequest, type: event.target.value })
+              }
+              placeholder="Örn. Güzellik merkezi"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="owner-business-phone">Telefon</Label>
+            <Input
+              id="owner-business-phone"
+              value={ownerRequest.phone}
+              onChange={(event) =>
+                onChange({ ...ownerRequest, phone: event.target.value })
+              }
+              placeholder="+90..."
+            />
+          </div>
+
+          {errorMsg && (
+            <div className="rounded border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+              {errorMsg}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="submit"
+              disabled={saving}
+              className="flex-1 bg-slate-900 text-white"
+            >
+              {saving ? "Gönderiliyor..." : "Başvuru gönder"}
+            </Button>
+            <Button type="button" variant="outline" onClick={onLogout}>
+              Çıkış yap
+            </Button>
+          </div>
+        </form>
+      </section>
+    </main>
+  );
 }
 
 function QuickCreateHost({
@@ -862,11 +1335,7 @@ function QuickCreateHost({
 
   function savePromotionList<K extends keyof PromotionsSettings>(
     key: K,
-    item:
-      | ExpenseItem
-      | PaymentItem
-      | LedgerItem
-      | CommissionItem,
+    item: ExpenseItem | PaymentItem | LedgerItem | CommissionItem,
   ) {
     const current = Array.isArray(promotions[key])
       ? (promotions[key] as unknown[])
@@ -882,7 +1351,11 @@ function QuickCreateHost({
 
   if (action === "customer") {
     return (
-      <CustomerModal saving={saving} onClose={onClose} onSubmit={saveCustomer} />
+      <CustomerModal
+        saving={saving}
+        onClose={onClose}
+        onSubmit={saveCustomer}
+      />
     );
   }
 
@@ -974,7 +1447,10 @@ function QuickCreateHost({
         onCreateCustomer={addCustomerForSale}
         onClose={onClose}
         onSubmit={(item) =>
-          savePromotionList(action === "receivable" ? "receivables" : "debts", item)
+          savePromotionList(
+            action === "receivable" ? "receivables" : "debts",
+            item,
+          )
         }
       />
     );
@@ -1064,21 +1540,21 @@ const dashboardTranslations: Record<string, string> = {
   "Personel bilgileri": "Staff details",
   "Yeni hizmet": "New service",
   "Hizmet bilgileri": "Service details",
-  "Hizmet": "Service",
-  "Cinsiyet": "Gender",
-  "Süre": "Duration",
-  "Fiyat": "Price",
+  Hizmet: "Service",
+  Cinsiyet: "Gender",
+  Süre: "Duration",
+  Fiyat: "Price",
   "Ad soyad": "Full name",
   "Cep telefonu": "Mobile phone",
   "E-posta adresi": "Email address",
   "Dosya numarası": "File number",
   "Instagram kullanıcı adı": "Instagram username",
-  "Belirtilmemiş": "Unspecified",
-  "Kadın": "Female",
-  "Erkek": "Male",
-  "Unisex": "Unisex",
-  "Arama": "Search",
-  "Ara": "Search",
+  Belirtilmemiş: "Unspecified",
+  Kadın: "Female",
+  Erkek: "Male",
+  Unisex: "Unisex",
+  Arama: "Search",
+  Ara: "Search",
   "Hizmet adı": "Service name",
   "Hizmet açıklaması": "Service description",
   "Online randevu": "Online booking",
@@ -1093,9 +1569,9 @@ const dashboardTranslations: Record<string, string> = {
   "Kayıtlı tahsilat bulunmamaktadır": "No saved collections",
   "Yeni tahsilat": "New collection",
   "Ödeme yöntemi": "Payment method",
-  "Nakit": "Cash",
+  Nakit: "Cash",
   "Kredi kartı": "Credit card",
-  "Havale": "Bank transfer",
+  Havale: "Bank transfer",
   "Online ödeme": "Online payment",
   "Etiket ayarları": "Tag settings",
   "Bot Ayarları": "Bot settings",
@@ -1122,7 +1598,7 @@ const dashboardTranslations: Record<string, string> = {
   "Ödenen tutar": "Paid amount",
   "Kalan ödeme": "Remaining payment",
   "Filtrele / Sırala": "Filter / Sort",
-  "Sıralama": "Sorting",
+  Sıralama: "Sorting",
   "En yeni önce": "Newest first",
   "En eski önce": "Oldest first",
   İndir: "Download",
@@ -1145,13 +1621,13 @@ const dashboardTranslations: Record<string, string> = {
   "Koyu tema": "Dark theme",
   "Açık tema": "Light theme",
   "Müşteri ara...": "Search customers...",
-  "Açıklama": "Description",
+  Açıklama: "Description",
   "Açık: 09:00 - 18:00": "Open: 09:00 - 18:00",
   "Açıkken bot yalnızca işletmenin kendi kendine gönderdiği mesajlara yanıt verir.":
     "When enabled, the bot only replies to messages the business sends to itself.",
-  "Adisyon": "Aloyz Dashboard",
+  Adisyon: "Aloyz Dashboard",
   "Adisyon detayları": "Aloyz Dashboard details",
-  "Adres": "Address",
+  Adres: "Address",
   "Aloyz'a geri dönün": "Return to Aloyz",
   "Ayarlar ve Paylaşım": "Settings and sharing",
   "Aylık görünüm": "Monthly view",
@@ -1159,14 +1635,14 @@ const dashboardTranslations: Record<string, string> = {
     "The bot starts replying after the connection is complete",
   "Bağlantı için Instagram tarafından açılan izin ekranını onaylamanız gerekir. Aloyz bu şekilde hesabı işletmenize kaydeder.":
     "Approve the permission screen opened by Instagram. Aloyz uses this approval to save the account to your business.",
-  "Bağlı": "Connected",
+  Bağlı: "Connected",
   "Bağlı değil": "Not connected",
-  "Başarısız": "Failed",
-  "Başlık": "Title",
-  "Barkod": "Barcode",
+  Başarısız: "Failed",
+  Başlık: "Title",
+  Barkod: "Barcode",
   "Bekleyen ödeme": "Pending payment",
-  "Borç": "Debt",
-  "Birleştir": "Merge",
+  Borç: "Debt",
+  Birleştir: "Merge",
   "Bu adisyon için indirim uygula.": "Apply discount to this record.",
   "Bu bölümün gerçek içeriği sırayla entegre edilecek.":
     "The real content for this section will be integrated in order.",
@@ -1179,8 +1655,8 @@ const dashboardTranslations: Record<string, string> = {
   "Bugünkü randevu": "Today's appointment",
   "Çalışan düzenle": "Edit staff",
   "Çalışan hizmetleri": "Staff services",
-  "Çar": "Wed",
-  "Çarşamba": "Wednesday",
+  Çar: "Wed",
+  Çarşamba: "Wednesday",
   "Değişiklikler kaydedildi.": "Changes saved.",
   "Değişiklikleri kaydet": "Save changes",
   "Deneme bitişi": "Trial ends",
@@ -1189,13 +1665,12 @@ const dashboardTranslations: Record<string, string> = {
   "Erişim bitiş tarihiniz": "Your access ends on",
   "Detayları görmek için listeden bir kişi seçin.":
     "Select a person from the list to view details.",
-  "Dönem": "Period",
-  "Dakika": "Minutes",
+  Dönem: "Period",
+  Dakika: "Minutes",
   "Doğum günü": "Birthday",
   "Dönemsel saat": "Special hours",
-  "Dün": "Yesterday",
-  "Eklendikten sonra ödeme penceresini aç":
-    "Open payment window after adding",
+  Dün: "Yesterday",
+  "Eklendikten sonra ödeme penceresini aç": "Open payment window after adding",
   "Eski → Yeni": "Old → New",
   "Etiket adı": "Tag name",
   "Etiket düzenle": "Edit tag",
@@ -1203,24 +1678,23 @@ const dashboardTranslations: Record<string, string> = {
   "Fatura tarihi": "Invoice date",
   "Geçen ay": "Last month",
   "Geçerlilik bitişi": "Expiration date",
-  "Geldi": "Arrived",
+  Geldi: "Arrived",
   "Geldi mi": "Attendance",
-  "Gelmedi": "No-show",
+  Gelmedi: "No-show",
   "Google Takvim bağlı değil": "Google Calendar is not connected",
   "Google Takvim bağlı": "Google Calendar connected",
   "Google Takvim senkronize edildi": "Google Calendar synced",
-  "Google Takvim senkronizasyonu başarısız.":
-    "Google Calendar sync failed.",
+  "Google Takvim senkronizasyonu başarısız.": "Google Calendar sync failed.",
   etkinlik: "event",
   etkinlikler: "events",
-  "Gönderildi": "Sent",
+  Gönderildi: "Sent",
   "Gönderim tarihi": "Send date",
-  "Görüşme": "Conversation",
+  Görüşme: "Conversation",
   "Görüşme yok": "No conversation",
   "Günlük görünüm": "Daily view",
   "Haftalık görünüm": "Weekly view",
   "Hak ediş notları": "Commission notes",
-  "Hatırlatıldı": "Reminded",
+  Hatırlatıldı: "Reminded",
   "Hizmet satışları": "Service sales",
   "Hizmet düzenle": "Edit service",
   "Hizmet tutarı": "Service amount",
@@ -1234,43 +1708,43 @@ const dashboardTranslations: Record<string, string> = {
   "Instagram Bot Aktif/Pasif": "Instagram bot active/passive",
   "İçe aktarma için ürün ve paketleri Kurulum bölümünden ekleyin.":
     "Add products and packages from Setup before importing.",
-  "İl": "City",
-  "İlçe": "District",
-  "İletildi": "Delivered",
-  "İletişim": "Contact",
-  "İndirim": "Discount",
+  İl: "City",
+  İlçe: "District",
+  İletildi: "Delivered",
+  İletişim: "Contact",
+  İndirim: "Discount",
   "İndirim tutarı": "Discount amount",
   "İndirim yüzdesi": "Discount percentage",
-  "İptal": "Cancel",
-  "İşletme": "Business",
+  İptal: "Cancel",
+  İşletme: "Business",
   "İşletme adı": "Business name",
   "İşletme bilgileri alınamadı.": "Business information could not be loaded.",
   "İşletme bilgileri zamanında alınamadı. Lütfen sayfayı yenileyin.":
     "Business information could not be loaded in time. Please refresh the page.",
   "Kalan kullanım": "Remaining usage",
-  "Kalan": "Remaining",
+  Kalan: "Remaining",
   "Kalan gün": "Days remaining",
-  "Kanal": "Channel",
-  "Kategori": "Category",
-  "Kaynak": "Source",
+  Kanal: "Channel",
+  Kategori: "Category",
+  Kaynak: "Source",
   "Kapalıyken bot bağlı kanallarda otomatik yanıt vermez.":
     "When disabled, the bot does not automatically reply on connected channels.",
   "Kapalıyken bot gelen mesajlara otomatik yanıt vermez.":
     "When disabled, the bot does not automatically reply to incoming messages.",
-  "kapalı": "closed",
-  "Kapandı": "Closed",
+  kapalı: "closed",
+  Kapandı: "Closed",
   "Kaydetme sırasında hata oluştu.": "An error occurred while saving.",
   "Kayıt sayısı": "Record count",
-  "Kişi": "Person",
+  Kişi: "Person",
   "Kişi sayısı": "Person count",
   "Kişi seçilmedi": "No person selected",
-  "Kişiler": "People",
-  "Kopyalandı": "Copied",
-  "Kullanıcı": "User",
+  Kişiler: "People",
+  Kopyalandı: "Copied",
+  Kullanıcı: "User",
   "Kullanıcı adı": "Username",
-  "Kullanılan": "Used",
+  Kullanılan: "Used",
   "Masraf adı": "Expense name",
-  "Mesaj": "Message",
+  Mesaj: "Message",
   "Mesaj kanalı": "Message channel",
   "Mesaj sayısı": "Message count",
   "Menüyü aç": "Expand menu",
@@ -1285,17 +1759,18 @@ const dashboardTranslations: Record<string, string> = {
     "Track your messages from WhatsApp > Messages",
   "Mevcut şifre": "Current password",
   "Müşteri Bilgileri": "Customer details",
-  "Miktar": "Quantity",
-  "Not": "Note",
-  "Oluşturan": "Created by",
-  "Oluşturulma": "Created",
+  Miktar: "Quantity",
+  Not: "Note",
+  Oluşturan: "Created by",
+  Oluşturulma: "Created",
   "Online randevu alınabilir": "Online booking available",
   "Otomatik yeni paket kullanımı penceresi":
     "Automatic new package usage window",
   "Ödeme bekleniyor": "Awaiting payment",
   "Ödeme bildirimleri": "Payment notifications",
-  "Açıklama kısmına hesap e-postanızı yazın:": "Write your account email in the payment description:",
-  "Ödenen": "Paid",
+  "Açıklama kısmına hesap e-postanızı yazın:":
+    "Write your account email in the payment description:",
+  Ödenen: "Paid",
   "Öğle arası": "Lunch break",
   "Örn. Saç kesimi": "E.g. Haircut",
   "Örn. 60": "E.g. 60",
@@ -1313,7 +1788,7 @@ const dashboardTranslations: Record<string, string> = {
     "The connection is completed when you scan the QR code.",
   "QR kodu WhatsApp > Bağlı Cihazlar ekranından okutun":
     "Scan the QR code from WhatsApp > Linked Devices",
-  "Randevu": "Appointment",
+  Randevu: "Appointment",
   "Randevu aralığı": "Appointment interval",
   "Randevu bildirimleri": "Appointment notifications",
   "Randevu hatırlatma": "Appointment reminder",
@@ -1322,17 +1797,19 @@ const dashboardTranslations: Record<string, string> = {
   "Randevu sayısı": "Appointment count",
   "Saat formatı": "Time format",
   "Sadece bu gün": "Only this day",
-  "Salı": "Tuesday",
-  "Perşembe": "Thursday",
-  "Satıcı": "Seller",
+  Salı: "Tuesday",
+  Perşembe: "Thursday",
+  Satıcı: "Seller",
   "Satış tarihi": "Sale date",
   "Satış tipi": "Sale type",
   "Sayfa hazır": "Page ready",
-  "Sayfadaki ürün satışlarının toplam tutarı": "Total product sales amount on this page",
-  "Sayfadaki paket satışlarının toplam tutarı": "Total package sales amount on this page",
+  "Sayfadaki ürün satışlarının toplam tutarı":
+    "Total product sales amount on this page",
+  "Sayfadaki paket satışlarının toplam tutarı":
+    "Total package sales amount on this page",
   "Son geçerlilik tarihi": "Expiration date",
   "Son güncelleme": "Last update",
-  "Sonuç": "Result",
+  Sonuç: "Result",
   "Tek fiyat": "Fixed price",
   "Sunucu hatası oluştu.": "A server error occurred.",
   "Şifre değiştirilemedi.": "Password could not be changed.",
@@ -1350,8 +1827,8 @@ const dashboardTranslations: Record<string, string> = {
   "Tüm tutar için alacak kaydı oluştur":
     "Create a receivable for the full amount",
   "Tüm zamanlar": "All time",
-  "TL": "TRY",
-  "Ürün": "Product",
+  TL: "TRY",
+  Ürün: "Product",
   "Ürün adı": "Product name",
   "Ürün adı veya barkoduyla arayın": "Search by product name or barcode",
   "Ürün düzenle": "Edit product",
@@ -1366,8 +1843,7 @@ const dashboardTranslations: Record<string, string> = {
   "WhatsApp bağlı değil": "WhatsApp not connected",
   "Whatsapp mesajları": "WhatsApp messages",
   "WhatsApp Bot Aktif/Pasif": "WhatsApp bot active/passive",
-  "WhatsApp ve Instagram konuşmaları.":
-    "WhatsApp and Instagram conversations.",
+  "WhatsApp ve Instagram konuşmaları.": "WhatsApp and Instagram conversations.",
   "Yeni → Eski": "New → Old",
   "Yeni adisyon": "New record",
   "Yeni alacak": "New receivable",
@@ -1407,55 +1883,55 @@ const dashboardTranslations: Record<string, string> = {
   "60 Dakika": "60 Minutes",
   "60 dakikada bir": "Every 60 minutes",
   "Açık randevular": "Open appointments",
-  "Adet": "Quantity",
+  Adet: "Quantity",
   "Adisyon kaydı yok.": "No records.",
-  "Alacak": "Receivable",
+  Alacak: "Receivable",
   "Alacak hatırlatmaları": "Receivable reminders",
-  "Asistan": "Assistant",
-  "Ayarlar": "Settings",
+  Asistan: "Assistant",
+  Ayarlar: "Settings",
   "Bağlantı durumu": "Connection status",
   "Bağlantı bekleniyor": "Waiting for connection",
   "Bağlantıyı kes": "Disconnect",
-  "Bildirimler": "Notifications",
-  "Bot": "Bot",
+  Bildirimler: "Notifications",
+  Bot: "Bot",
   "Bot aktif": "Bot active",
   "Bot okuyabilir": "Bot can read",
   "Bot Ayarlarına Git": "Go to bot settings",
   "Bot durumu": "Bot status",
-  "Cmt": "Sat",
-  "Cts": "Sat",
-  "Cum": "Fri",
+  Cmt: "Sat",
+  Cts: "Sat",
+  Cum: "Fri",
   "Detay yok": "No details",
-  "Dinamik": "Dynamic",
-  "Ekle": "Add",
+  Dinamik: "Dynamic",
+  Ekle: "Add",
   "En düşük fiyat (TL)": "Minimum price (TRY)",
   "En yüksek fiyat (TL)": "Maximum price (TRY)",
-  "Etiket": "Tag",
+  Etiket: "Tag",
   "Fiyat (TL)": "Price (TRY)",
   "Fiyat tipi": "Price type",
   "Google online randevu": "Google online booking",
   "Google Takvim Entegrasyonu": "Google Calendar Integration",
   "Bağlı ve senkronize": "Connected and synchronized",
   "Takvimi bağlamak için:": "To connect the calendar:",
-  "Takvim sahibinin e-posta adresini girin.": "Enter the calendar owner's email address.",
+  "Takvim sahibinin e-posta adresini girin.":
+    "Enter the calendar owner's email address.",
   "Aşağıdaki açıklamayı okuyun.": "Read the explanation below.",
   "Google Takvim'i yenile": "Refresh Google Calendar",
   "1. Google Takvim → Sol menüde takvimin yanındaki 3 nokta":
     "1. Google Calendar → Click the three dots next to the calendar in the left menu",
-  "2. \"Ayarlar ve Paylaşım\" menüsünü seçin":
-    "2. Select the \"Settings and sharing\" menu",
-  "3. \"Şunlarla paylaşıldı:\" kısmına şu Google servis hesabı e-postasını ekleyin:":
-    "3. Add this Google service account email under \"Shared with:\":",
-  "4. Rol olarak \"Editor\" seçin ve kaydedin.":
-    "4. Select \"Editor\" as the role and save.",
+  '2. "Ayarlar ve Paylaşım" menüsünü seçin':
+    '2. Select the "Settings and sharing" menu',
+  '3. "Şunlarla paylaşıldı:" kısmına şu Google servis hesabı e-postasını ekleyin:':
+    '3. Add this Google service account email under "Shared with:":',
+  '4. Rol olarak "Editor" seçin ve kaydedin.':
+    '4. Select "Editor" as the role and save.',
   Kopyala: "Copy",
-  "görüşme": "conversation",
+  görüşme: "conversation",
   "Hak ediş ayarları": "Commission settings",
   "Hak ediş oranı (%)": "Commission rate (%)",
-  "Hata": "Error",
+  Hata: "Error",
   "Hata kodu": "Error code",
-  "Hatırlatılacak açık alacak yok.":
-    "There are no open receivables to remind.",
+  "Hatırlatılacak açık alacak yok.": "There are no open receivables to remind.",
   "Henüz açık randevu yok.": "There are no open appointments yet.",
   "hesap e-postanız": "your account email",
   "Hizmet bulunamadı.": "No services found.",
@@ -1478,10 +1954,10 @@ const dashboardTranslations: Record<string, string> = {
     "The collection cannot exceed the remaining amount.",
   "Karşılama mesajı": "Welcome message",
   "kayıt gösteriliyor": "records shown",
-  "Komisyon": "Commission",
+  Komisyon: "Commission",
   "Komisyon toplamı": "Total commission",
-  "Konuşma": "Conversation",
-  "Koyu": "Dark",
+  Konuşma: "Conversation",
+  Koyu: "Dark",
   "Listeye dön": "Back to list",
   "Mesaj bildirimleri": "Message notifications",
   "Mesaj bulunamadı.": "No messages found.",
@@ -1494,45 +1970,45 @@ const dashboardTranslations: Record<string, string> = {
   "Mola saati eklenmedi.": "No break time added.",
   "Mola saatleri": "Break times",
   "Müşteri kaydı bulunamadı.": "No customer records found.",
-  "Net": "Net",
+  Net: "Net",
   "Net kasa": "Net cash",
-  "Okundu": "Read",
+  Okundu: "Read",
   "Okunma tarihi": "Read date",
   "Otomatik bekleme listesi penceresi": "Automatic waitlist window",
-  "Ödeme": "Payment",
+  Ödeme: "Payment",
   "Ödeme bilgileri": "Payment information",
   "Öğle arası mola saatleri": "Lunch break hours",
   "Önümüzdeki 30 gün içinde doğum günü yok.":
     "There are no birthdays in the next 30 days.",
   "Özel talimatlar": "Special instructions",
-  "Cevap": "Answer",
-  "Paket": "Package",
+  Cevap: "Answer",
+  Paket: "Package",
   "Paket tipi": "Package type",
   "Paketi sil": "Delete package",
-  "Paz": "Sun",
-  "Per": "Thu",
-  "Plan": "Plan",
+  Paz: "Sun",
+  Per: "Thu",
+  Plan: "Plan",
   "Profesyonel Instagram hesabı bağlandı":
     "Professional Instagram account connected",
-  "Puan": "Points",
-  "Pts": "Mon",
-  "Pzt": "Mon",
+  Puan: "Points",
+  Pts: "Mon",
+  Pzt: "Mon",
   "QR kod burada görünecek.": "The QR code will appear here.",
   "QR Kodu Getir": "Get QR Code",
   "Randevu yok.": "No appointments.",
-  "Renk": "Color",
-  "Sal": "Tue",
+  Renk: "Color",
+  Sal: "Tue",
   "Salon DM ayarları": "Salon DM settings",
-  "Seans": "Sessions",
+  Seans: "Sessions",
   "Sohbet bulunamadı": "No conversations found",
   "Sık sorulan sorular": "Frequently asked questions",
-  "Soru": "Question",
+  Soru: "Question",
   "Süre (dakika)": "Duration (minutes)",
   "Tahsil edilecek kalan tutar": "Remaining amount to collect",
   "Tahsil edilen": "Collected",
   "Tahsil edilen toplam tutar": "Total collected amount",
   "Tahsilatsız kapat": "Close without collection",
-  "Takvim": "Calendar",
+  Takvim: "Calendar",
   "Takvim genişliği": "Calendar width",
   "Takvim görünümü": "Calendar view",
   "Takvim saat aralığı": "Calendar time interval",
@@ -1540,11 +2016,11 @@ const dashboardTranslations: Record<string, string> = {
   "Takvim yazı rengi": "Calendar text color",
   "Takvimi aç": "Open calendar",
   "Takvimin bağlı olduğu e-posta": "Connected calendar email",
-  "Tamam": "Done",
+  Tamam: "Done",
   "Tarih Aralığı": "Date range",
   "Teslim tarihi": "Delivery date",
-  "Tip": "Type",
-  "Toplam": "Total",
+  Tip: "Type",
+  Toplam: "Total",
   "Toplam alacak": "Total receivables",
   "Toplam arama": "Total calls",
   "Toplam borç": "Total debts",
@@ -1562,11 +2038,9 @@ const dashboardTranslations: Record<string, string> = {
   "Deneme süreniz sona erdi. Devam etmek için aylık":
     "Your trial has ended. To continue, send the monthly",
   "Deneme sürenizde": "Your trial has",
-  "gün kaldı. Deneme süresi bittikten":
-    "days remaining. After the trial ends",
+  "gün kaldı. Deneme süresi bittikten": "days remaining. After the trial ends",
   "sonra abonelik aylık": "the subscription continues monthly at",
-  "ödemeyi aşağıdaki IBAN'a gönderebilirsiniz.":
-    "payment to the IBAN below.",
+  "ödemeyi aşağıdaki IBAN'a gönderebilirsiniz.": "payment to the IBAN below.",
   "WhatsApp aktif": "WhatsApp active",
   "WhatsApp bağlantısı": "WhatsApp connection",
   "WhatsApp hesabınıza gelen mesajları Aloyz üzerinden yönetin":
@@ -1580,9 +2054,9 @@ const dashboardTranslations: Record<string, string> = {
   "Yaklaşan doğum günleri": "Upcoming birthdays",
   "Ödemenizi yapmanızla beraber en fazla 1 gün içinde erişiminiz güncellenir.":
     "Your access will be updated within 1 day after payment.",
-  "Yazdır": "Print",
-  "Yorum": "Review",
-  "Yön": "Direction",
+  Yazdır: "Print",
+  Yorum: "Review",
+  Yön: "Direction",
   "Z → A": "Z → A",
   "Henüz sık sorulan soru eklenmedi.":
     "No frequently asked questions have been added yet.",
@@ -1607,7 +2081,8 @@ function translateDashboardDom(language: string) {
     let original = ((textNode as any).__aloyzSourceText || current) as string;
     const sourceTrimmed = original.trim();
     const translatedFromSource = sourceTrimmed
-      ? dashboardTranslations[sourceTrimmed] || translateDashboardText(sourceTrimmed)
+      ? dashboardTranslations[sourceTrimmed] ||
+        translateDashboardText(sourceTrimmed)
       : "";
     const currentTrimmed = current.trim();
     if (
@@ -1645,7 +2120,9 @@ function translateDashboardDom(language: string) {
       element.setAttribute(
         attr,
         language === "en"
-          ? dashboardTranslations[source] || translateDashboardText(source) || source
+          ? dashboardTranslations[source] ||
+              translateDashboardText(source) ||
+              source
           : source,
       );
     }

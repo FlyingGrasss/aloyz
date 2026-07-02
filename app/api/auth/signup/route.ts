@@ -1,97 +1,128 @@
-import { prisma } from '@/lib/prisma'
-import { hash } from 'bcryptjs'
-import { NextResponse } from 'next/server'
-import { auth } from '@/auth'
-import { defaultAccessTill } from '@/lib/access'
+import { auth } from "@/auth";
+import { createSlugBase, normalizeEmail } from "@/lib/businessAccess";
+import { defaultAccessTill } from "@/lib/access";
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {
-    // Only logged-in admin users can create new businesses / users
-    const session = await auth()
-    const userRole = (session?.user as any)?.role
+    const session = await auth();
+    const userRole = (session?.user as any)?.role;
 
-    if (!session || userRole !== 'admin') {
+    if (!session || userRole !== "admin") {
       return NextResponse.json(
-        { error: 'Bu işlem sadece sistem yöneticileri tarafından gerçekleştirilebilir.' },
-        { status: 403 }
-      )
+        { error: "Bu işlem sadece sistem yöneticileri tarafından gerçekleştirilebilir." },
+        { status: 403 },
+      );
     }
 
-    const { email, password, name, type, phone, address, website, city, district } = await request.json()
+    const { email, name, type, phone, address, website, city, district } = await request.json();
+    const normalizedEmail = normalizeEmail(String(email || ""));
+    const businessName = String(name || "").trim();
 
-    if (!email || !password || !name) {
-      return NextResponse.json({ error: 'E-posta, şifre ve isim/işletme adı zorunludur' }, { status: 400 })
+    if (!normalizedEmail || !businessName) {
+      return NextResponse.json(
+        { error: "E-posta ve işletme adı zorunludur." },
+        { status: 400 },
+      );
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    })
-
-    if (existingUser) {
-      return NextResponse.json({ error: 'Bu e-posta adresi zaten kullanımda' }, { status: 400 })
-    }
-
-    const passwordHash = await hash(password, 12)
-
-    // Create the user and their associated business in a transaction!
     const result = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          email,
-          name,
-          password_hash: passwordHash,
-          role: 'business'
-        }
-      })
+      const user = await tx.user.upsert({
+        where: { email: normalizedEmail },
+        update: {
+          name: businessName,
+          role: "business",
+          approvalStatus: "APPROVED",
+        },
+        create: {
+          email: normalizedEmail,
+          name: businessName,
+          role: "business",
+          approvalStatus: "APPROVED",
+        },
+      });
 
-      // Generate a unique admin-managed slug automatically
-      const slugBase = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'business'
-      const uniqueSlug = `${slugBase}-${user.id.slice(-6)}`
+      const existingBusiness = await tx.business.findFirst({
+        where: { ownerId: user.id },
+        select: { id: true, slug: true },
+      });
 
-      const hasAccessTill = defaultAccessTill(user.createdAt).toISOString()
+      if (existingBusiness) {
+        await tx.businessMembership.upsert({
+          where: {
+            businessId_userId: {
+              businessId: existingBusiness.id,
+              userId: user.id,
+            },
+          },
+          update: { role: "owner", status: "ACTIVE" },
+          create: {
+            businessId: existingBusiness.id,
+            userId: user.id,
+            role: "owner",
+            status: "ACTIVE",
+          },
+        });
+        return { user, business: existingBusiness };
+      }
+
+      const uniqueSlug = `${createSlugBase(businessName)}-${user.id.slice(-6)}`;
+      const now = new Date();
       const business = await tx.business.create({
         data: {
           ownerId: user.id,
-          name: name,
-          slug: uniqueSlug, // Set generated unique slug
-          type: type || 'İşletme',
-          phone: phone || '',
-          email: email || '',
-          city: city || '',
-          district: district || '',
-          address: address || '',
-          website: website || '',
-          welcome_message: '', // Optional welcome message
-          hours: {}, // Empty hours object (no default hours)
-          menu_or_services: '',
+          name: businessName,
+          slug: uniqueSlug,
+          type: type || "İşletme",
+          phone: phone || "",
+          email: normalizedEmail,
+          city: city || "",
+          district: district || "",
+          address: address || "",
+          website: website || "",
+          welcome_message: "",
+          hours: {},
+          menu_or_services: "",
           faqs: [],
           botSettings: {
             instagram: false,
             whatsapp: false,
-            hasAccessTill,
+            hasAccessTill: defaultAccessTill(now).toISOString(),
           },
-          is_active: false, // Default to false (WhatsApp inactive)
-          test_mode: false
-        }
-      })
+          is_active: false,
+          test_mode: false,
+        },
+      });
 
-      return { user, business }
-    })
+      await tx.businessMembership.create({
+        data: {
+          businessId: business.id,
+          userId: user.id,
+          role: "owner",
+          status: "ACTIVE",
+        },
+      });
 
-    return NextResponse.json({ 
-      user: { 
-        id: result.user.id, 
-        email: result.user.email, 
-        name: result.user.name 
+      return { user, business };
+    });
+
+    return NextResponse.json(
+      {
+        user: {
+          id: result.user.id,
+          email: result.user.email,
+          name: result.user.name,
+        },
+        business: {
+          id: result.business.id,
+          slug: result.business.slug,
+        },
       },
-      business: {
-        id: result.business.id,
-        slug: result.business.slug
-      }
-    }, { status: 201 })
-
+      { status: 201 },
+    );
   } catch (error: any) {
-    console.error('Signup Error:', error)
-    return NextResponse.json({ error: 'Sunucu hatası oluştu' }, { status: 500 })
+    console.error("Signup Error:", error);
+    return NextResponse.json({ error: "Sunucu hatası oluştu." }, { status: 500 });
   }
 }

@@ -35,6 +35,13 @@ export async function PATCH(request: Request) {
     return Response.json({ error: "Kullanıcı bulunamadı." }, { status: 404 });
   }
 
+  if (!user.password_hash) {
+    return Response.json(
+      { error: "Bu hesap Google ile giriş yapıyor; şifre değiştirilemez." },
+      { status: 400 },
+    );
+  }
+
   const passwordMatches = await bcrypt.compare(
     String(currentPassword),
     user.password_hash,

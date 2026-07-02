@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { getAccessibleBusiness } from "@/lib/businessAccess";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -10,10 +11,13 @@ export async function POST() {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const business = await prisma.business.findFirst({
-    where: { ownerId: userId },
-    select: { id: true, botSettings: true },
-  });
+  const accessibleBusiness = await getAccessibleBusiness(userId);
+  const business = accessibleBusiness
+    ? await prisma.business.findUnique({
+        where: { id: accessibleBusiness.id },
+        select: { id: true, botSettings: true },
+      })
+    : null;
   if (!business) {
     return Response.json({ error: "Business not found" }, { status: 404 });
   }

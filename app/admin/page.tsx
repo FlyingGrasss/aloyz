@@ -186,7 +186,6 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: newEmail,
-          password: newPassword,
           name: newName,
           type: newType,
         }),
@@ -196,7 +195,6 @@ export default function AdminPage() {
         setActionSuccess(`"${newName}" başarıyla sisteme eklendi ve boş işletme profili oluşturuldu.`)
         // Reset inputs
         setNewEmail('')
-        setNewPassword('')
         setNewName('')
         setNewType('')
         // Refresh businesses
@@ -430,6 +428,39 @@ export default function AdminPage() {
       setActionError('Şifre güncellenirken bağlantı hatası oluştu.')
     } finally {
       setPasswordLoading(prev => ({ ...prev, [userId]: false }))
+    }
+  }
+
+  async function handleApprovalChange(userId: string, approvalStatus: 'APPROVED' | 'REJECTED' | 'PENDING') {
+    setActionSuccess('')
+    setActionError('')
+    setActionLoading(true)
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, approvalStatus }),
+      })
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        setActionError(data.error || 'Kullanıcı durumu güncellenemedi.')
+        return
+      }
+
+      setBusinesses(prev =>
+        prev.map(b =>
+          b.owner?.id === userId
+            ? { ...b, owner: { ...b.owner, approvalStatus: data.user.approvalStatus } }
+            : b
+        )
+      )
+      setActionSuccess(`${data.user.email} durumu ${data.user.approvalStatus} olarak güncellendi.`)
+    } catch {
+      setActionError('Bağlantı hatası.')
+    } finally {
+      setActionLoading(false)
     }
   }
 
@@ -708,6 +739,42 @@ export default function AdminPage() {
                             <p className="text-xs text-neutral-500 mt-0.5">
                               Tipi: <span className="font-semibold">{b.type}</span> | Sahibi: <span className="font-semibold">{b.owner?.email}</span>
                             </p>
+                            {b.owner?.id && (
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                                  b.owner.approvalStatus === 'APPROVED'
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    : b.owner.approvalStatus === 'REJECTED'
+                                      ? 'border-rose-200 bg-rose-50 text-rose-700'
+                                      : 'border-amber-200 bg-amber-50 text-amber-700'
+                                }`}>
+                                  {b.owner.approvalStatus || 'PENDING'}
+                                </span>
+                                {b.owner.approvalStatus !== 'APPROVED' && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-7 bg-emerald-600 px-2 text-xs font-bold text-white hover:bg-emerald-700"
+                                    disabled={actionLoading}
+                                    onClick={() => handleApprovalChange(b.owner.id, 'APPROVED')}
+                                  >
+                                    Onayla
+                                  </Button>
+                                )}
+                                {b.owner.approvalStatus !== 'REJECTED' && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2 text-xs font-bold"
+                                    disabled={actionLoading}
+                                    onClick={() => handleApprovalChange(b.owner.id, 'REJECTED')}
+                                  >
+                                    Reddet
+                                  </Button>
+                                )}
+                              </div>
+                            )}
                             {bizSlug ? (
                               <div className="flex items-center gap-2 mt-1">
                                 <span className="text-[10px] text-neutral-500 font-semibold">WhatsApp Durumu:</span>
@@ -814,7 +881,7 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {b.owner?.id && (
+                        {false && b.owner?.id && (
                           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 bg-amber-50 p-3 rounded-xl border border-amber-200/70">
                             <div className="flex items-center gap-3">
                               <Label className="text-xs font-bold text-amber-800 shrink-0 w-28">Yeni Şifre:</Label>
@@ -938,7 +1005,7 @@ export default function AdminPage() {
               <CardContent>
                 <form onSubmit={handleCreateUser} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
+                    <div className="hidden">
                       <Label htmlFor="cName">İşletme Yetkilisi / Şirket İsmi</Label>
                       <Input
                         id="cName"
@@ -972,12 +1039,13 @@ export default function AdminPage() {
                         placeholder="isletme@sistem.com"
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="hidden">
                       <Label htmlFor="cPassword">Giriş Şifresi</Label>
                       <Input
                         id="cPassword"
                         type="password"
                         required
+                        disabled
                         value={newPassword}
                         onChange={e => setNewPassword(e.target.value)}
                         placeholder="••••••••"

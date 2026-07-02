@@ -6,20 +6,34 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRole {
+  admin
+  business
+}
+
+enum BusinessMemberRole {
+  owner
+  employee
+}
+
 model User {
   id            String     @id @default(cuid())
   name          String?
   email         String     @unique
   emailVerified DateTime?
   image         String?
-  password_hash String
-  role          String     @default("business") // 'admin' or 'business'
+  password_hash String?
+  role          UserRole   @default(business)
+  approvalStatus String    @default("PENDING") // 'PENDING', 'APPROVED', or 'REJECTED'
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
   accounts      Account[]
   sessions      Session[]
   businesses    Business[]
+  memberships   BusinessMembership[]
+  sentInvites    BusinessInvite[] @relation("InvitesSentBy")
+  acceptedInvites BusinessInvite[] @relation("InvitesAcceptedBy")
   sentEmails    SentEmail[]
 }
 
@@ -102,10 +116,52 @@ model Business {
   updatedAt            DateTime @updatedAt
 
   owner                User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  memberships          BusinessMembership[]
+  invites              BusinessInvite[]
   conversations        Conversation[]
   appointments         AppointmentTrack[]
 
   @@index([ownerId])
+}
+
+model BusinessMembership {
+  id         String   @id @default(cuid())
+  businessId String
+  userId     String
+  role       BusinessMemberRole @default(employee)
+  status     String   @default("ACTIVE") // 'ACTIVE' or 'REMOVED'
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, userId])
+  @@index([userId])
+  @@index([businessId])
+}
+
+model BusinessInvite {
+  id           String    @id @default(cuid())
+  businessId   String
+  email        String
+  role         BusinessMemberRole @default(employee)
+  tokenHash    String    @unique
+  status       String    @default("PENDING") // 'PENDING', 'ACCEPTED', 'REVOKED', or 'EXPIRED'
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  invitedById  String?
+  acceptedById String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invitedBy    User?     @relation("InvitesSentBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  acceptedBy   User?     @relation("InvitesAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([email])
+  @@index([status])
 }
 
 model Conversation {

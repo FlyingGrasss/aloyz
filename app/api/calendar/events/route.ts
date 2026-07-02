@@ -6,6 +6,7 @@ import {
   updateGoogleCalendarEvent,
 } from "@/lib/googleCalendar";
 import { prisma } from "@/lib/prisma";
+import { getAccessibleBusiness } from "@/lib/businessAccess";
 import { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
@@ -20,7 +21,9 @@ async function getBusiness(request: NextRequest) {
   if (userRole === "admin" && businessId) {
     return prisma.business.findUnique({ where: { id: businessId } });
   }
-  return prisma.business.findFirst({ where: { ownerId: userId } });
+  const accessibleBusiness = await getAccessibleBusiness(userId);
+  if (!accessibleBusiness) return null;
+  return prisma.business.findUnique({ where: { id: accessibleBusiness.id } });
 }
 
 export async function GET(request: NextRequest) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { getAccessibleBusiness } from "@/lib/businessAccess";
 import { hasDashboardAccess } from "@/lib/access";
 
 const ALLOWED_EXPIRED_VIEWS = new Set(["subscription", "invoice/list"]);
@@ -18,10 +18,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const business = await prisma.business.findFirst({
-    where: { ownerId: user.id },
-    select: { createdAt: true, botSettings: true },
-  });
+  const business = await getAccessibleBusiness(user.id);
 
   if (!business) {
     return NextResponse.next();

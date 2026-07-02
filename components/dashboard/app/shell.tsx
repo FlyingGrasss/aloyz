@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   FileText,
   Languages,
-  LockKeyhole,
   LogOut,
   Menu,
   PanelLeftClose,
@@ -191,6 +190,7 @@ export function MobileNavDrawer({
   activeView,
   open,
   groupsOpen,
+  canManageSetup,
   onClose,
   onToggleGroup,
   onSelect,
@@ -198,6 +198,7 @@ export function MobileNavDrawer({
   activeView: ViewId;
   open: boolean;
   groupsOpen: Record<string, boolean>;
+  canManageSetup: boolean;
   onClose: () => void;
   onToggleGroup: (key: string) => void;
   onSelect: (view: ViewId) => void;
@@ -309,21 +310,23 @@ export function MobileNavDrawer({
             })}
           </div>
 
-          <div className="mt-4 rounded-lg bg-white/5 p-1">
-            <div className="px-2 py-2 text-xs font-semibold uppercase text-slate-400">
-              Kurulum
+          {canManageSetup && (
+            <div className="mt-4 rounded-lg bg-white/5 p-1">
+              <div className="px-2 py-2 text-xs font-semibold uppercase text-slate-400">
+                Kurulum
+              </div>
+              {setupItems.map((item) => (
+                <SidebarItem
+                  key={item.id}
+                  item={item}
+                  active={activeView === item.id}
+                  collapsed={false}
+                  onSelect={selectAndClose}
+                  compact
+                />
+              ))}
             </div>
-            {setupItems.map((item) => (
-              <SidebarItem
-                key={item.id}
-                item={item}
-                active={activeView === item.id}
-                collapsed={false}
-                onSelect={selectAndClose}
-                compact
-              />
-            ))}
-          </div>
+          )}
         </nav>
       </aside>
     </div>
@@ -477,6 +480,7 @@ export function Topbar({
   onOpenModal,
   onCreateItem,
   onOpenMobileNav,
+  canManageSetup,
   mobileNavEnabled = true,
 }: {
   business: Business;
@@ -496,6 +500,7 @@ export function Topbar({
   ) => void;
   onCreateItem: (label: string) => void;
   onOpenMobileNav: () => void;
+  canManageSetup: boolean;
   mobileNavEnabled?: boolean;
 }) {
   return (
@@ -596,33 +601,35 @@ export function Topbar({
           )}
         </div>
 
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() =>
-              onOpenMenu(openMenu === "settings" ? null : "settings")
-            }
-            className="grid size-9 place-items-center rounded-lg text-slate-600 hover:bg-slate-100"
-            title="Ayarlar"
-          >
-            <Settings className="size-5" />
-          </button>
-          {openMenu === "settings" && (
-            <Dropdown className="w-64 py-1">
-              <div className="bg-[#5f86b6] px-3 py-2 text-sm font-semibold text-white">
-                Kurulum
-              </div>
-              {setupItems.map((item) => (
-                <DropdownButton
-                  key={item.id}
-                  icon={item.icon}
-                  label={item.label}
-                  onClick={() => onSelectView(item.id)}
-                />
-              ))}
-            </Dropdown>
-          )}
-        </div>
+        {canManageSetup && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() =>
+                onOpenMenu(openMenu === "settings" ? null : "settings")
+              }
+              className="grid size-9 place-items-center rounded-lg text-slate-600 hover:bg-slate-100"
+              title="Ayarlar"
+            >
+              <Settings className="size-5" />
+            </button>
+            {openMenu === "settings" && (
+              <Dropdown className="w-64 py-1">
+                <div className="bg-[#5f86b6] px-3 py-2 text-sm font-semibold text-white">
+                  Kurulum
+                </div>
+                {setupItems.map((item) => (
+                  <DropdownButton
+                    key={item.id}
+                    icon={item.icon}
+                    label={item.label}
+                    onClick={() => onSelectView(item.id)}
+                  />
+                ))}
+              </Dropdown>
+            )}
+          </div>
+        )}
 
         <div className="relative ">
           <button
@@ -670,11 +677,13 @@ export function Topbar({
                 label="Dil değiştir"
                 onClick={() => onOpenModal("language")}
               />
+              {false && (
               <DropdownButton
-                icon={LockKeyhole}
+                icon={Settings}
                 label="Şifre değiştir"
                 onClick={() => onOpenModal("password")}
               />
+              )}
               <DropdownButton
                 icon={FileText}
                 label="Faturalar"

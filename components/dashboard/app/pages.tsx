@@ -30,6 +30,7 @@ export function ContentRouter({
   saving,
   whatsAppStatus,
   qrCodeBase64,
+  canManageSetup,
   onChange,
   onHourChange,
   onSave,
@@ -50,6 +51,7 @@ export function ContentRouter({
   saving: boolean;
   whatsAppStatus: string | null;
   qrCodeBase64: string | null;
+  canManageSetup: boolean;
   onChange: <K extends keyof Business>(field: K, value: Business[K]) => void;
   onHourChange: (dayKey: string, value: string, field: "start" | "end") => void;
   onSave: () => void;
@@ -67,6 +69,7 @@ export function ContentRouter({
         contacts={contacts}
         onUpdateAndSave={onUpdateAndSave}
         onSelectView={onSelectView}
+        canManageSetup={canManageSetup}
       />
     );
   }
@@ -209,6 +212,7 @@ export function ContentRouter({
     );
   }
   if (view.startsWith("setup/")) {
+    if (!canManageSetup) return <PlaceholderPage view="dashboard" />;
     return (
       <SetupPage
         view={view as SetupViewId}

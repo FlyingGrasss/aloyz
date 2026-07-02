@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
+import { getAccessibleBusiness } from '@/lib/businessAccess'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function DELETE(request: NextRequest) {
@@ -35,12 +36,9 @@ export async function DELETE(request: NextRequest) {
     }
 
     if (userRole !== 'admin') {
-      const ownedBusiness = await prisma.business.findFirst({
-        where: { slug, ownerId: userId },
-        select: { id: true },
-      })
+      const ownedBusiness = userId ? await getAccessibleBusiness(userId) : null
 
-      if (!ownedBusiness) {
+      if (!ownedBusiness || ownedBusiness.slug !== slug) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
     }

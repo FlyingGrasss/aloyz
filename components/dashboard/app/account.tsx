@@ -1,7 +1,7 @@
 "use client";
 
-import { Download, FileText, X } from "lucide-react";
-import { useState } from "react";
+import { Download, FileText, Send, Users2, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Breadcrumb, Business, ViewId } from "./shared";
 import { getAccessTill, hasDashboardAccess } from "@/lib/access";
@@ -48,7 +48,7 @@ export function AccountPage({
 
   return (
     <SimpleAccountShell title="Üyelik">
-        <SubscriptionPanel
+      <SubscriptionPanel
           business={business}
           access={access}
         />
@@ -115,6 +115,113 @@ function SubscriptionPanel({
         />
       )}
     </>
+  );
+}
+
+function CollaboratorsPanel({ business }: { business: Business }) {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [memberships, setMemberships] = useState<any[]>(business.memberships || []);
+  const [invites, setInvites] = useState<any[]>([]);
+
+  async function loadInvites() {
+    if (!business.id) return;
+    const res = await fetch("/api/business/invites");
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setMemberships(Array.isArray(data.memberships) ? data.memberships : []);
+      setInvites(Array.isArray(data.invites) ? data.invites : []);
+    }
+  }
+
+  useEffect(() => {
+    loadInvites();
+  }, [business.id]);
+
+  async function sendInvite(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    setMessage("");
+    setError("");
+    try {
+      const res = await fetch("/api/business/invites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, role: "employee" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Davet gönderilemedi.");
+        return;
+      }
+      setEmail("");
+      setMessage("Davet e-postası gönderildi.");
+      await loadInvites();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="mt-5 rounded border border-slate-200 bg-white p-4">
+      <div className="flex items-center gap-2">
+        <Users2 className="size-4 text-slate-500" />
+        <h2 className="text-base font-semibold text-slate-700">Çalışan davetleri</h2>
+      </div>
+
+      <form onSubmit={sendInvite} className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="calisan@example.com"
+          className="h-10 flex-1 rounded border border-slate-200 px-3 text-sm outline-none focus:border-slate-400"
+        />
+        <Button type="submit" disabled={loading} className="bg-slate-900 text-white">
+          <Send className="size-4" />
+          {loading ? "Gönderiliyor..." : "Davet gönder"}
+        </Button>
+      </form>
+
+      {message && <p className="mt-3 text-sm font-semibold text-emerald-700">{message}</p>}
+      {error && <p className="mt-3 text-sm font-semibold text-red-700">{error}</p>}
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div>
+          <h3 className="text-xs font-bold uppercase text-slate-500">Aktif erişimler</h3>
+          <div className="mt-2 divide-y divide-slate-100 rounded border border-slate-200">
+            {memberships.map((membership) => (
+              <div key={membership.id} className="px-3 py-2 text-sm">
+                <div className="font-semibold text-slate-700">{membership.user?.name || membership.user?.email}</div>
+                <div className="text-xs text-slate-500">{membership.user?.email} · {membership.role}</div>
+              </div>
+            ))}
+            {memberships.length === 0 && (
+              <div className="px-3 py-4 text-sm text-slate-400">Henüz çalışan yok.</div>
+            )}
+          </div>
+        </div>
+        <div>
+          <h3 className="text-xs font-bold uppercase text-slate-500">Bekleyen davetler</h3>
+          <div className="mt-2 divide-y divide-slate-100 rounded border border-slate-200">
+            {invites.map((invite) => (
+              <div key={invite.id} className="px-3 py-2 text-sm">
+                <div className="font-semibold text-slate-700">{invite.email}</div>
+                <div className="text-xs text-slate-500">
+                  Son geçerlilik: {new Date(invite.expiresAt).toLocaleDateString("tr-TR")}
+                </div>
+              </div>
+            ))}
+            {invites.length === 0 && (
+              <div className="px-3 py-4 text-sm text-slate-400">Bekleyen davet yok.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

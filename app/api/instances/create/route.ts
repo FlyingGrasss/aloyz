@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
+import { canManageBusiness } from '@/lib/businessAccess'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
@@ -26,10 +27,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
 
-      const ownedBusiness = await prisma.business.findFirst({
-        where: { id: businessId, ownerId: userId },
-        select: { id: true },
-      })
+      const ownedBusiness = await canManageBusiness(userId, businessId)
 
       if (!ownedBusiness) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

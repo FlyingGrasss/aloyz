@@ -18,7 +18,6 @@ import {
   LayoutDashboard,
   Link as LinkIcon,
   List,
-  LockKeyhole,
   LogOut,
   Menu,
   MessageCircle,
@@ -119,6 +118,7 @@ export type StaffMember = {
   email: string;
   phone: string;
   role: string;
+  accessRole?: "owner" | "employee";
   onlineBooking: boolean;
   calendarVisible: boolean;
   workingHours?: Record<string, string>;
@@ -437,6 +437,19 @@ export type Business = {
   is_active: boolean;
   test_mode: boolean;
   instagram_page_id: string | null;
+  currentMembershipRole?: "owner" | "employee";
+  memberships?: Array<{
+    id: string;
+    role: string;
+    status: string;
+    user?: {
+      id: string;
+      name: string | null;
+      email: string;
+      image?: string | null;
+      approvalStatus?: string | null;
+    };
+  }>;
   conversations: Conversation[];
   appointments: Appointment[];
 };
@@ -1375,6 +1388,7 @@ export function emptyStaff(): StaffMember {
     email: "",
     phone: "",
     role: "Personel",
+    accessRole: "employee",
     onlineBooking: true,
     calendarVisible: true,
   };
@@ -1382,7 +1396,10 @@ export function emptyStaff(): StaffMember {
 
 export function sanitizeStaffMember(member: StaffMember): StaffMember {
   const { color: _color, ...rest } = member as StaffMember & { color?: string };
-  return rest;
+  return {
+    ...rest,
+    accessRole: rest.accessRole === "owner" ? "owner" : "employee",
+  };
 }
 
 export function emptyService(): ServiceItem {

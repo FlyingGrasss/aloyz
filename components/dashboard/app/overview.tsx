@@ -69,11 +69,13 @@ export function OverviewPage({
   contacts,
   onUpdateAndSave,
   onSelectView,
+  canManageSetup,
 }: {
   business: Business;
   contacts: ContactRow[];
   onUpdateAndSave: (fields: Partial<Business>) => Promise<boolean>;
   onSelectView: (view: ViewId) => void;
+  canManageSetup: boolean;
 }) {
   const [tab, setTab] = useState<"appointments" | "receivables" | "birthdays">(
     "appointments",
@@ -310,11 +312,13 @@ export function OverviewPage({
           description="Tüm müşteri kayıtlarını telefon, kanal ve son görüşme bilgileriyle görüntüleyin."
           onClick={() => onSelectView("client/list")}
         />
+        {canManageSetup && (
         <ActionPanel
           title="Kurulum"
           description="Temel bilgiler, çalışma saatleri ve entegrasyon ayarlarını düzenleyin."
           onClick={() => onSelectView("setup/general")}
         />
+        )}
       </div>
     </div>
   );

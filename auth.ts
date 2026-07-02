@@ -1,60 +1,56 @@
-import NextAuth from 'next-auth'
-import Credentials from 'next-auth/providers/credentials'
-import { PrismaAdapter } from '@auth/prisma-adapter'
-import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
+import NextAuth from "next-auth";
+import Google from "next-auth/providers/google";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { prisma } from "@/lib/prisma";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
-    Credentials({
-      credentials: {
-        email: { label: 'E-posta', type: 'email' },
-        password: { label: 'Şifre', type: 'password' },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null
-
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
-        })
-
-        if (!user) return null
-
-        const passwordMatch = await bcrypt.compare(
-          credentials.password as string,
-          user.password_hash
-        )
-
-        if (!passwordMatch) return null
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        }
-      },
+    Google({
+      allowDangerousEmailAccountLinking: true,
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
+    async signIn({ profile }) {
+      if (!profile?.email) return false;
+      const emailVerified = (profile as { email_verified?: boolean }).email_verified;
+      return emailVerified !== false;
+    },
+    async jwt({ token, user }) {
       if (user) {
-        token.id = user.id
-        token.role = (user as { role?: string }).role ?? 'business'
+        token.id = user.id;
       }
-      return token
+
+      if (!token.id && token.email) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: token.email },
+          select: { id: true },
+        });
+        if (dbUser) token.id = dbUser.id;
+      }
+
+      if (token.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { role: true, approvalStatus: true },
+        });
+        token.role = dbUser?.role ?? "business";
+        token.approvalStatus = dbUser?.approvalStatus ?? "PENDING";
+      }
+
+      return token;
     },
     session({ session, token }) {
-      (session.user as any).id = token.id as string
-      (session.user as any).role = token.role as string
-      return session
+      (session.user as any).id = token.id as string;
+      (session.user as any).role = token.role as string;
+      (session.user as any).approvalStatus = token.approvalStatus as string;
+      return session;
     },
   },
   pages: {
-    signIn: '/login',
+    signIn: "/login",
   },
   session: {
-    strategy: 'jwt',
+    strategy: "jwt",
   },
-})
+});

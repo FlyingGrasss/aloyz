@@ -1,5 +1,5 @@
 import { auth } from '@/auth'
-import { prisma } from '@/lib/prisma'
+import { getAccessibleBusiness } from '@/lib/businessAccess'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -27,12 +27,9 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
 
-      const business = await prisma.business.findFirst({
-        where: { ownerId: userId, slug },
-        select: { id: true },
-      })
+      const business = await getAccessibleBusiness(userId)
 
-      if (!business) {
+      if (!business || business.slug !== slug) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
     }

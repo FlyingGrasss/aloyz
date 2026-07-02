@@ -279,6 +279,8 @@ function StaffSetupPage({
 }) {
   const [editing, setEditing] = useState<StaffMember | null>(null);
   const [servicesFor, setServicesFor] = useState<StaffMember | null>(null);
+  const [inviteMessage, setInviteMessage] = useState("");
+  const [inviteError, setInviteError] = useState("");
   const staff = business.staff || [];
 
   async function saveStaff(member: StaffMember) {
@@ -288,12 +290,57 @@ function StaffSetupPage({
           item.id === member.id ? cleanMember : sanitizeStaffMember(item),
         )
       : [...staff.map(sanitizeStaffMember), cleanMember];
+    setInviteMessage("");
+    setInviteError("");
+    const saved = await onUpdateAndSave({ staff: next });
+    if (!saved) return;
     setEditing(null);
-    await onUpdateAndSave({ staff: next });
+
+    const email = cleanMember.email.trim();
+    if (!email) return;
+
+    try {
+      const res = await fetch("/api/business/invites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          role: cleanMember.accessRole === "owner" ? "owner" : "employee",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setInviteError(data.error || "Davet gönderilemedi.");
+        return;
+      }
+      setInviteMessage(
+        data.alreadyMember
+          ? "Panel erişimi güncellendi."
+          : "Davet e-postası gönderildi.",
+      );
+    } catch {
+      setInviteError("Davet gönderilemedi.");
+    }
   }
 
   async function removeStaff(id: string) {
-    await onUpdateAndSave({ staff: staff.filter((item) => item.id !== id) });
+    const removed = staff.find((item) => item.id === id);
+    const saved = await onUpdateAndSave({
+      staff: staff.filter((item) => item.id !== id),
+    });
+    const email = removed?.email?.trim();
+    if (!saved || !email) return;
+    try {
+      await fetch("/api/business/invites", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      setInviteMessage("Panel erişimi kaldırıldı.");
+      setInviteError("");
+    } catch {
+      setInviteError("Panel erişimi kaldırılamadı.");
+    }
   }
 
   return (
@@ -314,6 +361,7 @@ function StaffSetupPage({
             <tr>
               <th className="px-3 py-3">Personel</th>
               <th className="px-3 py-3">Hesap tipi</th>
+              <th className="px-3 py-3">Panel erişimi</th>
               <th className="px-3 py-3">Telefon numarası</th>
               <th className="px-3 py-3" />
             </tr>
@@ -323,6 +371,11 @@ function StaffSetupPage({
               <tr key={member.id}>
                 <td className="px-3 py-3">{member.name}</td>
                 <td className="px-3 py-3">{member.role || "Personel"}</td>
+                <td className="px-3 py-3">
+                  {member.accessRole === "owner"
+                    ? "Owner yetkisi"
+                    : "Çalışan yetkisi"}
+                </td>
                 <td className="px-3 py-3">{member.phone || "-"}</td>
                 <td className="px-3 py-3 text-right">
                   <div className="inline-flex gap-2">
@@ -354,7 +407,7 @@ function StaffSetupPage({
             {staff.length === 0 && (
               <tr>
                 <td
-                  colSpan={4}
+                  colSpan={5}
                   className="px-3 py-10 text-center text-slate-400"
                 >
                   Personel yok.
@@ -364,6 +417,16 @@ function StaffSetupPage({
           </tbody>
         </table>
       </div>
+      {inviteMessage && (
+        <p className="mt-3 text-sm font-semibold text-emerald-700">
+          {inviteMessage}
+        </p>
+      )}
+      {inviteError && (
+        <p className="mt-3 text-sm font-semibold text-red-700">
+          {inviteError}
+        </p>
+      )}
       {editing && (
         <StaffModal
           member={editing}
@@ -433,6 +496,19 @@ function StaffModal({
               value,
               label: value,
             }))}
+          />
+          <NativeSelect
+            value={form.accessRole || "employee"}
+            onChange={(value) =>
+              setForm({
+                ...form,
+                accessRole: value === "owner" ? "owner" : "employee",
+              })
+            }
+            options={[
+              { value: "employee", label: "Çalışan erişimi" },
+              { value: "owner", label: "Owner yetkisi" },
+            ]}
           />
           <ToggleRow
             label="Online randevu alınabilir"

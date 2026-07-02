@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { getAccessibleBusiness } from "@/lib/businessAccess";
 import { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
@@ -34,10 +34,7 @@ export async function GET(request: NextRequest) {
     return Response.redirect(new URL("/login", request.url));
   }
 
-  const business = await prisma.business.findFirst({
-    where: { ownerId: userId },
-    select: { id: true },
-  });
+  const business = await getAccessibleBusiness(userId);
   if (!business) {
     dashboardUrl.searchParams.set("instagram", "missing-business");
     return Response.redirect(dashboardUrl);
