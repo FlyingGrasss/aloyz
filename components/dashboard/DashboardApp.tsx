@@ -90,6 +90,7 @@ export function DashboardApp() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
+  const [successLeaving, setSuccessLeaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [view, setView] = useState<ViewId>("dashboard");
   const [savedSetupComplete, setSavedSetupComplete] = useState(false);
@@ -218,8 +219,16 @@ export function DashboardApp() {
 
   useEffect(() => {
     if (!successMsg) return;
-    const timer = window.setTimeout(() => setSuccessMsg(""), 1400);
-    return () => window.clearTimeout(timer);
+    setSuccessLeaving(false);
+    const fadeTimer = window.setTimeout(() => setSuccessLeaving(true), 1600);
+    const clearTimer = window.setTimeout(() => {
+      setSuccessMsg("");
+      setSuccessLeaving(false);
+    }, 2050);
+    return () => {
+      window.clearTimeout(fadeTimer);
+      window.clearTimeout(clearTimer);
+    };
   }, [successMsg]);
 
   useEffect(() => {
@@ -750,7 +759,9 @@ export function DashboardApp() {
             business={business}
             selectedDate={selectedDate}
             searchTerm={searchTerm}
-            userName={session?.user?.name || business.slug || "Kullanıcı"}
+            userName={
+              session?.user?.name || session?.user?.email || "Kullanıcı"
+            }
             userEmail={session?.user?.email || business.email || ""}
             userImage={session?.user?.image || undefined}
             openMenu={openMenu}
@@ -779,7 +790,15 @@ export function DashboardApp() {
               </StatusBanner>
             )}
             {successMsg && (
-              <StatusBanner tone="success">{successMsg}</StatusBanner>
+              <div
+                className={`transition-all duration-500 ease-out ${
+                  successLeaving
+                    ? "-translate-y-1 opacity-0"
+                    : "translate-y-0 opacity-100"
+                }`}
+              >
+                <StatusBanner tone="success">{successMsg}</StatusBanner>
+              </div>
             )}
             {errorMsg && <StatusBanner tone="error">{errorMsg}</StatusBanner>}
 
@@ -1485,7 +1504,6 @@ const dashboardTranslations: Record<string, string> = {
   "Tüm Mesajlar": "All messages",
   "WP Kurulumu": "WhatsApp setup",
   "IG Kurulumu": "Instagram setup",
-  "Hatırlatma Yanıtları": "Reminder replies",
   Mesajlar: "Messages",
   Diğer: "Other",
   "Randevu Komisyonları": "Appointment commissions",
@@ -1791,7 +1809,6 @@ const dashboardTranslations: Record<string, string> = {
   Randevu: "Appointment",
   "Randevu aralığı": "Appointment interval",
   "Randevu bildirimleri": "Appointment notifications",
-  "Randevu hatırlatma": "Appointment reminder",
   "Randevu iptali": "Appointment cancellation",
   "Randevu oluşturuldu bildirimi": "Appointment created notification",
   "Randevu sayısı": "Appointment count",

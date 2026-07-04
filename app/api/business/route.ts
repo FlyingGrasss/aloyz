@@ -20,6 +20,7 @@ const PROFILE_FIELDS = [
   "district",
   "address",
   "website",
+  "calendarId",
   "welcome_message",
   "hours",
   "menu_or_services",
@@ -31,6 +32,8 @@ const PROFILE_FIELDS = [
   "promotions",
   "bookingSettings",
   "botSettings",
+  "is_active",
+  "test_mode",
   "special_instructions",
 ] as const;
 
@@ -79,6 +82,8 @@ function sanitizeProfilePayload(
     }
   }
 
+  if (updateData.is_active !== undefined) updateData.is_active = !!updateData.is_active;
+  if (updateData.test_mode !== undefined) updateData.test_mode = !!updateData.test_mode;
   if (includeDefaults && !updateData.faqs) updateData.faqs = [];
   return updateData;
 }

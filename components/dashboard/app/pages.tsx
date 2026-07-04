@@ -12,7 +12,6 @@ import { AccountPage } from "./account";
 import {
   AutomaticMessagesPage,
   MessagingPage,
-  ReminderRepliesPage,
   WhatsappMessagesPage,
   WhatsappRegisterPage,
 } from "./whatsapp";
@@ -176,14 +175,6 @@ export function ContentRouter({
       <WhatsappMessagesPage
         business={business}
         contacts={contacts}
-      />
-    );
-  }
-  if (view === "messaging/whatsapp/reminder-messages") {
-    return (
-      <ReminderRepliesPage
-        contacts={contacts}
-        onSelectView={onSelectView}
       />
     );
   }

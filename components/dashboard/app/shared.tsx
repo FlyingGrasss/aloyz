@@ -60,7 +60,6 @@ export type ViewId =
   | "messaging/whatsapp/sent-reminders"
   | "messaging/whatsapp/register"
   | "messaging/whatsapp/list"
-  | "messaging/whatsapp/reminder-messages"
   | "messaging/instagram/setup"
   | "messaging/instagram/list"
   | "other/commissions"
@@ -616,11 +615,6 @@ export const navGroups: NavGroup[] = [
             label: "Mesajlar",
             icon: WhatsAppBrandIcon,
             iconClassName: "text-[#25D366]",
-          },
-          {
-            id: "messaging/whatsapp/reminder-messages",
-            label: "Hatırlatma Yanıtları",
-            icon: WalletCards,
           },
         ],
       },

@@ -1337,6 +1337,17 @@ function SalonBotSettingsPage({
     whatsAppStatus === "open" || whatsAppStatus === "connected";
   const instagramConnected =
     !!business.instagram_page_id || !!form.instagramConnected;
+
+  useEffect(() => {
+    setForm(business.botSettings || {});
+    setActive(!!business.is_active);
+    setTestMode(!!business.test_mode);
+    setMenuOrServices(business.menu_or_services || "");
+    setWelcomeMessage(business.welcome_message || "");
+    setSpecialInstructions(business.special_instructions || "");
+    setFaqs(Array.isArray(business.faqs) ? business.faqs : []);
+  }, [business]);
+
   return (
     <SettingsPanel
       title="Bot Ayarları"
@@ -1388,14 +1399,20 @@ function SalonBotSettingsPage({
       <ToggleRow
         label="Instagram Bot Aktif/Pasif"
         description=""
-        checked={!!form.instagram && instagramConnected}
-        onChange={(checked) => setForm({ ...form, instagram: checked })}
+        checked={!!form.instagram}
+        onChange={(checked) => {
+          setForm({ ...form, instagram: checked });
+          if (checked) setActive(true);
+        }}
       />
       <ToggleRow
         label="WhatsApp Bot Aktif/Pasif"
         description=""
-        checked={!!form.whatsapp && whatsAppConnected}
-        onChange={(checked) => setForm({ ...form, whatsapp: checked })}
+        checked={!!form.whatsapp}
+        onChange={(checked) => {
+          setForm({ ...form, whatsapp: checked });
+          if (checked) setActive(true);
+        }}
       />
       <div className="grid gap-3">
         <label className="grid gap-1 text-sm font-semibold text-slate-700">
@@ -1546,11 +1563,6 @@ function BookingSettingsPage({
         label="Randevu iptali"
         checked={!!form.cancellation}
         onChange={(checked) => setForm({ ...form, cancellation: checked })}
-      />
-      <SettingsToggle
-        label="Randevu hatırlatma"
-        checked={!!form.reminder}
-        onChange={(checked) => setForm({ ...form, reminder: checked })}
       />
       <GoogleCalendarIntegrationPanel
         calendarId={calendarId}

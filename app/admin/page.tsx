@@ -601,93 +601,96 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-slate-50/50 text-neutral-900 pb-16 font-sans">
       {/* Top Banner Navigation */}
-      <header className="bg-white border-b border-neutral-200/80 sticky top-0 z-20 shadow-sm">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-20 border-b border-neutral-200/80 bg-white shadow-sm">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
             <Image src="/logo.jpg" alt="Aloyz" width={34} height={34} className="rounded-lg shadow-sm" />
-            <span className="text-lg font-bold tracking-tight text-neutral-900">Aloyz</span>
-            <span className="inline-block px-2.5 py-0.5 rounded-full bg-neutral-900 text-xs font-bold text-white">
+            <span className="text-lg font-bold tracking-tight text-neutral-900">Aloyz Admin</span>
+            <span className="hidden">
               Sistem Yöneticisi
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-medium text-neutral-600">
+          <div className="flex min-w-0 items-center justify-between gap-3 md:justify-end">
+            <span className="min-w-0 truncate text-sm font-medium text-neutral-600">
               Yönetici: {session?.user?.email}
             </span>
             <button
               onClick={() => signOut({ callbackUrl: '/' })}
-              className="text-xs font-bold text-neutral-500 hover:text-neutral-900 transition-colors border border-neutral-200 px-3 py-1.5 rounded-lg bg-white shadow-sm cursor-pointer"
+              className="shrink-0 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs font-bold text-neutral-600 shadow-sm transition-colors hover:text-neutral-900"
             >
+              <span className="sr-only">
               Çıkış Yap
+              </span>
+              <span>Çıkış Yap</span>
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Grid Layout */}
-      <div className="max-w-6xl mx-auto px-6 mt-8 grid grid-cols-1 md:grid-cols-4 gap-8">
+      <div className="mx-auto mt-6 grid max-w-7xl grid-cols-1 gap-6 px-4 sm:px-6 lg:grid-cols-[240px_minmax(0,1fr)]">
 
         {/* Admin Navigation Sidebar */}
-        <aside className="md:col-span-1 flex flex-col gap-1">
+        <aside className="rounded-2xl border border-neutral-200 bg-white p-2 shadow-sm lg:sticky lg:top-24 lg:self-start">
           <button
             onClick={() => setActiveTab('businesses')}
-            className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all flex items-center gap-3 ${activeTab === 'businesses'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
+            className={`flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold transition ${activeTab === 'businesses'
+                ? 'bg-slate-900 text-white shadow-sm'
                 : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
               }`}
           >
-            🏢 Kayıtlı İşletmeler
+            Kayıtlı İşletmeler
           </button>
           <button
             onClick={() => setActiveTab('create')}
-            className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all flex items-center gap-3 ${activeTab === 'create'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
+            className={`flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold transition ${activeTab === 'create'
+                ? 'bg-slate-900 text-white shadow-sm'
                 : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
               }`}
           >
-            ➕ Yeni İşletme Tanımla
+            Yeni İşletme Tanımla
           </button>
           <button
             onClick={() => setActiveTab('conversations')}
-            className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all flex items-center gap-3 ${activeTab === 'conversations'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
+            className={`flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold transition ${activeTab === 'conversations'
+                ? 'bg-slate-900 text-white shadow-sm'
                 : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
               }`}
           >
-            💬 Son Görüşmeler
+            Son Görüşmeler
           </button>
           <button
             onClick={() => setActiveTab('appointments')}
-            className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all flex items-center gap-3 ${activeTab === 'appointments'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
+            className={`flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold transition ${activeTab === 'appointments'
+                ? 'bg-slate-900 text-white shadow-sm'
                 : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
               }`}
           >
-            📅 Randevu Veri Havuzu
+            Randevu Veri Havuzu
           </button>
           <button
             onClick={() => setActiveTab('whatsapp')}
-            className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all flex items-center gap-3 ${activeTab === 'whatsapp'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
+            className={`flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold transition ${activeTab === 'whatsapp'
+                ? 'bg-slate-900 text-white shadow-sm'
                 : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
               }`}
           >
-            🔌 WhatsApp Kurulumu
+            WhatsApp Kurulumu
           </button>
           <button
             onClick={() => setActiveTab('mail')}
-            className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all flex items-center gap-3 ${activeTab === 'mail'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
+            className={`flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold transition ${activeTab === 'mail'
+                ? 'bg-slate-900 text-white shadow-sm'
                 : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
               }`}
           >
-            ✉️ Mail Gönderimi
+            Mail Gönderimi
           </button>
         </aside>
 
         {/* Admin Dashboard Area */}
-        <main className="md:col-span-3 space-y-6">
+        <main className="min-w-0 space-y-6">
 
           {/* Action Bulletins */}
           {actionSuccess && (
@@ -807,40 +810,46 @@ export default function AdminPage() {
                             )}
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-3">
+                          <div className="grid w-full gap-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3 sm:grid-cols-2 xl:grid-cols-[auto_180px_140px_170px_auto] xl:items-end">
                             <Button
                               type="button"
                               variant="outline"
                               onClick={() => router.push(`/dashboard?businessId=${b.id}`)}
-                              className="text-xs font-bold h-8 px-3"
+                              className="h-9 w-full text-xs font-bold xl:w-auto"
                             >
                               Profili Düzenle
                             </Button>
-                            <span className="text-xs font-semibold text-neutral-500">Asistan Durumu:</span>
+                            <label className="grid gap-1 text-xs font-semibold text-neutral-600">
+                              Asistan Durumu
                             <select
                               value={rowChanges.is_active ? 'active' : 'inactive'}
                               onChange={e => updateLocalField(b.id, 'is_active', e.target.value === 'active')}
-                              className="text-xs font-bold px-2.5 py-1 rounded border border-neutral-300 bg-white shadow-sm cursor-pointer hover:border-neutral-400"
+                              className="h-9 rounded border border-neutral-300 bg-white px-2.5 text-xs font-bold shadow-sm"
                             >
                               <option value="inactive">Pasif / Kurulumda</option>
-                              <option value="active">Aktif (WhatsApp Çalışıyor)</option>
+                              <option value="active">Aktif</option>
                             </select>
-                            <span className="text-xs font-semibold text-neutral-500">Test Modu:</span>
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-neutral-600">
+                              Test Modu
                             <select
                               value={rowChanges.test_mode ? 'enabled' : 'disabled'}
                               onChange={e => updateLocalField(b.id, 'test_mode', e.target.value === 'enabled')}
-                              className="text-xs font-bold px-2.5 py-1 rounded border border-neutral-300 bg-white shadow-sm cursor-pointer hover:border-neutral-400"
+                              className="h-9 rounded border border-neutral-300 bg-white px-2.5 text-xs font-bold shadow-sm"
                             >
                               <option value="disabled">Kapalı</option>
                               <option value="enabled">Açık</option>
                             </select>
-                            <span className="text-xs font-semibold text-neutral-500">Erişim Bitişi:</span>
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-neutral-600">
+                              Erişim Bitişi
                             <Input
                               type="date"
                               value={rowChanges.hasAccessTill}
                               onChange={e => updateLocalField(b.id, 'hasAccessTill', e.target.value)}
-                              className="h-8 w-36 text-xs bg-white"
+                              className="h-9 bg-white text-xs"
                             />
+                            </label>
                             <Button
                               type="button"
                               variant="outline"
@@ -851,7 +860,7 @@ export default function AdminPage() {
                                   addOneMonthToAccessDate(rowChanges.hasAccessTill),
                                 )
                               }
-                              className="h-8 px-2 text-xs font-bold"
+                              className="h-9 w-full px-2 text-xs font-bold xl:w-auto"
                             >
                               +1 Ay
                             </Button>

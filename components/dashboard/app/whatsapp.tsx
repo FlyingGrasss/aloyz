@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bell,
   CalendarDays,
@@ -94,21 +94,23 @@ export function AutomaticMessagesPage({
     const diff = new Date(right.readAt).getTime() - new Date(left.readAt).getTime();
     return latestFirst ? diff : -diff;
   });
-  const filteredRows = rows
+  const baseRows = rows
     .filter((row) => {
       const query = customerQuery.trim().toLocaleLowerCase("tr-TR");
       const matchesCustomer =
         !query || row.customer.toLocaleLowerCase("tr-TR").startsWith(query);
-      const matchesStatus = status === "Tümü" || row.status === status;
       const matchesPeriod = period === "Tümü" || isInPeriod(row.date, period);
-      return matchesCustomer && matchesStatus && matchesPeriod;
+      return matchesCustomer && matchesPeriod;
     });
+  const filteredRows = baseRows.filter(
+    (row) => status === "Tümü" || row.status === status,
+  );
   const counts = {
-    Tümü: filteredRows.length,
-    Gönderildi: filteredRows.filter((row) => row.status === "Gönderildi")
+    Tümü: baseRows.length,
+    Gönderildi: baseRows.filter((row) => row.status === "Gönderildi")
       .length,
     İletildi: 0,
-    Okundu: filteredRows.filter((row) => row.status === "Okundu").length,
+    Okundu: baseRows.filter((row) => row.status === "Okundu").length,
     Başarısız: 0,
   };
   return (
@@ -244,6 +246,11 @@ export function WhatsappRegisterPage({
     whatsAppStatus === "open" || whatsAppStatus === "connected";
   const connecting = whatsAppStatus === "connecting";
 
+  useEffect(() => {
+    setWhatsAppActive(!!business.botSettings?.whatsapp);
+    setTestMode(!!business.test_mode);
+  }, [business.botSettings, business.test_mode]);
+
   async function saveChannelSettings(next: {
     whatsapp?: boolean;
     testMode?: boolean;
@@ -261,6 +268,7 @@ export function WhatsappRegisterPage({
           whatsappConnected: connected,
         },
         test_mode: nextTestMode,
+        is_active: nextWhatsApp ? true : business.is_active,
       });
     } finally {
       setBusy(false);
@@ -493,55 +501,6 @@ export function WhatsappMessagesPage({
           )}
         </section>
       </div>
-    </div>
-  );
-}
-
-export function ReminderRepliesPage({
-  contacts,
-  onSelectView,
-}: {
-  contacts: ContactRow[];
-  onSelectView: (view: ViewId) => void;
-}) {
-  const replyRows = contacts
-    .filter((contact) => contact.channel !== "instagram")
-    .filter((contact) =>
-      getConversationMessages(contact.conversation).some(
-        (message) => message.role === "user",
-      ),
-    )
-    .map((contact) => [contact.name, contact.phone || "-"]);
-  return (
-    <div className="space-y-4">
-      <Breadcrumb
-        items={[
-          { label: "Aloyz", view: "dashboard" },
-          {
-            label: "Hatırlatma Yanıtları",
-            view: "messaging/whatsapp/reminder-messages",
-          },
-        ]}
-        onSelectView={onSelectView}
-      />
-      <section className="rounded bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-slate-700">
-            Hatırlatma Yanıtları
-          </h1>
-          <span className="text-xs text-slate-500">
-            Toplam Yanıt Sayısı: {replyRows.length}
-          </span>
-        </div>
-        <div className="mt-6 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          Bu sayfa, gönderilen hatırlatma mesajlarına müşterilerinizin WhatsApp
-          üzerinden gönderdiği yanıtları listeler.
-        </div>
-        <MessageTable
-          columns={["Müşteri", "Telefon numarası"]}
-          rows={replyRows}
-        />
-      </section>
     </div>
   );
 }

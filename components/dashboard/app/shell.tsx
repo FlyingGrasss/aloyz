@@ -652,7 +652,7 @@ export function Topbar({
             )}
             <span className="hidden min-w-0 md:block">
               <span className="block truncate text-sm font-semibold text-slate-600">
-                {business.slug || userName}
+                {userName}
               </span>
               <span className="block truncate text-xs text-slate-400">
                 {userEmail}

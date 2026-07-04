@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, ExternalLink, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +34,11 @@ export function InstagramSetupPage({
     !!business.instagram_page_id || !!business.botSettings?.instagramConnected;
   const username =
     business.botSettings?.instagramUsername || business.instagram_page_id || "";
+
+  useEffect(() => {
+    setInstagramActive(!!business.botSettings?.instagram);
+    setTestMode(!!business.test_mode);
+  }, [business.botSettings, business.test_mode]);
 
   function connectInstagram() {
     window.location.href = "/api/integrations/instagram/connect";
@@ -78,6 +83,7 @@ export function InstagramSetupPage({
           instagramConnected: connected,
         },
         test_mode: nextTestMode,
+        is_active: nextInstagram ? true : business.is_active,
       });
     } finally {
       setBusy(false);
