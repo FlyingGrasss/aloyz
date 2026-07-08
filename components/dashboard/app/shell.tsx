@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import {
-  Bell,
   CalendarDays,
   ChevronDown,
   ChevronLeft,
@@ -32,7 +31,8 @@ import {
   navGroups,
   primaryNav,
   isNavSubGroup,
-  setupItems,
+  advancedSetupItems,
+  mainSetupItems,
   Dropdown,
   DropdownButton,
 } from "./shared";
@@ -315,7 +315,20 @@ export function MobileNavDrawer({
               <div className="px-2 py-2 text-xs font-semibold uppercase text-slate-400">
                 Kurulum
               </div>
-              {setupItems.map((item) => (
+              {mainSetupItems.map((item) => (
+                <SidebarItem
+                  key={item.id}
+                  item={item}
+                  active={activeView === item.id}
+                  collapsed={false}
+                  onSelect={selectAndClose}
+                  compact
+                />
+              ))}
+              <div className="mt-1 px-2 py-2 text-xs font-semibold uppercase text-slate-400">
+                Diğer
+              </div>
+              {advancedSetupItems.map((item) => (
                 <SidebarItem
                   key={item.id}
                   item={item}
@@ -566,15 +579,6 @@ export function Topbar({
           />
         </div>
 
-        <button
-          type="button"
-          onClick={() => onOpenModal("notifications")}
-          className="grid size-9 place-items-center rounded-lg text-slate-600 hover:bg-slate-100"
-          title="Bildirimler"
-        >
-          <Bell className="size-5" />
-        </button>
-
         <div className="relative">
           <button
             type="button"
@@ -618,7 +622,18 @@ export function Topbar({
                 <div className="bg-[#5f86b6] px-3 py-2 text-sm font-semibold text-white">
                   Kurulum
                 </div>
-                {setupItems.map((item) => (
+                {mainSetupItems.map((item) => (
+                  <DropdownButton
+                    key={item.id}
+                    icon={item.icon}
+                    label={item.label}
+                    onClick={() => onSelectView(item.id)}
+                  />
+                ))}
+                <div className="border-t border-slate-100 px-3 py-2 text-xs font-semibold uppercase text-slate-400">
+                  Diğer
+                </div>
+                {advancedSetupItems.map((item) => (
                   <DropdownButton
                     key={item.id}
                     icon={item.icon}
@@ -668,14 +683,14 @@ export function Topbar({
                 onClick={() => onSelectView("subscription")}
               />
               <DropdownButton
-                icon={Settings}
-                label="Tema ayarları"
-                onClick={() => onOpenModal("theme")}
-              />
-              <DropdownButton
                 icon={Languages}
                 label="Dil değiştir"
                 onClick={() => onOpenModal("language")}
+              />
+              <DropdownButton
+                icon={Settings}
+                label="Tema ayarları"
+                onClick={() => onOpenModal("theme")}
               />
               {false && (
               <DropdownButton

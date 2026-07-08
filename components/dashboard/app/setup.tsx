@@ -60,7 +60,8 @@ import {
   emptyService,
   sanitizeStaffMember,
   contactToCustomerProfile,
-  setupItems,
+  advancedSetupItems,
+  mainSetupItems,
   TIME_OPTIONS,
   GOOGLE_SERVICE_ACCOUNT_EMAIL,
 } from "./shared";
@@ -72,12 +73,14 @@ export function OnboardingPanel({
   onChange,
   onHourChange,
   onSave,
+  onUpdateAndSave,
 }: {
   business: Business;
   saving: boolean;
   onChange: <K extends keyof Business>(field: K, value: Business[K]) => void;
   onHourChange: (dayKey: string, value: string, field: "start" | "end") => void;
   onSave: () => void;
+  onUpdateAndSave: (fields: Partial<Business>) => Promise<boolean>;
 }) {
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -95,6 +98,7 @@ export function OnboardingPanel({
         saving={saving}
         onHourChange={onHourChange}
         onSave={onSave}
+        onUpdateAndSave={onUpdateAndSave}
       />
     </div>
   );
@@ -144,7 +148,26 @@ export function SetupPage({
       />
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         <aside className="rounded border border-slate-200 bg-white shadow-sm">
-          {setupItems.map((item) => {
+          {mainSetupItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onSelectView(item.id)}
+                className={`flex h-10 w-full items-center gap-3 border-b border-slate-200 px-4 text-left text-sm hover:bg-slate-50 ${
+                  view === item.id ? "dashboard-nav-active bg-slate-100 font-semibold" : ""
+                }`}
+              >
+                <Icon className="size-4" />
+                {item.label}
+              </button>
+            );
+          })}
+          <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Diğer
+          </div>
+          {advancedSetupItems.map((item) => {
             const Icon = item.icon;
             return (
               <button

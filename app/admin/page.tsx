@@ -38,11 +38,22 @@ function addOneMonthToAccessDate(value: string) {
   return formatAccessInputDate(safeSource)
 }
 
+type AdminTab = 'businesses' | 'create' | 'conversations' | 'appointments' | 'whatsapp' | 'mail'
+
+const ADMIN_TABS: Array<{ id: AdminTab; label: string; description: string }> = [
+  { id: 'businesses', label: 'İşletmeler', description: 'Hesap, erişim ve entegrasyon ayarları' },
+  { id: 'create', label: 'Yeni işletme', description: 'İşletme ve yetkili hesabı oluşturma' },
+  { id: 'conversations', label: 'Görüşmeler', description: 'Son WhatsApp ve Instagram diyalogları' },
+  { id: 'appointments', label: 'Randevular', description: 'Tüm işletmelerin randevu kayıtları' },
+  { id: 'whatsapp', label: 'WhatsApp', description: 'Evolution oturumları ve QR kurulumları' },
+  { id: 'mail', label: 'Mail', description: 'Gönderim ve gelen mail kayıtları' },
+]
+
 export default function AdminPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
 
-  const [activeTab, setActiveTab] = useState<'businesses' | 'create' | 'conversations' | 'appointments' | 'whatsapp' | 'mail'>('businesses')
+  const [activeTab, setActiveTab] = useState<AdminTab>('businesses')
   const [loading, setLoading] = useState(true)
 
   // WhatsApp Setup tab states
@@ -606,9 +617,6 @@ export default function AdminPage() {
           <div className="flex min-w-0 items-center gap-3">
             <Image src="/logo.jpg" alt="Aloyz" width={34} height={34} className="rounded-lg shadow-sm" />
             <span className="text-lg font-bold tracking-tight text-neutral-900">Aloyz Admin</span>
-            <span className="hidden">
-              Sistem Yöneticisi
-            </span>
           </div>
 
           <div className="flex min-w-0 items-center justify-between gap-3 md:justify-end">
@@ -632,61 +640,29 @@ export default function AdminPage() {
       <div className="mx-auto mt-6 grid max-w-7xl grid-cols-1 gap-6 px-4 sm:px-6 lg:grid-cols-[240px_minmax(0,1fr)]">
 
         {/* Admin Navigation Sidebar */}
-        <aside className="rounded-2xl border border-neutral-200 bg-white p-2 shadow-sm lg:sticky lg:top-24 lg:self-start">
-          <button
-            onClick={() => setActiveTab('businesses')}
-            className={`flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold transition ${activeTab === 'businesses'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-              }`}
-          >
-            Kayıtlı İşletmeler
-          </button>
-          <button
-            onClick={() => setActiveTab('create')}
-            className={`flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold transition ${activeTab === 'create'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-              }`}
-          >
-            Yeni İşletme Tanımla
-          </button>
-          <button
-            onClick={() => setActiveTab('conversations')}
-            className={`flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold transition ${activeTab === 'conversations'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-              }`}
-          >
-            Son Görüşmeler
-          </button>
-          <button
-            onClick={() => setActiveTab('appointments')}
-            className={`flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold transition ${activeTab === 'appointments'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-              }`}
-          >
-            Randevu Veri Havuzu
-          </button>
-          <button
-            onClick={() => setActiveTab('whatsapp')}
-            className={`flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold transition ${activeTab === 'whatsapp'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-              }`}
-          >
-            WhatsApp Kurulumu
-          </button>
-          <button
-            onClick={() => setActiveTab('mail')}
-            className={`flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold transition ${activeTab === 'mail'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-              }`}
-          >
-            Mail Gönderimi
-          </button>
+        <aside className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white p-2 shadow-sm lg:sticky lg:top-24 lg:self-start lg:overflow-visible">
+          <nav className="flex min-w-max gap-2 lg:min-w-0 lg:flex-col">
+            {ADMIN_TABS.map((tab) => {
+              const active = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`min-h-14 w-44 rounded-xl px-3 py-2 text-left transition lg:w-full ${
+                    active
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
+                  }`}
+                >
+                  <span className="block text-sm font-semibold">{tab.label}</span>
+                  <span className={`mt-0.5 block text-xs leading-snug ${active ? 'text-slate-200' : 'text-neutral-400'}`}>
+                    {tab.description}
+                  </span>
+                </button>
+              )
+            })}
+          </nav>
         </aside>
 
         {/* Admin Dashboard Area */}
@@ -695,12 +671,12 @@ export default function AdminPage() {
           {/* Action Bulletins */}
           {actionSuccess && (
             <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm font-semibold shadow-sm">
-              🎉 {actionSuccess}
+              {actionSuccess}
             </div>
           )}
           {actionError && (
             <div className="p-4 rounded-xl border border-red-200 bg-red-50 text-red-800 text-sm font-semibold shadow-sm">
-              ⚠️ {actionError}
+              {actionError}
             </div>
           )}
 

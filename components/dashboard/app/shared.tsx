@@ -102,12 +102,16 @@ export type Conversation = {
 
 export type Appointment = {
   id: string;
+  eventId?: string;
   customerName: string;
   phone: string;
   date: string;
   time: string;
+  serviceId?: string | null;
+  staffId?: string | null;
   description: string;
   status: string;
+  source?: string | null;
   createdAt: string;
 };
 
@@ -531,14 +535,9 @@ export const InstagramBrandIcon = ((props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 )) as LucideIcon;
 
-export const setupItems: NavItem[] = [
+export const mainSetupItems: NavItem[] = [
   { id: "setup/general", label: "Bilgileri", icon: Info },
   { id: "setup/working-hours", label: "Çalışma saatleri", icon: Settings },
-  {
-    id: "setup/special-working-hours",
-    label: "Dönemsel çalışma saatleri",
-    icon: CalendarDays,
-  },
   { id: "setup/staff", label: "Personeller", icon: Users },
   { id: "setup/services", label: "Hizmetler", icon: List },
   { id: "setup/service_durations", label: "Hizmet süreleri", icon: Clock3 },
@@ -547,14 +546,11 @@ export const setupItems: NavItem[] = [
     label: "Hizmet fiyatları",
     icon: CircleDollarSign,
   },
-  { id: "setup/products", label: "Ürünler", icon: Tag },
-  { id: "setup/service_packages", label: "Paketler", icon: Package },
   {
     id: "setup/booking_settings",
     label: "Randevu ayarları",
     icon: CalendarDays,
   },
-  { id: "setup/tag_settings", label: "Etiket ayarları", icon: Tag },
   {
     id: "setup/salon-bot-settings",
     label: "Bot Ayarları",
@@ -566,6 +562,19 @@ export const setupItems: NavItem[] = [
     icon: LinkIcon,
   },
 ];
+
+export const advancedSetupItems: NavItem[] = [
+  {
+    id: "setup/special-working-hours",
+    label: "Dönemsel çalışma saatleri",
+    icon: CalendarDays,
+  },
+  { id: "setup/products", label: "Ürünler", icon: Tag },
+  { id: "setup/service_packages", label: "Paketler", icon: Package },
+  { id: "setup/tag_settings", label: "Etiket ayarları", icon: Tag },
+];
+
+export const setupItems: NavItem[] = [...mainSetupItems, ...advancedSetupItems];
 
 export const primaryNav: NavItem[] = [
   { id: "dashboard", label: "Özet", icon: Home },
@@ -646,8 +655,6 @@ export const navGroups: NavGroup[] = [
     icon: MoreVertical,
     children: [
       { id: "other/commissions", label: "Randevu Komisyonları", icon: Percent },
-      { id: "other/review/list", label: "Yorumlar", icon: MessageCircle },
-      { id: "other/call_log/list", label: "Arama kayıtları", icon: Phone },
       { id: "other/expense/list", label: "Masraflar", icon: Upload },
       { id: "other/payment/list", label: "Tahsilatlar", icon: WalletCards },
       { id: "other/receivable/list", label: "Alacaklar", icon: ReceiptText },
@@ -846,11 +853,7 @@ export function UtilityModal({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const storedTheme = localStorage.getItem("aloyz-theme");
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)",
-    ).matches;
-    const nextDarkMode = storedTheme ? storedTheme === "dark" : prefersDark;
+    const nextDarkMode = localStorage.getItem("aloyz-theme") === "dark";
     document.documentElement.classList.toggle("dark", nextDarkMode);
     setDarkMode(nextDarkMode);
     setLanguage(localStorage.getItem("aloyz-language") || "tr");
@@ -1704,4 +1707,30 @@ export function getEvolutionInstanceName(instance: any) {
     instance?.instanceName ||
     ""
   );
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+export function getEvolutionPhoneNumber(instance: unknown) {
+  const root = asRecord(instance);
+  const nestedInstance = asRecord(root.instance);
+  const profile = asRecord(root.profile);
+  const nestedProfile = asRecord(nestedInstance.profile);
+  const value =
+    root.ownerJid ||
+    profile.id ||
+    profile.wid ||
+    nestedInstance.ownerJid ||
+    nestedProfile.id ||
+    nestedProfile.wid ||
+    root.number ||
+    root.phone ||
+    nestedInstance.number ||
+    nestedInstance.phone ||
+    "";
+  const digits = String(value).split("@")[0].replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.startsWith("90") ? `+${digits}` : digits;
 }

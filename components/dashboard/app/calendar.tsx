@@ -594,35 +594,89 @@ export function AppointmentsPage({
   appointments: Appointment[];
   business: Business;
 }) {
+  const [sourceFilter, setSourceFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [staffFilter, setStaffFilter] = useState("all");
+  const [selectedRow, setSelectedRow] = useState<AppointmentListRow | null>(null);
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
+  const [statusSavingId, setStatusSavingId] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState("");
+
   const checkoutRows = (business.checkouts || []).map((checkout) => {
     const customer = (business.customers || []).find(
       (item) =>
         item.id === checkout.customerId || item.name === checkout.customerName,
     );
+    const staffIds = getCheckoutStaffIds(checkout);
     return {
       id: `checkout-${checkout.id}`,
+      rawId: checkout.id,
+      kind: "checkout" as const,
       customerName: checkout.customerName,
       phone: customer?.phone || "-",
       date: checkout.date,
       time: `${checkout.hour}:${checkout.minute}`,
       description: getCheckoutServiceSummary(business, checkout) || "Adisyon",
       status: checkout.attendance || checkout.status || "-",
+      staffId: staffIds[0] || "",
+      serviceId: checkout.serviceId || "",
+      sourceKey: "checkout",
       source: "Adisyon",
     };
   });
-  const appointmentRows = appointments.map((appointment) => ({
-    id: `appointment-${appointment.id}`,
-    customerName: appointment.customerName,
-    phone: appointment.phone || "-",
-    date: appointment.date,
-    time: appointment.time,
-    description: appointment.description,
-    status: appointment.status,
-    source: "Bot / Google",
-  }));
-  const rows = [...checkoutRows, ...appointmentRows].sort((a, b) =>
+  const appointmentRows = appointments.map((appointment) => {
+    const sourceKey = getAppointmentSourceKey(appointment);
+    return {
+      id: `appointment-${appointment.id}`,
+      rawId: appointment.id,
+      kind: "appointment" as const,
+      customerName: appointment.customerName,
+      phone: appointment.phone || "-",
+      date: appointment.date,
+      time: appointment.time,
+      description: appointment.description,
+      status: statusOverrides[appointment.id] || appointment.status,
+      staffId: appointment.staffId || "",
+      serviceId: appointment.serviceId || "",
+      sourceKey,
+      source: getAppointmentSourceLabel(sourceKey),
+    };
+  });
+  const rows: AppointmentListRow[] = [...checkoutRows, ...appointmentRows].sort((a, b) =>
     `${b.date}T${b.time}`.localeCompare(`${a.date}T${a.time}`),
   );
+  const filteredRows = rows.filter((row) => {
+    const sourceMatches = sourceFilter === "all" || row.sourceKey === sourceFilter;
+    const statusMatches = statusFilter === "all" || row.status === statusFilter;
+    const staffMatches = staffFilter === "all" || row.staffId === staffFilter;
+    return sourceMatches && statusMatches && staffMatches;
+  });
+
+  async function updateAppointmentStatus(row: AppointmentListRow, status: string) {
+    if (row.kind !== "appointment") return;
+    setStatusError("");
+    setStatusSavingId(row.id);
+    try {
+      const response = await fetch(`/api/appointments/${row.rawId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Randevu güncellenemedi.");
+      }
+      const nextStatus = data.appointment?.status || status;
+      setStatusOverrides((current) => ({ ...current, [row.rawId]: nextStatus }));
+      setSelectedRow((current) =>
+        current?.id === row.id ? { ...current, status: nextStatus } : current,
+      );
+    } catch (error) {
+      setStatusError(error instanceof Error ? error.message : "Randevu güncellenemedi.");
+    } finally {
+      setStatusSavingId(null);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -633,11 +687,59 @@ export function AppointmentsPage({
         ]}
       />
       <section className="rounded bg-white p-4 shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-700">
-          Randevular ({rows.length})
-        </h1>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-700">
+              Randevular ({filteredRows.length})
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Adisyon kaynaklı kayıtlar burada görünür; durum işlemleri gerçek randevu kayıtlarında yapılır.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={sourceFilter}
+              onChange={(event) => setSourceFilter(event.target.value)}
+              className="h-9 rounded border border-slate-300 bg-white px-3 text-sm"
+            >
+              <option value="all">Tüm kaynaklar</option>
+              <option value="checkout">Adisyon</option>
+              <option value="public">Online randevu</option>
+              <option value="bot">Bot</option>
+              <option value="google">Google / diğer</option>
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="h-9 rounded border border-slate-300 bg-white px-3 text-sm"
+            >
+              <option value="all">Tüm durumlar</option>
+              <option value="REQUESTED">Talep</option>
+              <option value="CONFIRMED">Onaylı</option>
+              <option value="COMPLETED">Tamamlandı</option>
+              <option value="CANCELED">İptal</option>
+            </select>
+            <select
+              value={staffFilter}
+              onChange={(event) => setStaffFilter(event.target.value)}
+              className="h-9 rounded border border-slate-300 bg-white px-3 text-sm"
+            >
+              <option value="all">Tüm personel</option>
+              {(business.staff || []).map((staff) => (
+                <option key={staff.id} value={staff.id}>
+                  {staff.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {statusError && (
+          <div className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {statusError}
+          </div>
+        )}
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
+          <table className="w-full min-w-[980px] text-left text-sm">
             <thead className="border-y border-slate-200 text-slate-600">
               <tr>
                 <th className="px-3 py-3">Müşteri</th>
@@ -647,10 +749,11 @@ export function AppointmentsPage({
                 <th className="px-3 py-3">Not</th>
                 <th className="px-3 py-3">Durum</th>
                 <th className="px-3 py-3">Kaynak</th>
+                <th className="px-3 py-3 text-right">İşlem</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {rows.map((appointment) => (
+              {filteredRows.map((appointment) => (
                 <tr key={appointment.id}>
                   <td className="px-3 py-3 font-medium">
                     {appointment.customerName}
@@ -659,14 +762,58 @@ export function AppointmentsPage({
                   <td className="px-3 py-3">{appointment.date}</td>
                   <td className="px-3 py-3">{appointment.time}</td>
                   <td className="px-3 py-3">{appointment.description}</td>
-                  <td className="px-3 py-3">{appointment.status}</td>
+                  <td className="px-3 py-3">{formatAppointmentStatus(appointment.status)}</td>
                   <td className="px-3 py-3">{appointment.source}</td>
+                  <td className="px-3 py-3">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedRow(appointment)}
+                      >
+                        Detay
+                      </Button>
+                      {appointment.kind === "appointment" && appointment.status === "REQUESTED" && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={statusSavingId === appointment.id}
+                          onClick={() => updateAppointmentStatus(appointment, "CONFIRMED")}
+                        >
+                          Onayla
+                        </Button>
+                      )}
+                      {appointment.kind === "appointment" && appointment.status === "CONFIRMED" && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={statusSavingId === appointment.id}
+                          onClick={() => updateAppointmentStatus(appointment, "COMPLETED")}
+                        >
+                          Tamamlandı
+                        </Button>
+                      )}
+                      {appointment.kind === "appointment" && appointment.status !== "CANCELED" && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={statusSavingId === appointment.id}
+                          onClick={() => updateAppointmentStatus(appointment, "CANCELED")}
+                        >
+                          İptal
+                        </Button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
-              {rows.length === 0 && (
+              {filteredRows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-3 py-10 text-center text-slate-400"
                   >
                     Randevu yok.
@@ -677,8 +824,117 @@ export function AppointmentsPage({
           </table>
         </div>
       </section>
+      {selectedRow && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-xl rounded bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">Randevu detayı</h2>
+                <p className="text-sm text-slate-500">{selectedRow.customerName}</p>
+              </div>
+              <Button type="button" variant="outline" size="icon-sm" onClick={() => setSelectedRow(null)}>
+                <X className="size-4" />
+              </Button>
+            </div>
+            <div className="grid gap-3 p-4 text-sm sm:grid-cols-2">
+              <InfoRow label="Telefon" value={selectedRow.phone} />
+              <InfoRow label="Tarih" value={`${selectedRow.date} ${selectedRow.time}`} />
+              <InfoRow label="Durum" value={formatAppointmentStatus(selectedRow.status)} />
+              <InfoRow label="Kaynak" value={selectedRow.source} />
+              <InfoRow
+                label="Personel"
+                value={
+                  (business.staff || []).find((staff) => staff.id === selectedRow.staffId)?.name ||
+                  "Belirtilmemiş"
+                }
+              />
+              <InfoRow
+                label="Hizmet"
+                value={
+                  (business.services || []).find((service) => service.id === selectedRow.serviceId)?.name ||
+                  selectedRow.description
+                }
+              />
+              <div className="sm:col-span-2">
+                <InfoRow label="Not" value={selectedRow.description || "-"} />
+              </div>
+            </div>
+            {selectedRow.kind === "appointment" && (
+              <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 px-4 py-3">
+                {selectedRow.status === "REQUESTED" && (
+                  <Button
+                    type="button"
+                    disabled={statusSavingId === selectedRow.id}
+                    onClick={() => updateAppointmentStatus(selectedRow, "CONFIRMED")}
+                  >
+                    Onayla
+                  </Button>
+                )}
+                {selectedRow.status === "CONFIRMED" && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={statusSavingId === selectedRow.id}
+                    onClick={() => updateAppointmentStatus(selectedRow, "COMPLETED")}
+                  >
+                    Tamamlandı
+                  </Button>
+                )}
+                {selectedRow.status !== "CANCELED" && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={statusSavingId === selectedRow.id}
+                    onClick={() => updateAppointmentStatus(selectedRow, "CANCELED")}
+                  >
+                    İptal et
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+type AppointmentListRow = {
+  id: string;
+  rawId: string;
+  kind: "appointment" | "checkout";
+  customerName: string;
+  phone: string;
+  date: string;
+  time: string;
+  description: string;
+  status: string;
+  staffId: string;
+  serviceId: string;
+  sourceKey: string;
+  source: string;
+};
+
+function getAppointmentSourceKey(appointment: Appointment) {
+  const source = String(appointment.source || "").toLowerCase();
+  const eventId = String(appointment.eventId || "").toLowerCase();
+  if (source === "public" || eventId.startsWith("public-")) return "public";
+  if (source === "bot" || eventId.startsWith("bot-")) return "bot";
+  return "google";
+}
+
+function getAppointmentSourceLabel(sourceKey: string) {
+  if (sourceKey === "public") return "Online randevu";
+  if (sourceKey === "bot") return "Bot";
+  return "Google / diğer";
+}
+
+function formatAppointmentStatus(status: string) {
+  if (status === "REQUESTED") return "Talep";
+  if (status === "CONFIRMED") return "Onaylı";
+  if (status === "COMPLETED") return "Tamamlandı";
+  if (status === "CANCELED") return "İptal";
+  return status || "-";
 }
 
 function getCheckoutLines(checkout: CheckoutItem) {

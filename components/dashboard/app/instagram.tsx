@@ -26,6 +26,7 @@ export function InstagramSetupPage({
   onSelectView: (view: ViewId) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [generalActive, setGeneralActive] = useState(!!business.is_active);
   const [instagramActive, setInstagramActive] = useState(
     !!business.botSettings?.instagram,
   );
@@ -36,9 +37,10 @@ export function InstagramSetupPage({
     business.botSettings?.instagramUsername || business.instagram_page_id || "";
 
   useEffect(() => {
+    setGeneralActive(!!business.is_active);
     setInstagramActive(!!business.botSettings?.instagram);
     setTestMode(!!business.test_mode);
-  }, [business.botSettings, business.test_mode]);
+  }, [business.is_active, business.botSettings, business.test_mode]);
 
   function connectInstagram() {
     window.location.href = "/api/integrations/instagram/connect";
@@ -67,11 +69,14 @@ export function InstagramSetupPage({
   }
 
   async function saveChannelSettings(next: {
+    active?: boolean;
     instagram?: boolean;
     testMode?: boolean;
   }) {
     const nextInstagram = next.instagram ?? instagramActive;
+    const nextActive = next.active ?? (nextInstagram ? true : generalActive);
     const nextTestMode = next.testMode ?? testMode;
+    setGeneralActive(nextActive);
     setInstagramActive(nextInstagram);
     setTestMode(nextTestMode);
     setBusy(true);
@@ -80,10 +85,11 @@ export function InstagramSetupPage({
         botSettings: {
           ...(business.botSettings || {}),
           instagram: nextInstagram,
+          active: nextActive,
           instagramConnected: connected,
         },
         test_mode: nextTestMode,
-        is_active: nextInstagram ? true : business.is_active,
+        is_active: nextActive,
       });
     } finally {
       setBusy(false);
@@ -207,6 +213,12 @@ export function InstagramSetupPage({
         </div>
         <div className="mt-5 rounded border border-slate-200 p-3">
           <ToggleRow
+            label="Bot Aktif"
+            description="Kapalıyken WhatsApp ve Instagram botları otomatik yanıt vermez."
+            checked={generalActive}
+            onChange={(checked) => saveChannelSettings({ active: checked })}
+          />
+          <ToggleRow
             label="Instagram aktif"
             description="Kapalıyken bot gelen mesajlara otomatik yanıt vermez."
             checked={instagramActive}
@@ -243,11 +255,11 @@ export function InstagramMessagesPage({
     instagramContacts[0] ||
     null;
   const messages = active ? getConversationMessages(active.conversation) : [];
+  const connected =
+    !!business.instagram_page_id || !!business.botSettings?.instagramConnected;
   const account =
     business.botSettings?.instagramUsername ||
-    business.instagram_page_id ||
-    business.slug ||
-    "instagram";
+    (connected ? business.instagram_page_id || "" : "");
 
   function reconnectInstagram() {
     window.location.href = "/api/integrations/instagram/connect";
@@ -267,14 +279,15 @@ export function InstagramMessagesPage({
           <div className="relative flex items-center justify-between">
             <button
               type="button"
+              disabled={!connected}
               onClick={() => setMenuOpen((open) => !open)}
-              className="flex items-center gap-1 font-semibold"
+              className="flex items-center gap-1 font-semibold disabled:cursor-default disabled:text-slate-500"
             >
-              Instagram @{account}
-              <ChevronDown className="size-4" />
+              {connected && account ? `Instagram @${account}` : "Instagram bağlı değil"}
+              {connected && <ChevronDown className="size-4" />}
             </button>
             <Search className="size-5" />
-            {menuOpen && (
+            {connected && menuOpen && (
               <div className="absolute left-0 top-8 z-20 w-56 rounded border border-slate-200 bg-white py-1 text-sm shadow">
                 <button
                   type="button"
@@ -328,7 +341,7 @@ export function InstagramMessagesPage({
             ))}
             {instagramContacts.length === 0 && (
               <div className="mt-10 text-center text-sm font-semibold text-slate-700">
-                Sohbet bulunamadı
+                {connected ? "Sohbet bulunamadı" : "Instagram bağlı değil"}
               </div>
             )}
           </div>
@@ -372,7 +385,9 @@ export function InstagramMessagesPage({
                 <InstagramBrandIcon className="mx-auto size-12 text-pink-600" />
                 <h2 className="mt-3 font-semibold">Mesajlar</h2>
                 <p className="mt-2 text-sm text-slate-500">
-                  Instagram hesabınıza gelen mesajları Aloyz üzerinden yönetin
+                  {connected
+                    ? "Instagram hesabınıza gelen mesajları Aloyz üzerinden yönetin"
+                    : "Instagram mesajlarını görmek için önce Instagram hesabınızı bağlayın."}
                 </p>
               </div>
             </div>

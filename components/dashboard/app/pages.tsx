@@ -28,7 +28,9 @@ export function ContentRouter({
   searchTerm,
   saving,
   whatsAppStatus,
+  whatsAppInstance,
   qrCodeBase64,
+  qrLoading,
   canManageSetup,
   onChange,
   onHourChange,
@@ -49,7 +51,9 @@ export function ContentRouter({
   searchTerm: string;
   saving: boolean;
   whatsAppStatus: string | null;
+  whatsAppInstance: unknown;
   qrCodeBase64: string | null;
+  qrLoading: boolean;
   canManageSetup: boolean;
   onChange: <K extends keyof Business>(field: K, value: Business[K]) => void;
   onHourChange: (dayKey: string, value: string, field: "start" | "end") => void;
@@ -162,6 +166,7 @@ export function ContentRouter({
       <WhatsappRegisterPage
         business={business}
         whatsAppStatus={whatsAppStatus}
+        qrLoading={qrLoading}
         qrCodeBase64={qrCodeBase64}
         saving={saving}
         onUpdateAndSave={onUpdateAndSave}
@@ -173,7 +178,7 @@ export function ContentRouter({
   if (view === "messaging/whatsapp/list") {
     return (
       <WhatsappMessagesPage
-        business={business}
+        whatsAppInstance={whatsAppInstance}
         contacts={contacts}
       />
     );

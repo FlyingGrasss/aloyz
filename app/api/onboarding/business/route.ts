@@ -16,6 +16,9 @@ export async function POST(request: Request) {
   const name = String(body.name || "").trim();
   const type = String(body.type || "İşletme").trim() || "İşletme";
   const phone = String(body.phone || "").trim();
+  const instagram = String(body.instagram || "")
+    .trim()
+    .replace(/^@+/, "");
 
   if (!name) {
     return NextResponse.json({ error: "İşletme adı zorunludur." }, { status: 400 });
@@ -61,6 +64,7 @@ export async function POST(request: Request) {
         botSettings: {
           instagram: false,
           whatsapp: false,
+          instagramUsername: instagram,
           hasAccessTill: defaultAccessTill(now).toISOString(),
         },
         is_active: false,

@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  LoaderCircle,
   MessageCircle,
   Pencil,
   Plus,
@@ -57,6 +58,7 @@ import {
   parseLooseNumber,
   emptyStaff,
   emptyService,
+  getEvolutionPhoneNumber,
   sanitizeStaffMember,
   contactToCustomerProfile,
   setupItems,
@@ -76,39 +78,40 @@ export function AutomaticMessagesPage({
   const [period, setPeriod] = useState("Bu ay");
   const [status, setStatus] = useState("Tümü");
   const [latestFirst, setLatestFirst] = useState(true);
-  const rows = contacts.flatMap((contact) =>
-    getConversationMessages(contact.conversation).map((message, index) => ({
-      id: `${contact.id}-${index}`,
-      customer: contact.name,
-      phone: contact.phone,
-      channel: contact.channel === "instagram" ? "Instagram" : "WhatsApp",
-      status: message.role === "model" ? "Gönderildi" : "Okundu",
-      date: contact.updatedAt.slice(0, 10),
-      sentAt: message.role === "model" ? contact.updatedAt : "-",
-      deliveredAt: message.role === "model" ? contact.updatedAt : "-",
-      readAt: contact.updatedAt,
-      errorCode: "-",
-      error: "-",
-    })),
-  ).sort((left, right) => {
-    const diff = new Date(right.readAt).getTime() - new Date(left.readAt).getTime();
-    return latestFirst ? diff : -diff;
-  });
-  const baseRows = rows
-    .filter((row) => {
-      const query = customerQuery.trim().toLocaleLowerCase("tr-TR");
-      const matchesCustomer =
-        !query || row.customer.toLocaleLowerCase("tr-TR").startsWith(query);
-      const matchesPeriod = period === "Tümü" || isInPeriod(row.date, period);
-      return matchesCustomer && matchesPeriod;
+  const rows = contacts
+    .flatMap((contact) =>
+      getConversationMessages(contact.conversation).map((message, index) => ({
+        id: `${contact.id}-${index}`,
+        customer: contact.name,
+        phone: contact.phone,
+        channel: contact.channel === "instagram" ? "Instagram" : "WhatsApp",
+        status: message.role === "model" ? "Gönderildi" : "Okundu",
+        date: contact.updatedAt.slice(0, 10),
+        sentAt: message.role === "model" ? contact.updatedAt : "-",
+        deliveredAt: message.role === "model" ? contact.updatedAt : "-",
+        readAt: contact.updatedAt,
+        errorCode: "-",
+        error: "-",
+      })),
+    )
+    .sort((left, right) => {
+      const diff =
+        new Date(right.readAt).getTime() - new Date(left.readAt).getTime();
+      return latestFirst ? diff : -diff;
     });
+  const baseRows = rows.filter((row) => {
+    const query = customerQuery.trim().toLocaleLowerCase("tr-TR");
+    const matchesCustomer =
+      !query || row.customer.toLocaleLowerCase("tr-TR").startsWith(query);
+    const matchesPeriod = period === "Tümü" || isInPeriod(row.date, period);
+    return matchesCustomer && matchesPeriod;
+  });
   const filteredRows = baseRows.filter(
     (row) => status === "Tümü" || row.status === status,
   );
   const counts = {
     Tümü: baseRows.length,
-    Gönderildi: baseRows.filter((row) => row.status === "Gönderildi")
-      .length,
+    Gönderildi: baseRows.filter((row) => row.status === "Gönderildi").length,
     İletildi: 0,
     Okundu: baseRows.filter((row) => row.status === "Okundu").length,
     Başarısız: 0,
@@ -223,6 +226,7 @@ export function AutomaticMessagesPage({
 export function WhatsappRegisterPage({
   business,
   whatsAppStatus,
+  qrLoading,
   qrCodeBase64,
   saving,
   onUpdateAndSave,
@@ -231,6 +235,7 @@ export function WhatsappRegisterPage({
 }: {
   business: Business;
   whatsAppStatus: string | null;
+  qrLoading: boolean;
   qrCodeBase64: string | null;
   saving: boolean;
   onUpdateAndSave: (fields: Partial<Business>) => Promise<boolean>;
@@ -238,25 +243,30 @@ export function WhatsappRegisterPage({
   onReconnectWhatsApp: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [generalActive, setGeneralActive] = useState(!!business.is_active);
   const [whatsAppActive, setWhatsAppActive] = useState(
     !!business.botSettings?.whatsapp,
   );
   const [testMode, setTestMode] = useState(business.test_mode);
-  const connected =
-    whatsAppStatus === "open" || whatsAppStatus === "connected";
+  const connected = whatsAppStatus === "open" || whatsAppStatus === "connected";
   const connecting = whatsAppStatus === "connecting";
+  const waitingForScan = connecting && !qrCodeBase64;
 
   useEffect(() => {
+    setGeneralActive(!!business.is_active);
     setWhatsAppActive(!!business.botSettings?.whatsapp);
     setTestMode(!!business.test_mode);
-  }, [business.botSettings, business.test_mode]);
+  }, [business.is_active, business.botSettings, business.test_mode]);
 
   async function saveChannelSettings(next: {
+    active?: boolean;
     whatsapp?: boolean;
     testMode?: boolean;
   }) {
     const nextWhatsApp = next.whatsapp ?? whatsAppActive;
+    const nextActive = next.active ?? (nextWhatsApp ? true : generalActive);
     const nextTestMode = next.testMode ?? testMode;
+    setGeneralActive(nextActive);
     setWhatsAppActive(nextWhatsApp);
     setTestMode(nextTestMode);
     setBusy(true);
@@ -265,10 +275,11 @@ export function WhatsappRegisterPage({
         botSettings: {
           ...(business.botSettings || {}),
           whatsapp: nextWhatsApp,
+          active: nextActive,
           whatsappConnected: connected,
         },
         test_mode: nextTestMode,
-        is_active: nextWhatsApp ? true : business.is_active,
+        is_active: nextActive,
       });
     } finally {
       setBusy(false);
@@ -297,19 +308,21 @@ export function WhatsappRegisterPage({
           </div>
           <Button
             type="button"
-            disabled={saving || busy || connected || connecting}
+            disabled={saving || busy || connected || qrLoading}
             onClick={onReconnectWhatsApp}
             className="bg-[#25D366] text-white hover:bg-[#1fb85a]"
           >
             {connected
               ? "WhatsApp bağlı"
-              : connecting
-                ? "Bağlantı bekleniyor"
+              : qrLoading
+                ? "QR kod hazırlanıyor"
+                : waitingForScan
+                  ? "QR Kodunu Yenile"
                 : "QR Kodu Getir"}
           </Button>
         </div>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_320px]">
+        <div className="my-5 grid gap-4 lg:grid-cols-[1fr_320px]">
           <div className="rounded border border-slate-200">
             {[
               "QR kodu WhatsApp > Bağlı Cihazlar ekranından okutun",
@@ -340,16 +353,20 @@ export function WhatsappRegisterPage({
                 <div className="font-semibold">
                   {connected
                     ? "WhatsApp bağlı"
-                    : connecting
+                    : waitingForScan
                       ? "Bağlantı bekleniyor"
+                      : qrLoading
+                        ? "QR kod hazırlanıyor"
                       : "WhatsApp bağlı değil"}
                 </div>
                 <div className="text-xs text-slate-500">
                   {connected
                     ? "Mesajlar bot tarafından alınabilir."
-                    : connecting
+                    : waitingForScan
                       ? "QR kod okutulmayı bekliyor."
-                    : "QR kodu okutunca bağlantı tamamlanır."}
+                      : qrLoading
+                        ? "QR kod hazırlanıyor."
+                      : "QR kodu okutunca bağlantı tamamlanır."}
                 </div>
               </div>
             </div>
@@ -363,24 +380,64 @@ export function WhatsappRegisterPage({
                 alt="WhatsApp QR kodu"
                 className="mx-auto mt-4 size-72"
               />
+            ) : qrLoading ? (
+              <div className="mt-4 grid aspect-square place-items-center rounded border border-dashed border-slate-300 bg-slate-50 text-center text-sm text-slate-500">
+                <div className="grid justify-items-center gap-3 px-6">
+                  <LoaderCircle className="size-8 animate-spin text-[#25D366]" />
+                  <div>
+                    <div className="font-semibold text-slate-700">
+                      QR kod hazırlanıyor
+                    </div>
+                    <div className="mt-1 text-xs">
+                      Bu işlem bir dakika sürebilir.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : waitingForScan ? (
+              <div className="mt-4 grid aspect-square place-items-center rounded border border-dashed border-slate-300 bg-white text-center text-sm text-slate-500">
+                <div className="grid justify-items-center gap-2 px-6">
+                  <div className="font-semibold text-slate-700">
+                    QR kod bekleniyor
+                  </div>
+                  <div className="text-xs">
+                    Yeni QR kod almak için QR Kodunu Yenile düğmesine basın.
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="mt-4 grid aspect-square place-items-center rounded border border-dashed border-slate-300 bg-white text-center text-sm text-slate-400">
                 QR kod burada görünecek.
               </div>
             )}
             {connected && (
-              <Button
-                type="button"
-                onClick={() => onSelectView("messaging/whatsapp/list")}
-                className="mt-4 w-full bg-[#5f86b6] text-white"
-              >
-                Mesajlara Git
-              </Button>
+              <div className="mt-4 space-y-3">
+                <StatusBanner tone="success">
+                  WhatsApp bağlı! Mesajları almaya başlayabilirsiniz.
+                </StatusBanner>
+                <Button
+                  type="button"
+                  onClick={() => onSelectView("messaging/whatsapp/list")}
+                  className="w-full bg-[#5f86b6] text-white"
+                >
+                  Mesajlara Git
+                </Button>
+              </div>
             )}
           </div>
         </div>
+        <StatusBanner tone="warning">
+          Test etmeden önce mesajların yüklenmesi için lütfen 3 dakikaya kadar
+          bekleyin.
+        </StatusBanner>
 
         <div className="mt-5 rounded border border-slate-200 p-3">
+          <ToggleRow
+            label="Bot Aktif"
+            description="Kapalıyken WhatsApp ve Instagram botları otomatik yanıt vermez."
+            checked={generalActive}
+            onChange={(checked) => saveChannelSettings({ active: checked })}
+          />
           <ToggleRow
             label="WhatsApp aktif"
             description="Kapalıyken bot gelen mesajlara otomatik yanıt vermez."
@@ -400,10 +457,10 @@ export function WhatsappRegisterPage({
 }
 
 export function WhatsappMessagesPage({
-  business,
+  whatsAppInstance,
   contacts,
 }: {
-  business: Business;
+  whatsAppInstance: unknown;
   contacts: ContactRow[];
 }) {
   const whatsappContacts = contacts.filter(
@@ -417,7 +474,8 @@ export function WhatsappMessagesPage({
     whatsappContacts[0] ||
     null;
   const messages = active ? getConversationMessages(active.conversation) : [];
-  const account = business.phone || business.slug || "whatsapp";
+  const account =
+    getEvolutionPhoneNumber(whatsAppInstance) || "WhatsApp bağlı değil";
 
   return (
     <div className="min-h-[calc(100vh-96px)] rounded bg-white shadow-sm">
@@ -514,10 +572,7 @@ function MessageTable({
 }) {
   const [page, setPage] = useState(0);
   const pageSize = 50;
-  const pageRows = rows.slice(
-    page * pageSize,
-    page * pageSize + pageSize,
-  );
+  const pageRows = rows.slice(page * pageSize, page * pageSize + pageSize);
   const maxPage = Math.max(0, Math.ceil(rows.length / pageSize) - 1);
   return (
     <div className="mt-6">

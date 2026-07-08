@@ -27,13 +27,21 @@ export function ReportPage({
 
 function ReportShell({
   title,
+  period,
+  sortDesc,
+  onPeriodChange,
+  onSortChange,
+  showSort = true,
   children,
 }: {
   title: string;
+  period: ReportPeriod;
+  sortDesc: boolean;
+  onPeriodChange: (period: ReportPeriod) => void;
+  onSortChange: () => void;
+  showSort?: boolean;
   children: React.ReactNode;
 }) {
-  const [period, setPeriod] = useState("Bu ay");
-  const [sortDesc, setSortDesc] = useState(true);
   return (
     <div className="space-y-3">
       <Breadcrumb items={[{ label: "Aloyz", view: "dashboard" }, title]} />
@@ -43,13 +51,12 @@ function ReportShell({
           <div className="flex items-center gap-2">
             <select
               value={period}
-              onChange={(event) => setPeriod(event.target.value)}
+              onChange={(event) => onPeriodChange(event.target.value as ReportPeriod)}
               className="h-8 rounded border border-slate-300 bg-white px-3 text-sm"
             >
-              <option>Bu ay</option>
-              <option>Bugün</option>
-              <option>Dün</option>
-              <option>Geçen ay</option>
+              {REPORT_PERIODS.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
             </select>
             <Button type="button" variant="outline" onClick={() => window.print()}>
               <CalendarDays className="size-4" />
@@ -59,14 +66,18 @@ function ReportShell({
         </div>
         <div className="border-b border-slate-200 bg-slate-100 px-4 py-3">
           <div className="flex justify-between gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setSortDesc((value) => !value)}
-            >
-              <Filter className="size-4" />
-              {sortDesc ? "Yeni → Eski" : "Eski → Yeni"}
-            </Button>
+            {showSort ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onSortChange}
+              >
+                <Filter className="size-4" />
+                {sortDesc ? "Yeni → Eski" : "Eski → Yeni"}
+              </Button>
+            ) : (
+              <span className="text-sm text-slate-500">Dönem filtresi aktif</span>
+            )}
             <div className="flex gap-1">
               <Button
                 type="button"
@@ -149,9 +160,17 @@ function escapeCsv(value: string) {
 }
 
 function CashierReport({ business }: { business: Business }) {
-  const data = getFinancialSnapshot(business);
+  const [period, setPeriod] = useState<ReportPeriod>("Bu ay");
+  const [sortDesc, setSortDesc] = useState(true);
+  const data = getFinancialSnapshot(business, period);
   return (
-    <ReportShell title="Kasa raporu">
+    <ReportShell
+      title="Kasa raporu"
+      period={period}
+      sortDesc={sortDesc}
+      onPeriodChange={setPeriod}
+      onSortChange={() => setSortDesc((value) => !value)}
+    >
       <div className="grid gap-3 md:grid-cols-4">
         <ReportCard label="Hizmet toplamı" value={data.checkoutTotal} />
         <ReportCard label="Ürün satışları" value={data.productTotal} />
@@ -176,32 +195,66 @@ function CashierReport({ business }: { business: Business }) {
 }
 
 function StaffReport({ business }: { business: Business }) {
+  const [period, setPeriod] = useState<ReportPeriod>("Bu ay");
+  const [sortDesc, setSortDesc] = useState(true);
+  const filteredCheckouts = filterByPeriod(
+    business.checkouts || [],
+    period,
+    (checkout) => checkout.date || checkout.createdAt,
+  );
+  const filteredCommissions = filterByPeriod(
+    business.promotions?.commissions || [],
+    period,
+    (item) => getItemDate(item),
+  );
   const rows = (business.staff || []).map((staff) => {
-    const checkouts = (business.checkouts || []).filter((checkout) =>
+    const checkouts = filteredCheckouts.filter((checkout) =>
       getCheckoutStaffIds(checkout).includes(staff.id),
     );
     const serviceTotal = checkouts.reduce((sum, checkout) => sum + checkout.amount, 0);
-    const commissions = (business.promotions?.commissions || [])
+    const staffCommissions = filteredCommissions.filter((item) => item.staffId === staff.id);
+    const commissions = staffCommissions
       .filter((item) => item.staffId === staff.id)
       .reduce((sum, item) => sum + item.amount, 0);
+    const latestActivity =
+      [
+        ...checkouts.map((checkout) => checkout.date || checkout.createdAt),
+        ...staffCommissions.map((item) => getItemDate(item)),
+      ]
+        .filter(Boolean)
+        .sort()
+        .at(-1) || "-";
     return {
       staff: staff.name,
       serviceCount: checkouts.length,
       serviceTotal,
       commission: commissions,
       net: serviceTotal - commissions,
+      latestActivity,
     };
-  });
+  }).sort((a, b) =>
+    sortDesc
+      ? b.latestActivity.localeCompare(a.latestActivity)
+      : a.latestActivity.localeCompare(b.latestActivity),
+  );
   return (
-    <ReportShell title="Personel raporu">
+    <ReportShell
+      title="Personel raporu"
+      period={period}
+      sortDesc={sortDesc}
+      onPeriodChange={setPeriod}
+      onSortChange={() => setSortDesc((value) => !value)}
+      showSort={false}
+    >
       <ReportTable
-        headers={["Personel", "Hizmet", "Hizmet tutarı", "Komisyon", "Net"]}
+        headers={["Personel", "Hizmet", "Hizmet tutarı", "Komisyon", "Net", "Son işlem"]}
         rows={rows.map((row) => [
           row.staff,
           row.serviceCount,
           money(row.serviceTotal),
           money(row.commission),
           money(row.net),
+          row.latestActivity,
         ])}
       />
     </ReportShell>
@@ -209,9 +262,35 @@ function StaffReport({ business }: { business: Business }) {
 }
 
 function SalesReport({ business }: { business: Business }) {
-  const productSales = business.promotions?.productSales || [];
-  const packageSales = business.promotions?.packageSales || [];
-  const serviceSales = business.checkouts || [];
+  const [period, setPeriod] = useState<ReportPeriod>("Bu ay");
+  const [sortDesc, setSortDesc] = useState(true);
+  const productSales = sortByDate(
+    filterByPeriod(
+      business.promotions?.productSales || [],
+      period,
+      (item) => item.date || item.createdAt,
+    ),
+    sortDesc,
+    (item) => item.date || item.createdAt,
+  );
+  const packageSales = sortByDate(
+    filterByPeriod(
+      business.promotions?.packageSales || [],
+      period,
+      (item) => item.date || item.createdAt,
+    ),
+    sortDesc,
+    (item) => item.date || item.createdAt,
+  );
+  const serviceSales = sortByDate(
+    filterByPeriod(
+      business.checkouts || [],
+      period,
+      (item) => item.date || item.createdAt,
+    ),
+    sortDesc,
+    (item) => item.date || item.createdAt,
+  );
   const rows = [
     {
       type: "Hizmet satışları",
@@ -230,7 +309,14 @@ function SalesReport({ business }: { business: Business }) {
     },
   ];
   return (
-    <ReportShell title="Satış raporu">
+    <ReportShell
+      title="Satış raporu"
+      period={period}
+      sortDesc={sortDesc}
+      onPeriodChange={setPeriod}
+      onSortChange={() => setSortDesc((value) => !value)}
+      showSort={false}
+    >
       <div className="grid gap-3 md:grid-cols-3">
         {rows.map((row) => (
           <ReportCard key={row.type} label={row.type} value={row.total} />
@@ -326,14 +412,46 @@ function ReportTable({
   );
 }
 
-function getFinancialSnapshot(business: Business) {
-  const productSales = business.promotions?.productSales || [];
-  const packageSales = business.promotions?.packageSales || [];
-  const payments = business.promotions?.payments || [];
-  const expenses = business.promotions?.expenses || [];
-  const receivables = business.promotions?.receivables || [];
-  const debts = business.promotions?.debts || [];
-  const checkoutTotal = (business.checkouts || []).reduce((sum, item) => sum + item.amount, 0);
+const REPORT_PERIODS = ["Bu ay", "Bugün", "Dün", "Geçen ay"] as const;
+type ReportPeriod = (typeof REPORT_PERIODS)[number];
+
+function getFinancialSnapshot(business: Business, period: ReportPeriod) {
+  const checkouts = filterByPeriod(
+    business.checkouts || [],
+    period,
+    (item) => item.date || item.createdAt,
+  );
+  const productSales = filterByPeriod(
+    business.promotions?.productSales || [],
+    period,
+    (item) => item.date || item.createdAt,
+  );
+  const packageSales = filterByPeriod(
+    business.promotions?.packageSales || [],
+    period,
+    (item) => item.date || item.createdAt,
+  );
+  const payments = filterByPeriod(
+    business.promotions?.payments || [],
+    period,
+    (item) => item.date || item.createdAt,
+  );
+  const expenses = filterByPeriod(
+    business.promotions?.expenses || [],
+    period,
+    (item) => item.date || item.createdAt,
+  );
+  const receivables = filterByPeriod(
+    business.promotions?.receivables || [],
+    period,
+    (item) => item.date || item.createdAt,
+  );
+  const debts = filterByPeriod(
+    business.promotions?.debts || [],
+    period,
+    (item) => item.date || item.createdAt,
+  );
+  const checkoutTotal = checkouts.reduce((sum, item) => sum + item.amount, 0);
   const productTotal = productSales.reduce((sum, item) => sum + item.total, 0);
   const packageTotal = packageSales.reduce((sum, item) => sum + item.total, 0);
   const paymentTotal = payments.reduce((sum, item) => sum + item.amount, 0);
@@ -349,7 +467,7 @@ function getFinancialSnapshot(business: Business) {
   const revenue = checkoutTotal + productTotal + packageTotal;
   const collected =
     paymentTotal +
-    (business.checkouts || []).reduce((sum, item) => sum + paidFromCheckout(item), 0) +
+    checkouts.reduce((sum, item) => sum + paidFromCheckout(item), 0) +
     productSales.reduce((sum, item) => sum + item.paidAmount, 0) +
     packageSales.reduce((sum, item) => sum + item.paidAmount, 0);
   return {
@@ -364,6 +482,75 @@ function getFinancialSnapshot(business: Business) {
     collected,
     pending: Math.max(0, revenue + receivableRemaining - collected),
   };
+}
+
+function filterByPeriod<T>(
+  items: T[],
+  period: ReportPeriod,
+  getDate: (item: T) => string | undefined,
+) {
+  const range = getPeriodRange(period);
+  return items.filter((item) => {
+    const date = getDateOnly(getDate(item));
+    return date >= range.start && date <= range.end;
+  });
+}
+
+function sortByDate<T>(
+  items: T[],
+  sortDesc: boolean,
+  getDate: (item: T) => string | undefined,
+) {
+  return [...items].sort((a, b) => {
+    const left = getDateOnly(getDate(a));
+    const right = getDateOnly(getDate(b));
+    return sortDesc ? right.localeCompare(left) : left.localeCompare(right);
+  });
+}
+
+function getPeriodRange(period: ReportPeriod) {
+  const today = new Date();
+  const start = new Date(today);
+  const end = new Date(today);
+
+  if (period === "Bugün") {
+    return { start: formatDateKey(today), end: formatDateKey(today) };
+  }
+
+  if (period === "Dün") {
+    start.setDate(today.getDate() - 1);
+    end.setDate(today.getDate() - 1);
+    return { start: formatDateKey(start), end: formatDateKey(end) };
+  }
+
+  if (period === "Geçen ay") {
+    start.setMonth(today.getMonth() - 1, 1);
+    end.setDate(0);
+    return { start: formatDateKey(start), end: formatDateKey(end) };
+  }
+
+  start.setDate(1);
+  end.setMonth(today.getMonth() + 1, 0);
+  return { start: formatDateKey(start), end: formatDateKey(end) };
+}
+
+function getDateOnly(value?: string) {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return formatDateKey(parsed);
+}
+
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getItemDate(item: { date?: string; createdAt?: string }) {
+  return item.date || item.createdAt;
 }
 
 function getCheckoutStaffIds(checkout: CheckoutItem) {

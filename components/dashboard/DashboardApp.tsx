@@ -126,6 +126,7 @@ export function DashboardApp() {
   } | null>(null);
   const [whatsAppInstance, setWhatsAppInstance] = useState<any | null>(null);
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
   const [instagramNotice, setInstagramNotice] = useState<string | null>(null);
   const [accessBlock, setAccessBlock] = useState<
     "pending" | "no-business" | null
@@ -134,6 +135,7 @@ export function DashboardApp() {
     name: "",
     type: "",
     phone: "",
+    instagram: "",
   });
   const canManageSetup =
     isAdminMode || business.currentMembershipRole === "owner";
@@ -154,9 +156,7 @@ export function DashboardApp() {
     if (typeof window === "undefined") return;
     const storedTheme = localStorage.getItem("aloyz-theme");
     const storedLanguage = localStorage.getItem("aloyz-language") || "tr";
-    if (storedTheme) {
-      document.documentElement.classList.toggle("dark", storedTheme === "dark");
-    }
+    document.documentElement.classList.toggle("dark", storedTheme === "dark");
     document.documentElement.lang = storedLanguage;
     document.documentElement.dataset.language = storedLanguage;
     setDashboardLanguage(storedLanguage);
@@ -375,14 +375,61 @@ export function DashboardApp() {
       const res = await fetch(`/api/instances/list${instanceName}`);
       if (res.ok) {
         const data = await res.json();
-        setWhatsAppInstance(
-          Array.isArray(data.instances) ? data.instances[0] || null : null,
-        );
+        const nextInstance = Array.isArray(data.instances)
+          ? data.instances[0] || null
+          : null;
+        setWhatsAppInstance(nextInstance);
+        const nextStatus = getWhatsAppInstanceStatus(nextInstance);
+        if (nextStatus === "open" || nextStatus === "connected") {
+          setQrCodeBase64(null);
+          setQrLoading(false);
+        }
+        return nextInstance;
       }
     } catch {
       setWhatsAppInstance(null);
     }
+    return null;
   }
+
+  useEffect(() => {
+    if (isAdminMode) return;
+    if (view !== "messaging/whatsapp/register") return;
+    if (!business.slug) return;
+
+    const currentStatus = getWhatsAppInstanceStatus(whatsAppInstance);
+    const shouldPoll =
+      qrLoading ||
+      !!qrCodeBase64 ||
+      currentStatus === "connecting" ||
+      currentStatus === "close" ||
+      currentStatus === "disconnected" ||
+      !currentStatus;
+
+    if (!shouldPoll || currentStatus === "open" || currentStatus === "connected") {
+      return;
+    }
+
+    let cancelled = false;
+    const poll = async () => {
+      if (cancelled) return;
+      await fetchWhatsAppInstanceStatus(business.slug);
+    };
+
+    poll();
+    const interval = window.setInterval(poll, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [
+    business.slug,
+    isAdminMode,
+    qrCodeBase64,
+    qrLoading,
+    view,
+    whatsAppInstance,
+  ]);
 
   async function saveBusiness(nextBusiness = business) {
     setSaving(true);
@@ -482,6 +529,7 @@ export function DashboardApp() {
   async function reconnectWhatsApp() {
     if (!business.slug || !business.id) return;
     setSaving(true);
+    setQrLoading(true);
     setQrCodeBase64(null);
     setErrorMsg("");
     setSuccessMsg("");
@@ -530,6 +578,7 @@ export function DashboardApp() {
       }
     } finally {
       setSaving(false);
+      setQrLoading(false);
     }
   }
 
@@ -809,6 +858,7 @@ export function DashboardApp() {
                 onChange={updateBusiness}
                 onHourChange={updateHour}
                 onSave={() => saveBusiness()}
+                onUpdateAndSave={updateAndSave}
               />
             ) : (
               <ContentRouter
@@ -821,7 +871,9 @@ export function DashboardApp() {
                 searchTerm={searchTerm}
                 saving={saving}
                 whatsAppStatus={getWhatsAppInstanceStatus(whatsAppInstance)}
+                whatsAppInstance={whatsAppInstance}
                 qrCodeBase64={qrCodeBase64}
+                qrLoading={qrLoading}
                 canManageSetup={canManageSetup}
                 onChange={updateBusiness}
                 onHourChange={updateHour}
@@ -962,11 +1014,11 @@ function NoBusinessScreen({
   onSubmit,
   onLogout,
 }: {
-  ownerRequest: { name: string; type: string; phone: string };
+  ownerRequest: { name: string; type: string; phone: string; instagram: string };
   saving: boolean;
   errorMsg: string;
   userEmail: string;
-  onChange: (next: { name: string; type: string; phone: string }) => void;
+  onChange: (next: { name: string; type: string; phone: string; instagram: string }) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onLogout: () => void;
 }) {
@@ -1107,6 +1159,17 @@ function NoBusinessScreen({
                     onChange({ ...ownerRequest, phone: event.target.value })
                   }
                   placeholder="+90..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="owner-business-instagram">Instagram kullanıcı adı</Label>
+                <Input
+                  id="owner-business-instagram"
+                  value={ownerRequest.instagram}
+                  onChange={(event) =>
+                    onChange({ ...ownerRequest, instagram: event.target.value })
+                  }
+                  placeholder="Örn. lumina_guzellik"
                 />
               </div>
 
