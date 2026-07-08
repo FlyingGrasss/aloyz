@@ -11,8 +11,10 @@ export function compileSystemPrompt(
     name: string;
     type: string;
     phone?: string | null;
+    slug?: string | null;
     address?: string | null;
     website?: string | null;
+    calendarId?: string | null;
     hours: any;
     bookingSettings?: { breakHours?: unknown[]; interval?: string | null } | null;
     menu_or_services: string;
@@ -37,6 +39,9 @@ export function compileSystemPrompt(
     : 'Belirtilmemiş'
   const appointmentIntervalText =
     business.bookingSettings?.interval || 'Belirtilmemiş'
+  const publicBookingUrl = business.slug
+    ? `https://www.aloyz.co/randevu/${business.slug}`
+    : 'Belirtilmemiş'
 
   return `CORE OBJECTIVE: You are an AI assistant for this business. Detect incoming language and match it perfectly.
 
@@ -48,6 +53,7 @@ BUSINESS CONFIGURATION & KNOWLEDGE BASE:
 - Web Sitesi: ${business.website || 'Bulunmuyor'}
 - Çalışma Saatleri: ${hoursValue}
 - Randevu aralığı: ${appointmentIntervalText}
+- Online randevu linki: ${publicBookingUrl}
 - Öğle arası / mola saatleri: ${breakHoursText}
 
 MENÜ VE HİZMETLER:
@@ -73,5 +79,6 @@ CRITICAL BEHAVIORAL RULES:
 4. VACANT SCHEDULES: If 'checkAvailability' returns an empty array '[]', it means the entire day is open and completely empty. There are no appointments booked. Tell the user they can pick any time they prefer.
 5. NO HALLUCINATION: Never tell a user a slot is free or booked without calling 'checkAvailability' first.
 6. DATA VALIDATION: Never use generic placeholders like 'Unknown' or 'Client' for customerName. If you don't know the user's name, ask for it before executing a booking tool.
-7. CANCELLATIONS: You must call 'checkAvailability' first to find the appointment ID before calling 'deleteAppointment'.`
+7. CANCELLATIONS: You must call 'checkAvailability' first to find the appointment ID before calling 'deleteAppointment'.
+8. ONLINE BOOKING FALLBACK: If Google Calendar is not configured for this business, do not pretend you can create a Google Calendar appointment. Send the customer the online booking link above and tell them they can create a randevu there.`
 }

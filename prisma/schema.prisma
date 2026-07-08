@@ -191,16 +191,19 @@ model AppointmentTrack {
   customerName String
   phone       String
   date        String
-
   time        String
-
+  serviceId   String?
+  staffId     String?
   description String
   status      String   @default("CONFIRMED")
+  source      String   @default("manual")
   createdAt   DateTime @default(now())
 
   business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
+  @@index([businessId, date])
+  @@index([businessId, staffId, date])
 }
 
 model SentEmail {
