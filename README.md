@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Aloyz
 
-## Getting Started
+Aloyz consists of a Next.js 16 web application/API and an Expo SDK 54 mobile application. PostgreSQL is accessed through Prisma 7 by the Next.js server; the mobile app never connects to the database directly.
 
-First, run the development server:
+## Requirements
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
+- Node.js 20.19 or newer (required by Expo SDK 54)
+- pnpm
+- PostgreSQL
+
+This repository uses pnpm exclusively.
+
+## Web application and API
+
+Install dependencies and start Next.js:
+
+```sh
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The Prisma connection URL is configured in `prisma.config.ts`. Generate the client after dependency or schema changes:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```sh
+pnpm prisma generate
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Do not expose server environment variables to the Expo app. Server integrations use the variables referenced by the route and helper modules, including the database, Auth.js/Google, Evolution API, Google Calendar, Instagram/Meta, Resend, and Vercel Blob credentials.
 
-## Learn More
+## Expo mobile application
 
-To learn more about Next.js, take a look at the following resources:
+Copy `mobile/.env.example` to `mobile/.env.local` and set the deployed or LAN-accessible Next.js origin:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```env
+EXPO_PUBLIC_API_URL=https://www.aloyz.co
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Start Expo on the local network with the required SDK 54 command:
 
-## Deploy on Vercel
+```sh
+cd mobile
+pnpm exec expo start --lan
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The mobile app uses Expo Router, strict TypeScript, React Native primitives, SecureStore for the opaque session token, and AsyncStorage for non-sensitive preferences. Native Google login opens the existing web Auth.js flow and exchanges a short-lived one-time code for a revocable mobile session.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Production deep links use `aloyz://`. Set `MOBILE_AUTH_REDIRECT_SCHEMES` on the Next.js deployment only if an additional production scheme is required. Development accepts Expo Go's `exp:` callback scheme; production does not.
+
+## Checks
+
+```sh
+pnpm exec tsc --noEmit
+pnpm --dir mobile exec tsc --noEmit
+pnpm --dir mobile exec expo install --check
+```
+
+The full migration inventory, architecture, phases, and known risks are documented in [`docs/mobile-migration-plan.md`](docs/mobile-migration-plan.md).

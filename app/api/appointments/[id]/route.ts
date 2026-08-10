@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { getApiUser } from "@/lib/apiAuth";
 import { getAccessibleBusiness } from "@/lib/businessAccess";
 import { prisma } from "@/lib/prisma";
 import { NextRequest } from "next/server";
@@ -15,12 +15,9 @@ export async function PATCH(
   request: NextRequest,
   context: RouteContext,
 ) {
-  const session = await auth();
-  const sessionUser = session?.user as
-    | { id?: string; role?: string | null }
-    | undefined;
-  const userId = sessionUser?.id;
-  const userRole = sessionUser?.role;
+  const user = await getApiUser(request);
+  const userId = user?.id;
+  const userRole = user?.role;
 
   if (!userId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });

@@ -1,12 +1,12 @@
-import { auth } from '@/auth'
+import { getApiUser } from '@/lib/apiAuth'
 import { getAccessibleBusiness } from '@/lib/businessAccess'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
-  const session = await auth()
-  const userRole = (session?.user as any)?.role
+  const user = await getApiUser(request)
+  const userRole = user?.role
 
-  if (!session) {
+  if (!user) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (userRole !== 'admin') {
-      const userId = session.user?.id
+      const userId = user.id
       if (!userId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }

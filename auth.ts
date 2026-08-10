@@ -1,7 +1,9 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
+import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
+import { authenticatePassword } from "@/lib/passwordAuth";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -9,9 +11,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Google({
       allowDangerousEmailAccountLinking: true,
     }),
+    Credentials({
+      credentials: {
+        email: { label: "E-posta", type: "email" },
+        password: { label: "Şifre", type: "password" },
+      },
+      async authorize(credentials) {
+        return authenticatePassword(
+          String(credentials.email || ""),
+          String(credentials.password || ""),
+        );
+      },
+    }),
   ],
   callbacks: {
-    async signIn({ profile }) {
+    async signIn({ account, profile, user }) {
+      if (account?.provider === "credentials") return !!user?.email;
       if (!profile?.email) return false;
       const emailVerified = (profile as { email_verified?: boolean }).email_verified;
       return emailVerified !== false;

@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { getApiUser } from "@/lib/apiAuth";
 import {
   createGoogleCalendarEvent,
   isGoogleCalendarConfigured,
@@ -12,9 +12,9 @@ import { NextRequest } from "next/server";
 export const runtime = "nodejs";
 
 async function getBusiness(request: NextRequest) {
-  const session = await auth();
-  const userId = session?.user?.id;
-  const userRole = (session?.user as any)?.role;
+  const user = await getApiUser(request);
+  const userId = user?.id;
+  const userRole = user?.role;
   if (!userId) return null;
 
   const businessId = request.nextUrl.searchParams.get("businessId");

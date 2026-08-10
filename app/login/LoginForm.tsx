@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
+import { useState, type FormEvent } from "react";
 import {
   Card,
   CardContent,
@@ -11,6 +12,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 function GoogleLogo() {
   return (
@@ -41,13 +44,40 @@ export function LoginForm() {
   const inviteToken = searchParams.get("inviteToken");
   const googleLabel =
     callbackUrl && !inviteToken ? "Google ile giriş yap" : "Google ile devam et";
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+
+  const redirectTo = inviteToken
+    ? `/invite/accept?token=${encodeURIComponent(inviteToken)}`
+    : callbackUrl || "/dashboard";
 
   function continueWithGoogle() {
-    const redirectTo = inviteToken
-      ? `/invite/accept?token=${encodeURIComponent(inviteToken)}`
-      : callbackUrl || "/dashboard";
+    signIn("google", { redirectTo });
+  }
 
-    signIn("google", { callbackUrl: redirectTo });
+  async function continueWithPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPasswordLoading(true);
+    setPasswordError("");
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+        redirectTo,
+      });
+      if (!result.ok) {
+        setPasswordError("E-posta veya şifre hatalı.");
+        return;
+      }
+      window.location.assign(result.url || redirectTo);
+    } catch {
+      setPasswordError("Giriş sırasında bir hata oluştu. Lütfen yeniden deneyin.");
+    } finally {
+      setPasswordLoading(false);
+    }
   }
 
   return (
@@ -65,10 +95,51 @@ export function LoginForm() {
             Aloyz
           </CardTitle>
           <CardDescription>
-            Google hesabınızla giriş yapın veya kayıt olun.
+            Google hesabınızla veya yöneticinizin oluşturduğu şifreyle giriş yapın.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-5">
+          <form className="space-y-4" onSubmit={continueWithPassword}>
+            <div className="space-y-2">
+              <Label htmlFor="email">E-posta</Label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="ornek@isletme.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Şifre</Label>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+            {passwordError && (
+              <p className="text-sm font-medium text-red-600" role="alert">
+                {passwordError}
+              </p>
+            )}
+            <Button type="submit" className="h-11 w-full" disabled={passwordLoading}>
+              {passwordLoading ? "Giriş yapılıyor..." : "E-posta ile giriş yap"}
+            </Button>
+          </form>
+
+          <div className="flex items-center gap-3" aria-hidden="true">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs font-medium text-muted-foreground">veya</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+
           <Button
             type="button"
             variant="outline"

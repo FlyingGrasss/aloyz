@@ -1,11 +1,11 @@
 import { put } from '@vercel/blob'
 import { NextResponse } from 'next/server'
-import { auth } from '@/auth'
+import { getApiUser } from '@/lib/apiAuth'
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const session = await auth()
+  const user = await getApiUser(request)
   
-  if (!session) {
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

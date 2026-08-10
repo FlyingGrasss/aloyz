@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { getApiUser } from "@/lib/apiAuth";
 import {
   APPROVAL_PENDING,
   NO_BUSINESS,
@@ -122,10 +122,8 @@ function businessInclude(includeConversations: boolean, includeMemberships: bool
   };
 }
 
-async function requireDashboardUser() {
-  const session = await auth();
-  const sessionUser = session?.user as { id?: string; email?: string | null; role?: string | null } | undefined;
-  const user = await getSessionUser(sessionUser?.id, sessionUser?.email);
+async function requireDashboardUser(request: Request) {
+  const user = await getApiUser(request);
   if (!user) return { error: Response.json({ error: "Unauthorized" }, { status: 401 }) };
   if (!isApprovedUser(user)) {
     return {
@@ -148,13 +146,12 @@ export async function GET(request: NextRequest) {
   let currentMembershipRole: "owner" | "employee" | undefined;
 
   if (slug || id) {
-    const session = await auth();
-    const sessionUser = session?.user as { id?: string; email?: string | null; role?: string | null } | undefined;
+    const sessionUser = await getApiUser(request);
     const isAdmin = sessionUser?.role === "admin";
 
     let includeMemberships = false;
     if (id && !isAdmin) {
-      const authResult = await requireDashboardUser();
+      const authResult = await requireDashboardUser(request);
       if (authResult.error) return authResult.error;
       const accessibleBusiness = await getAccessibleBusiness(authResult.user.id);
       if (!accessibleBusiness || accessibleBusiness.id !== id) {
@@ -171,9 +168,7 @@ export async function GET(request: NextRequest) {
     });
     if (isAdmin && id) currentMembershipRole = "owner";
   } else {
-    const session = await auth();
-    const sessionUser = session?.user as { id?: string; email?: string | null } | undefined;
-    const user = await getSessionUser(sessionUser?.id, sessionUser?.email);
+    const user = await getApiUser(request);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const accessibleBusiness = await getAccessibleBusiness(user.id);
@@ -223,7 +218,7 @@ export async function GET(request: NextRequest) {
 
 // POST /api/business - create or update the signed-in user's accessible business.
 export async function POST(request: NextRequest) {
-  const authResult = await requireDashboardUser();
+  const authResult = await requireDashboardUser(request);
   if (authResult.error) return authResult.error;
 
   const body = await request.json();
@@ -299,7 +294,7 @@ export async function POST(request: NextRequest) {
 
 // PATCH /api/business - quick-save calendarId, is_active, and test_mode.
 export async function PATCH(request: NextRequest) {
-  const authResult = await requireDashboardUser();
+  const authResult = await requireDashboardUser(request);
   if (authResult.error) return authResult.error;
 
   try {

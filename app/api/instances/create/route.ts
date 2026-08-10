@@ -1,14 +1,14 @@
 import { prisma } from '@/lib/prisma'
-import { auth } from '@/auth'
+import { getApiUser } from '@/lib/apiAuth'
 import { canManageBusiness } from '@/lib/businessAccess'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
-  const session = await auth()
-  const userRole = (session?.user as any)?.role
-  const userId = session?.user?.id
+  const user = await getApiUser(request)
+  const userRole = user?.role
+  const userId = user?.id
 
-  if (!session) {
+  if (!user) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },
