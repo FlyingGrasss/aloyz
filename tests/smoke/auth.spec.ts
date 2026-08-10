@@ -16,7 +16,7 @@ test("invalid web password is rejected without leaving login", async ({ page }) 
   await page.getByLabel("Şifre").fill("definitely-not-a-real-password");
   await page.getByRole("button", { name: "E-posta ile giriş yap" }).click();
 
-  await expect(page.getByRole("alert")).toHaveText("E-posta veya şifre hatalı.");
+  await expect(page.getByText("E-posta veya şifre hatalı.", { exact: true })).toBeVisible();
   await expect(page).toHaveURL(/\/login/);
 });
 
@@ -29,4 +29,7 @@ test("mobile auth endpoints reject missing or invalid credentials", async ({ req
 
   const missingSession = await request.get("/api/mobile/auth/session");
   expect(missingSession.status()).toBe(401);
+
+  const protectedInstagramConnect = await request.get("/api/mobile/integrations/instagram/connect");
+  expect(protectedInstagramConnect.status()).toBe(401);
 });

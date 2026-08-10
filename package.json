@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:smoke": "playwright test"
+    "test:smoke": "playwright test",
+    "test:mobile-web": "playwright test --config playwright.mobile.config.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
