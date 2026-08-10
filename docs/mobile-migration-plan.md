@@ -9,9 +9,9 @@ The maintained application is a Next.js 16.2.4 App Router project backed by Post
 | Web route | Current responsibility | Mobile destination |
 | --- | --- | --- |
 | `/` | Marketing entry and authenticated redirect | Native session gate / welcome screen |
-| `/login` | Auth.js Google sign-in | Native browser-based Google sign-in bridge |
+| `/login` | Auth.js Google and email/password sign-in | Native Google browser bridge and native email/password sign-in |
 | `/dashboard` | Business dashboard and all business workflows | Authenticated Expo Router tabs and stacks |
-| `/admin` | Administrator console | Deferred admin stack; not mixed into the business tabs |
+| `/admin` | Administrator console | Intentionally excluded from the mobile business app |
 | `/invite/accept` | Authenticated invitation acceptance | Deep-link-capable invitation screen |
 | `/randevu/[slug]` | Public appointment booking | `/booking/[slug]` native route |
 | `/privacy` | Privacy policy | Native legal screen, with canonical web link |
@@ -19,7 +19,7 @@ The maintained application is a Next.js 16.2.4 App Router project backed by Post
 
 ### Server/API surface
 
-- Authentication: Auth.js Google provider at `/api/auth/[...nextauth]`; JWT browser sessions; Prisma adapter; user role and approval status are attached to the session.
+- Authentication: Auth.js Google and credentials providers at `/api/auth/[...nextauth]`; JWT browser sessions; Prisma adapter; user role and approval status are attached to the session.
 - Business: `/api/business` (GET/POST/PATCH), `/api/onboarding/business`, and `/api/business/invites`.
 - Invitations: `/api/invites/pending` and `/api/invites/accept`.
 - Scheduling: `/api/calendar/events`, `/api/appointments/[id]`, and public `/api/public/booking/[slug]`.
@@ -70,12 +70,16 @@ The web dashboard uses Tailwind grids, breakpoint-specific columns, wide data ta
 
 Auth.js currently authenticates a browser cookie jar, which is not a safe native session contract. The migration will add a narrowly scoped bridge:
 
-1. The app opens the existing `/login` page in `expo-web-browser`, with a callback to a server route and an Expo deep-link return URI.
+1. Google login opens the existing `/login` page in `expo-web-browser`, with a callback to a server route and an Expo deep-link return URI. Password login calls the dedicated native password endpoint directly.
 2. The authenticated callback creates a short-lived, single-use code in the existing Prisma `VerificationToken` table and redirects to the app.
 3. The app exchanges the code for a prefixed opaque session token stored in the existing Prisma `Session` table.
 4. The app stores that token in SecureStore and sends it as `Authorization: Bearer ...`.
 5. A shared server helper resolves bearer sessions first and falls back to the existing Auth.js browser session, preserving web behavior.
 6. Native logout deletes the server session and the SecureStore value.
+
+## Dashboard parity boundary
+
+The mobile app includes every visible business-dashboard destination: overview, calendar, appointments, checkouts, customers, product/package sales, all three reports, WhatsApp and Instagram setup/message history, commissions, expenses, collections, receivables, debts, subscription, invoices, and every setup page. Administrator screens are deliberately outside the product boundary. Shared JSON-backed records use typed native managers and continue to save through the existing `/api/business` contract.
 
 Production allows only the configured `aloyz` scheme. Expo Go `exp:` callback URLs are a development-only fallback.
 
@@ -92,7 +96,7 @@ Production allows only the configured `aloyz` scheme. Expo Go `exp:` callback UR
 5. **Sales, finance, reports, and exports**
    - Migrate product/package sales, expenses/payments/ledgers/commissions, report cards, and native CSV sharing/printing fallbacks.
 6. **Secondary surfaces**
-   - Migrate messaging lists, subscription/invoices, invite deep links, legal pages, then the separate admin stack.
+   - Migrate messaging lists, subscription/invoices, invite deep links, and legal pages. Do not add the admin console to mobile.
 7. **Hardening and release readiness**
    - Add focused service/domain tests, accessibility labels, empty/error/loading states, offline/cache policy, telemetry hooks, and emulator/device verification. Native builds/exports remain out of scope until explicitly requested.
 
@@ -110,5 +114,5 @@ Production allows only the configured `aloyz` scheme. Expo Go `exp:` callback UR
 - The current dashboard persists many business workflows inside large JSON columns, so concurrent web/mobile edits can overwrite each other. Initial mobile mutations must refetch after writes; longer term, high-churn entities should become dedicated endpoints/tables.
 - Several web screens derive export/report rows from the rendered DOM. Mobile must derive them from domain data instead.
 - Integration callbacks and Expo deep links require production scheme/host allowlists and provider-console configuration.
-- Existing source contains mojibake in some Turkish strings. New mobile copy will use correct UTF-8; broad web-copy cleanup is separate from this migration.
+- Turkish source was audited with a UTF-8-aware reader; no mojibake code points are present in maintained application files. PowerShell terminal rendering is not used as evidence of encoding damage.
 - Expo Go is suitable for the selected foundation modules, but production OAuth callback behavior and any future push notifications still require a development/production build for final verification.

@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import { appendInstagramResult, parseInstagramOAuthState } from "@/lib/instagramOAuthState";
 import { prisma } from "@/lib/prisma";
 import { NextRequest } from "next/server";
 
@@ -16,29 +16,9 @@ function getBaseUrl(request: NextRequest) {
   ).replace(/\/$/, "");
 }
 
-function signState(value: string) {
-  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "aloyz";
-  return crypto.createHmac("sha256", secret).update(value).digest("hex");
-}
-
-function parseState(state: string | null) {
-  if (!state) return null;
-  const parts = state.split(".");
-  if (parts.length !== 4) return null;
-  const payload = parts.slice(0, 3).join(".");
-  const signature = parts[3];
-  const expected = signState(payload);
-  if (signature.length !== expected.length) return null;
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
-    return null;
-  }
-  const [userId, businessId] = parts;
-  return { userId, businessId };
-}
-
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
-  const parsedState = parseState(request.nextUrl.searchParams.get("state"));
+  const parsedState = parseInstagramOAuthState(request.nextUrl.searchParams.get("state"));
   const dashboardUrl = new URL("/dashboard", request.url);
   dashboardUrl.searchParams.set("view", "messaging/instagram/setup");
 
@@ -46,6 +26,10 @@ export async function GET(request: NextRequest) {
     dashboardUrl.searchParams.set("instagram", "invalid-callback");
     return Response.redirect(dashboardUrl);
   }
+
+  const resultUrl = (result: string) => parsedState.returnUrl
+    ? appendInstagramResult(parsedState.returnUrl, result)
+    : (() => { dashboardUrl.searchParams.set("instagram", result); return dashboardUrl; })();
 
   const clientId =
     process.env.INSTAGRAM_APP_ID ||
@@ -120,11 +104,9 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    dashboardUrl.searchParams.set("instagram", "connected");
-    return Response.redirect(dashboardUrl);
+    return Response.redirect(resultUrl("connected"));
   } catch (error: any) {
     console.error("Instagram callback error:", error);
-    dashboardUrl.searchParams.set("instagram", "failed");
-    return Response.redirect(dashboardUrl);
+    return Response.redirect(resultUrl("failed"));
   }
 }

@@ -42,6 +42,9 @@ export type StaffMember = {
   onlineBooking: boolean;
   calendarVisible: boolean;
   workingHours?: Record<string, string>;
+  breakHours?: BreakHourItem[];
+  commissionRate?: number;
+  commissionNotes?: string;
 };
 
 export type ServiceItem = {
@@ -84,6 +87,59 @@ export type Conversation = {
   updatedAt: string;
 };
 
+export type BreakHourItem = {
+  id: string;
+  label: string;
+  start: string;
+  end: string;
+  days: string[];
+};
+
+export type CheckoutItem = {
+  id: string;
+  customerId?: string;
+  customerName: string;
+  date: string;
+  hour: string;
+  minute: string;
+  notes: string;
+  staffId: string;
+  serviceId: string;
+  lines?: Array<Record<string, unknown>>;
+  duration: number;
+  amount: number;
+  discount: number;
+  attendance?: "Belirtilmemiş" | "Geldi" | "Gelmedi";
+  payments?: Array<Record<string, unknown>>;
+  status: string;
+  createdAt: string;
+};
+
+export type ProductCatalogItem = { id: string; name: string; barcode: string; price: number };
+export type PackageCatalogItem = { id: string; name: string; type: string; serviceId: string; quantity: number; price: number };
+export type ProductSaleItem = { id: string; customerId?: string; date: string; customerName: string; sellerId: string; notes: string; lines: Array<Record<string, unknown>>; paid: boolean; total: number; paidAmount: number; createdBy: string; createdAt: string };
+export type PackageSaleItem = { id: string; customerId?: string; date: string; customerName: string; sellerId: string; notes: string; lines: Array<Record<string, unknown>>; hasExpiry: boolean; openPaymentWindow: boolean; createReceivable: boolean; total: number; paidAmount: number; createdBy: string; createdAt: string };
+export type ExpenseItem = { id: string; date: string; category: string; title: string; amount: number; paymentMethod: string; status: string; notes: string; createdAt: string };
+export type PaymentItem = { id: string; date: string; customerId?: string; customerName: string; amount: number; method: string; source: string; notes: string; createdAt: string };
+export type LedgerItem = { id: string; date: string; customerId?: string; personName: string; amount: number; paidAmount: number; description: string; status: string; reminderSentAt?: string; createdAt: string };
+export type CommissionItem = { id: string; date: string; staffId: string; source: string; amount: number; status: string };
+export type SpecialWorkingHourItem = { id: string; valid_from: string; valid_until: string; working_hours: Record<string, string>; staffIds: string[]; title?: string; date?: string; open?: boolean; start?: string; end?: string };
+export type ClientTagItem = { id: string; name: string; color: string; discountRate: number };
+
+export type PromotionsSettings = Record<string, unknown> & {
+  products?: ProductCatalogItem[];
+  packages?: PackageCatalogItem[];
+  productSales?: ProductSaleItem[];
+  packageSales?: PackageSaleItem[];
+  expenses?: ExpenseItem[];
+  payments?: PaymentItem[];
+  receivables?: LedgerItem[];
+  debts?: LedgerItem[];
+  commissions?: CommissionItem[];
+  specialWorkingHours?: SpecialWorkingHourItem[];
+  tags?: ClientTagItem[];
+};
+
 export type Business = {
   id: string;
   createdAt?: string;
@@ -105,8 +161,8 @@ export type Business = {
   staff: StaffMember[];
   services: ServiceItem[];
   customers: CustomerProfile[];
-  checkouts: Array<Record<string, unknown>>;
-  promotions: Record<string, unknown>;
+  checkouts: CheckoutItem[];
+  promotions: PromotionsSettings;
   bookingSettings: Record<string, unknown>;
   botSettings: Record<string, unknown> & { hasAccessTill?: string };
   special_instructions: string | null;

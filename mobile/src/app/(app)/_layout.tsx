@@ -28,6 +28,7 @@ export default function AppTabsLayout() {
         <Tabs.Screen name="customers" options={{ title: "Müşteriler", tabBarIcon: ({ color, size }) => <Users color={color} size={size} /> }} />
         <Tabs.Screen name="more" options={{ title: "Diğer", tabBarIcon: ({ color, size }) => <Menu color={color} size={size} /> }} />
         <Tabs.Screen name="business" options={{ href: null }} />
+        <Tabs.Screen name="feature" options={{ href: null }} />
       </Tabs>
     </BusinessProvider>
   );

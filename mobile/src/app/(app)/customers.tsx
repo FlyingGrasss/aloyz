@@ -1,66 +1,85 @@
 import { useMemo, useState } from "react";
-import { FlatList, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, StyleSheet, TextInput, View } from "react-native";
 import { Search } from "lucide-react-native";
 import { BusinessGate } from "@/components/BusinessGate";
-import { Card, PageHeader, uiStyles } from "@/components/ui";
+import { EntityManager, type EntityField } from "@/components/EntityManager";
+import { PageHeader, ScrollScreen } from "@/components/ui";
+import type { CustomerProfile } from "@/domain/models";
 import { useBusiness } from "@/providers/BusinessProvider";
 import { colors, radii, spacing } from "@/theme/tokens";
+
+const customerFields: EntityField[] = [
+  { key: "name", label: "Ad soyad", type: "text", required: true },
+  { key: "countryCode", label: "Ülke kodu", type: "text", placeholder: "+90" },
+  { key: "phone", label: "Telefon", type: "text" },
+  { key: "email", label: "E-posta", type: "text" },
+  { key: "birthDate", label: "Doğum tarihi", type: "text", placeholder: "YYYY-AA-GG" },
+  { key: "gender", label: "Cinsiyet", type: "text" },
+  { key: "fileNumber", label: "Dosya numarası", type: "text" },
+  { key: "instagramUsername", label: "Instagram kullanıcı adı", type: "text" },
+  { key: "discountEnabled", label: "Özel indirim etkin", type: "boolean" },
+  { key: "discountRate", label: "İndirim oranı", type: "number" },
+  { key: "notes", label: "Notlar", type: "text", multiline: true },
+];
 
 export default function CustomersScreen() {
   return <BusinessGate><CustomersContent /></BusinessGate>;
 }
 
 function CustomersContent() {
-  const { business, refresh } = useBusiness();
+  const { business, save } = useBusiness();
   const [query, setQuery] = useState("");
+  const allCustomers = business?.customers || [];
   const customers = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("tr-TR");
-    if (!normalized) return business?.customers || [];
-    return (business?.customers || []).filter((item) =>
+    if (!normalized) return allCustomers;
+    return allCustomers.filter((item) =>
       [item.name, item.phone, item.email, item.instagramUsername]
         .join(" ")
         .toLocaleLowerCase("tr-TR")
         .includes(normalized),
     );
-  }, [business?.customers, query]);
+  }, [allCustomers, query]);
+
+  async function persist(nextVisible: Array<Record<string, unknown> & { id?: string }>) {
+    const visibleIds = new Set(customers.map((item) => item.id));
+    const untouched = allCustomers.filter((item) => !visibleIds.has(item.id));
+    try {
+      await save({ customers: [...nextVisible as unknown as CustomerProfile[], ...untouched] });
+    } catch (caught) {
+      Alert.alert("Müşteriler kaydedilemedi", caught instanceof Error ? caught.message : "Lütfen yeniden deneyin.");
+      throw caught;
+    }
+  }
 
   return (
-    <FlatList
-      style={styles.list}
-      contentContainerStyle={styles.content}
-      data={customers}
-      keyExtractor={(item) => item.id}
-      onRefresh={() => void refresh()}
-      refreshing={false}
-      keyboardShouldPersistTaps="handled"
-      ListHeaderComponent={
-        <View style={styles.header}>
-          <PageHeader title="Müşteriler" subtitle={`${customers.length} kayıt gösteriliyor`} />
-          <View style={styles.search}>
-            <Search color={colors.textMuted} size={19} />
-            <TextInput value={query} onChangeText={setQuery} placeholder="Ad, telefon veya e-posta ara" placeholderTextColor={colors.textMuted} style={styles.searchInput} returnKeyType="search" />
-          </View>
-        </View>
-      }
-      ListEmptyComponent={<Card><Text style={uiStyles.body}>Aramanızla eşleşen müşteri bulunamadı.</Text></Card>}
-      renderItem={({ item }) => (
-        <Card>
-          <Text style={styles.name}>{item.name || "İsimsiz müşteri"}</Text>
-          {item.phone ? <Text style={uiStyles.body}>{item.countryCode} {item.phone}</Text> : null}
-          {item.email ? <Text style={uiStyles.body}>{item.email}</Text> : null}
-          {item.notes ? <Text numberOfLines={3} style={styles.notes}>{item.notes}</Text> : null}
-        </Card>
-      )}
-    />
+    <ScrollScreen>
+      <PageHeader title="Müşteriler" subtitle={`${customers.length} kayıt gösteriliyor`} />
+      <View style={styles.search}>
+        <Search color={colors.textMuted} size={19} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Ad, telefon veya e-posta ara"
+          placeholderTextColor={colors.textMuted}
+          style={styles.searchInput}
+          returnKeyType="search"
+        />
+      </View>
+      <EntityManager
+        records={customers as unknown as Array<Record<string, unknown> & { id?: string }>}
+        fields={customerFields}
+        createLabel="Yeni müşteri"
+        createDefaults={{ countryCode: "+90", tags: [], discountEnabled: false, discountRate: 0 }}
+        getTitle={(item) => String(item.name || "İsimsiz müşteri")}
+        getSubtitle={(item) => [item.countryCode, item.phone, item.email].filter(Boolean).join(" ")}
+        onChange={persist}
+      />
+    </ScrollScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
-  header: { gap: spacing.md, marginBottom: spacing.xs },
   search: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: spacing.sm, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, paddingHorizontal: spacing.md },
   searchInput: { flex: 1, color: colors.text, fontSize: 15 },
-  name: { color: colors.text, fontSize: 16, fontWeight: "800" },
-  notes: { color: colors.textMuted, fontSize: 13, lineHeight: 19, backgroundColor: colors.surfaceMuted, borderRadius: radii.sm, padding: spacing.sm },
 });

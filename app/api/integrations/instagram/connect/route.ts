@@ -1,6 +1,6 @@
-import crypto from "crypto";
 import { auth } from "@/auth";
 import { getAccessibleBusiness } from "@/lib/businessAccess";
+import { createInstagramOAuthState } from "@/lib/instagramOAuthState";
 import { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
@@ -17,11 +17,6 @@ function getBaseUrl(request: NextRequest) {
     process.env.APP_URL ||
     `${request.nextUrl.protocol}//${request.nextUrl.host}`
   ).replace(/\/$/, "");
-}
-
-function signState(value: string) {
-  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "aloyz";
-  return crypto.createHmac("sha256", secret).update(value).digest("hex");
 }
 
 export async function GET(request: NextRequest) {
@@ -49,8 +44,7 @@ export async function GET(request: NextRequest) {
     return Response.redirect(dashboardUrl);
   }
 
-  const payload = `${userId}.${business.id}.${Date.now()}`;
-  const state = `${payload}.${signState(payload)}`;
+  const state = createInstagramOAuthState({ userId, businessId: business.id, issuedAt: Date.now() });
   const redirectUri = `${getBaseUrl(request)}/api/integrations/instagram/callback`;
 
   const url = new URL(INSTAGRAM_AUTHORIZE_URL);

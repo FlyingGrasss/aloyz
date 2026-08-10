@@ -1,13 +1,11 @@
-import { auth } from "@/auth";
-import { getSessionUser, normalizeEmail } from "@/lib/businessAccess";
+import { getApiUser } from "@/lib/apiAuth";
+import { normalizeEmail } from "@/lib/businessAccess";
 import { hashInviteToken } from "@/lib/invites";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
-  const session = await auth();
-  const sessionUser = session?.user as { id?: string; email?: string | null } | undefined;
-  const user = await getSessionUser(sessionUser?.id, sessionUser?.email);
+  const user = await getApiUser(request);
 
   if (!user?.id || !user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

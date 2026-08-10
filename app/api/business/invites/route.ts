@@ -1,14 +1,12 @@
-import { auth } from "@/auth";
-import { getSessionUser, normalizeEmail } from "@/lib/businessAccess";
+import { getApiUser } from "@/lib/apiAuth";
+import { normalizeEmail } from "@/lib/businessAccess";
 import { escapeHtml, sendAloyzEmail } from "@/lib/email";
 import { createInviteToken, hashInviteToken, inviteExpiresAt } from "@/lib/invites";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 async function getInviteBusiness(request: NextRequest) {
-  const session = await auth();
-  const sessionUser = session?.user as { id?: string; email?: string | null; role?: string | null } | undefined;
-  const user = await getSessionUser(sessionUser?.id, sessionUser?.email);
+  const user = await getApiUser(request);
   if (!user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
 
   const requestedBusinessId = request.nextUrl.searchParams.get("businessId");

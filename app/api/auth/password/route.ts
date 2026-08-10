@@ -1,10 +1,9 @@
-import { auth } from "@/auth";
+import { getApiUser } from "@/lib/apiAuth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
 export async function PATCH(request: Request) {
-  const session = await auth();
-  const userId = session?.user?.id;
+  const userId = (await getApiUser(request))?.id;
 
   if (!userId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });

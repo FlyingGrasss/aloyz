@@ -1,21 +1,16 @@
-import { auth } from "@/auth";
-import { getSessionUser, normalizeEmail } from "@/lib/businessAccess";
+import { getApiUser } from "@/lib/apiAuth";
+import { normalizeEmail } from "@/lib/businessAccess";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-async function getInviteUser() {
-  const session = await auth();
-  const sessionUser = session?.user as
-    | { id?: string; email?: string | null }
-    | undefined;
-  const user = await getSessionUser(sessionUser?.id, sessionUser?.email);
-
+async function getInviteUser(request: Request) {
+  const user = await getApiUser(request);
   if (!user?.id || !user.email) return null;
   return user;
 }
 
-export async function GET() {
-  const user = await getInviteUser();
+export async function GET(request: Request) {
+  const user = await getInviteUser(request);
   if (!user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -47,7 +42,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const user = await getInviteUser();
+  const user = await getInviteUser(request);
   if (!user?.id || !user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

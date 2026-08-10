@@ -68,7 +68,7 @@ export function LoginForm() {
         redirect: false,
         redirectTo,
       });
-      if (!result.ok) {
+      if (!result.ok || result.error || !result.url) {
         setPasswordError("E-posta veya şifre hatalı.");
         return;
       }
