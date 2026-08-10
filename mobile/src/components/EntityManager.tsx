@@ -14,16 +14,18 @@ import {
 import { Pencil, Plus, Trash2, X } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button, Card, Field, uiStyles } from "@/components/ui";
+import { MultiSelectField, SelectField, type SelectOption } from "@/components/SelectField";
 import { colors, radii, spacing } from "@/theme/tokens";
 
 export type EntityField = {
   key: string;
   label: string;
-  type?: "text" | "number" | "boolean";
+  type?: "text" | "number" | "boolean" | "select" | "multiselect";
   multiline?: boolean;
   required?: boolean;
   placeholder?: string;
-  defaultValue?: string | number | boolean;
+  defaultValue?: string | number | boolean | string[];
+  options?: SelectOption[];
 };
 
 type Entity = Record<string, unknown> & { id?: string };
@@ -163,6 +165,24 @@ export function EntityManager<T extends Entity>({
                     trackColor={{ false: colors.border, true: colors.primary }}
                   />
                 </View>
+              ) : field.type === "select" ? (
+                <SelectField
+                  key={field.key}
+                  label={field.label}
+                  value={String(draft[field.key] ?? "")}
+                  options={field.options || []}
+                  onChange={(value) => setDraft((current) => ({ ...current, [field.key]: value }))}
+                  {...(field.placeholder ? { placeholder: field.placeholder } : {})}
+                />
+              ) : field.type === "multiselect" ? (
+                <MultiSelectField
+                  key={field.key}
+                  label={field.label}
+                  values={Array.isArray(draft[field.key]) ? draft[field.key] as string[] : []}
+                  options={field.options || []}
+                  onChange={(values) => setDraft((current) => ({ ...current, [field.key]: values }))}
+                  {...(field.placeholder ? { placeholder: field.placeholder } : {})}
+                />
               ) : (
                 <Field
                   key={field.key}

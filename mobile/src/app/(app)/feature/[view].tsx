@@ -5,6 +5,7 @@ import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { BusinessGate } from "@/components/BusinessGate";
 import { EntityManager, type EntityField } from "@/components/EntityManager";
+import { CheckoutManager, SalesManager } from "@/components/OperationalManagers";
 import { Button, Card, Field, MessageState, PageHeader, ScrollScreen, StatusPill, uiStyles } from "@/components/ui";
 import { decodeFeatureId, featureLabel, type DashboardFeatureId } from "@/domain/dashboardNavigation";
 import type { Business, Conversation } from "@/domain/models";
@@ -320,7 +321,7 @@ function SetupFeature({ view, business }: { view: DashboardFeatureId; business: 
 
   if (view === "setup/booking_settings") return <BookingSettingsFeature business={business} />;
 
-  const config = setupManagerConfig(view);
+  const config = setupManagerConfig(view, business);
 
   async function saveRows(next: ManagedRecord[]) {
     if (["setup/staff"].includes(view)) {
@@ -405,7 +406,7 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
 function RecordFeature({ view, business }: { view: DashboardFeatureId; business: Business }) {
   const { save } = useBusiness();
   const rows = view === "visit/list" ? business.checkouts : recordRows(view, business);
-  const config = recordManagerConfig(view);
+  const config = recordManagerConfig(view, business);
 
   async function saveRows(next: ManagedRecord[]) {
     if (view === "visit/list") {
@@ -420,7 +421,10 @@ function RecordFeature({ view, business }: { view: DashboardFeatureId; business:
   return (
     <ScrollScreen>
       <PageHeader title={featureLabel(view)} subtitle={`${rows.length} kayıt`} />
-      {config ? (
+      {view === "visit/list" ? <CheckoutManager business={business} /> : null}
+      {view === "product_sale/list" ? <SalesManager business={business} kind="product" /> : null}
+      {view === "package_sale/list" ? <SalesManager business={business} kind="package" /> : null}
+      {!(["visit/list", "product_sale/list", "package_sale/list"] as DashboardFeatureId[]).includes(view) && config ? (
         <EntityManager
           records={rows as ManagedRecord[]}
           fields={config.fields}
@@ -430,7 +434,8 @@ function RecordFeature({ view, business }: { view: DashboardFeatureId; business:
           getSubtitle={(row) => config.subtitle(row)}
           onChange={saveRows}
         />
-      ) : <Card><Text style={uiStyles.body}>Bu görünüm için kayıt düzenleyicisi bulunamadı.</Text></Card>}
+      ) : null}
+      {!(["visit/list", "product_sale/list", "package_sale/list"] as DashboardFeatureId[]).includes(view) && !config ? <Card><Text style={uiStyles.body}>Bu görünüm için kayıt düzenleyicisi bulunamadı.</Text></Card> : null}
     </ScrollScreen>
   );
 }
@@ -469,29 +474,31 @@ type ManagerConfig = {
 const today = () => new Date().toISOString().slice(0, 10);
 const createdAt = () => new Date().toISOString();
 
-function setupManagerConfig(view: DashboardFeatureId): ManagerConfig | null {
+function setupManagerConfig(view: DashboardFeatureId, business: Business): ManagerConfig | null {
+  const staffOptions = business.staff.map((item) => ({ value: item.id, label: item.name, subtitle: item.role }));
+  const serviceOptions = business.services.map((item) => ({ value: item.id, label: item.name, subtitle: `${item.duration} dk · ${money(item.price)}` }));
   const configs: Partial<Record<DashboardFeatureId, ManagerConfig>> = {
     "setup/staff": {
       createLabel: "Yeni personel",
-      fields: [textField("name", "Ad soyad", true), textField("email", "E-posta"), textField("phone", "Telefon"), textField("role", "Görev"), numberField("commissionRate", "Komisyon oranı"), booleanField("onlineBooking", "Online randevuya açık"), booleanField("calendarVisible", "Takvimde göster")],
+      fields: [textField("name", "Ad soyad", true), textField("email", "E-posta"), textField("phone", "Telefon"), selectField("role", "Görev", [{ value: "Hesap sahibi", label: "Hesap sahibi" }, { value: "Personel", label: "Personel" }]), selectField("accessRole", "Erişim yetkisi", [{ value: "owner", label: "İşletme sahibi erişimi" }, { value: "employee", label: "Çalışan erişimi" }]), numberField("commissionRate", "Komisyon oranı"), textField("commissionNotes", "Komisyon notları", false, undefined, true), booleanField("onlineBooking", "Online randevuya açık"), booleanField("calendarVisible", "Takvimde göster")],
       defaults: { onlineBooking: true, calendarVisible: true, accessRole: "employee", workingHours: {} },
       subtitle: (row) => [row.role, row.phone].filter(Boolean).join(" · "),
     },
     "setup/services": {
       createLabel: "Yeni hizmet",
-      fields: [textField("name", "Hizmet adı", true), textField("gender", "Cinsiyet / hedef grup"), numberField("duration", "Süre (dakika)"), numberField("price", "Fiyat")],
+      fields: [textField("name", "Hizmet adı", true), selectField("gender", "Cinsiyet / hedef grup", [{ value: "Kadın", label: "Kadın" }, { value: "Erkek", label: "Erkek" }, { value: "Unisex", label: "Unisex" }]), numberField("duration", "Süre (dakika)"), selectField("priceType", "Fiyat türü", [{ value: "single", label: "Tek fiyat" }, { value: "range", label: "Fiyat aralığı" }]), numberField("price", "Tek fiyat"), numberField("minPrice", "En düşük fiyat"), numberField("maxPrice", "En yüksek fiyat"), multiSelectField("staffIds", "Hizmeti veren personeller", staffOptions, true)],
       defaults: { priceType: "single", minPrice: 0, maxPrice: 0, staffIds: [] },
       subtitle: (row) => `${Number(row.duration || 0)} dk · ${money(Number(row.price || 0))}`,
     },
     "setup/service_durations": {
       createLabel: "Yeni hizmet",
-      fields: [textField("name", "Hizmet adı", true), numberField("duration", "Süre (dakika)")],
+      fields: [textField("name", "Hizmet adı", true), numberField("duration", "Süre (dakika)"), multiSelectField("staffIds", "Hizmeti veren personeller", staffOptions, true)],
       defaults: { gender: "", priceType: "single", price: 0, minPrice: 0, maxPrice: 0, staffIds: [] },
       subtitle: (row) => `${Number(row.duration || 0)} dakika`,
     },
     "setup/service_prices": {
       createLabel: "Yeni hizmet",
-      fields: [textField("name", "Hizmet adı", true), numberField("price", "Tek fiyat"), numberField("minPrice", "En düşük fiyat"), numberField("maxPrice", "En yüksek fiyat")],
+      fields: [textField("name", "Hizmet adı", true), selectField("priceType", "Fiyat türü", [{ value: "single", label: "Tek fiyat" }, { value: "range", label: "Fiyat aralığı" }]), numberField("price", "Tek fiyat"), numberField("minPrice", "En düşük fiyat"), numberField("maxPrice", "En yüksek fiyat"), multiSelectField("staffIds", "Hizmeti veren personeller", staffOptions, true)],
       defaults: { gender: "", duration: 30, priceType: "single", staffIds: [] },
       subtitle: (row) => money(Number(row.price || row.minPrice || 0)),
     },
@@ -504,7 +511,7 @@ function setupManagerConfig(view: DashboardFeatureId): ManagerConfig | null {
     "setup/service_packages": {
       createLabel: "Yeni paket",
       promotionField: "packages",
-      fields: [textField("name", "Paket adı", true), textField("type", "Paket türü"), textField("serviceId", "Hizmet kimliği"), numberField("quantity", "Seans adedi"), numberField("price", "Fiyat")],
+      fields: [textField("name", "Paket adı", true), textField("type", "Paket türü"), selectField("serviceId", "Hizmet", serviceOptions, true), numberField("quantity", "Seans adedi"), numberField("price", "Fiyat")],
       subtitle: (row) => `${Number(row.quantity || 0)} seans · ${money(Number(row.price || 0))}`,
     },
     "setup/tag_settings": {
@@ -525,7 +532,9 @@ function setupManagerConfig(view: DashboardFeatureId): ManagerConfig | null {
   return configs[view] || null;
 }
 
-function recordManagerConfig(view: DashboardFeatureId): ManagerConfig | null {
+function recordManagerConfig(view: DashboardFeatureId, business: Business): ManagerConfig | null {
+  const staffOptions = business.staff.map((item) => ({ value: item.id, label: item.name, subtitle: item.role }));
+  const customerNameOptions = business.customers.map((item) => ({ value: item.name, label: item.name, subtitle: [item.countryCode, item.phone].filter(Boolean).join(" ") }));
   const baseDateDefaults = { date: today(), createdAt: createdAt() };
   const configs: Partial<Record<DashboardFeatureId, ManagerConfig>> = {
     "visit/list": {
@@ -543,14 +552,14 @@ function recordManagerConfig(view: DashboardFeatureId): ManagerConfig | null {
     },
     "other/payment/list": {
       createLabel: "Yeni tahsilat", promotionField: "payments",
-      fields: [textField("date", "Tarih", true, "YYYY-AA-GG"), textField("customerName", "Müşteri", true), numberField("amount", "Tutar"), textField("method", "Ödeme yöntemi"), textField("source", "Kaynak"), textField("notes", "Notlar", false, undefined, true)],
+      fields: [textField("date", "Tarih", true, "YYYY-AA-GG"), selectField("customerName", "Müşteri", customerNameOptions, true), numberField("amount", "Tutar"), textField("method", "Ödeme yöntemi"), textField("source", "Kaynak"), textField("notes", "Notlar", false, undefined, true)],
       defaults: { ...baseDateDefaults, method: "Nakit", source: "Manuel" }, subtitle: (row) => `${row.date || ""} · ${money(Number(row.amount || 0))}`,
     },
-    "other/receivable/list": ledgerConfig("Yeni alacak", "receivables"),
-    "other/debt/list": ledgerConfig("Yeni borç", "debts"),
+    "other/receivable/list": ledgerConfig("Yeni alacak", "receivables", customerNameOptions),
+    "other/debt/list": ledgerConfig("Yeni borç", "debts", customerNameOptions),
     "other/commissions": {
       createLabel: "Yeni komisyon", promotionField: "commissions",
-      fields: [textField("date", "Tarih", true, "YYYY-AA-GG"), textField("staffId", "Personel kimliği", true), textField("source", "Kaynak"), numberField("amount", "Tutar"), textField("status", "Durum")],
+      fields: [textField("date", "Tarih", true, "YYYY-AA-GG"), selectField("staffId", "Personel", staffOptions, true), textField("source", "Kaynak"), numberField("amount", "Tutar"), textField("status", "Durum")],
       defaults: { date: today(), source: "Randevu", status: "Bekliyor" }, subtitle: (row) => `${row.date || ""} · ${money(Number(row.amount || 0))}`,
     },
   };
@@ -566,10 +575,10 @@ function saleConfig(createLabel: string, promotionField: string, packageSale: bo
   };
 }
 
-function ledgerConfig(createLabel: string, promotionField: string): ManagerConfig {
+function ledgerConfig(createLabel: string, promotionField: string, customerOptions: NonNullable<EntityField["options"]>): ManagerConfig {
   return {
     createLabel, promotionField,
-    fields: [textField("date", "Tarih", true, "YYYY-AA-GG"), textField("personName", "Kişi / kurum", true), numberField("amount", "Toplam tutar"), numberField("paidAmount", "Ödenen"), textField("description", "Açıklama", false, undefined, true), textField("status", "Durum")],
+    fields: [textField("date", "Tarih", true, "YYYY-AA-GG"), selectField("personName", "Müşteri", customerOptions, true), numberField("amount", "Toplam tutar"), numberField("paidAmount", "Ödenen"), textField("description", "Açıklama", false, undefined, true), textField("status", "Durum")],
     defaults: { date: today(), createdAt: createdAt(), status: "Açık", paidAmount: 0 },
     subtitle: (row) => `${row.date || ""} · ${money(Number(row.amount || 0))}`,
   };
@@ -580,6 +589,8 @@ function textField(key: string, label: string, required = false, placeholder?: s
 }
 function numberField(key: string, label: string): EntityField { return { key, label, type: "number" }; }
 function booleanField(key: string, label: string): EntityField { return { key, label, type: "boolean" }; }
+function selectField(key: string, label: string, options: NonNullable<EntityField["options"]>, required = false): EntityField { return { key, label, type: "select", options, required }; }
+function multiSelectField(key: string, label: string, options: NonNullable<EntityField["options"]>, required = false): EntityField { return { key, label, type: "multiselect", options, required }; }
 
 function recordRows(view: DashboardFeatureId, business: Business) {
   const map: Partial<Record<DashboardFeatureId, string>> = {

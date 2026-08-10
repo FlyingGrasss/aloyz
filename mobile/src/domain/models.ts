@@ -117,8 +117,10 @@ export type CheckoutItem = {
 
 export type ProductCatalogItem = { id: string; name: string; barcode: string; price: number };
 export type PackageCatalogItem = { id: string; name: string; type: string; serviceId: string; quantity: number; price: number };
-export type ProductSaleItem = { id: string; customerId?: string; date: string; customerName: string; sellerId: string; notes: string; lines: Array<Record<string, unknown>>; paid: boolean; total: number; paidAmount: number; createdBy: string; createdAt: string };
-export type PackageSaleItem = { id: string; customerId?: string; date: string; customerName: string; sellerId: string; notes: string; lines: Array<Record<string, unknown>>; hasExpiry: boolean; openPaymentWindow: boolean; createReceivable: boolean; total: number; paidAmount: number; createdBy: string; createdAt: string };
+export type ProductSaleLine = { id: string; productId: string; name: string; quantity: number; amount: number };
+export type PackageSaleLine = { id: string; packageId: string; name: string; packageType: string; serviceId: string; quantity: number; amount: number };
+export type ProductSaleItem = { id: string; customerId?: string; date: string; customerName: string; sellerId: string; notes: string; lines: ProductSaleLine[]; paid: boolean; total: number; paidAmount: number; createdBy: string; createdAt: string };
+export type PackageSaleItem = { id: string; customerId?: string; date: string; customerName: string; sellerId: string; notes: string; lines: PackageSaleLine[]; hasExpiry: boolean; openPaymentWindow: boolean; createReceivable: boolean; total: number; paidAmount: number; createdBy: string; createdAt: string };
 export type ExpenseItem = { id: string; date: string; category: string; title: string; amount: number; paymentMethod: string; status: string; notes: string; createdAt: string };
 export type PaymentItem = { id: string; date: string; customerId?: string; customerName: string; amount: number; method: string; source: string; notes: string; createdAt: string };
 export type LedgerItem = { id: string; date: string; customerId?: string; personName: string; amount: number; paidAmount: number; description: string; status: string; reminderSentAt?: string; createdAt: string };
