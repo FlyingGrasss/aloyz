@@ -1,6 +1,7 @@
 import type { PropsWithChildren, ReactNode } from "react";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,15 +15,17 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { LucideIcon } from "lucide-react-native";
+import { Menu } from "lucide-react-native";
+import { type Href, useRouter } from "expo-router";
 import { colors, radii, spacing } from "@/theme/tokens";
 
 export function Screen({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) {
   return <SafeAreaView style={[styles.screen, style]} edges={["top", "left", "right"]}>{children}</SafeAreaView>;
 }
 
-export function ScrollScreen({ children }: PropsWithChildren) {
+export function ScrollScreen({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) {
   return (
-    <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
+    <SafeAreaView style={[styles.screen, style]} edges={["top", "left", "right"]}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -38,12 +41,20 @@ export function ScrollScreen({ children }: PropsWithChildren) {
   );
 }
 
-export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+export function PageHeader({ title, subtitle, dark = false }: { title: string; subtitle?: string; dark?: boolean }) {
+  const router = useRouter();
   return (
     <View style={styles.header}>
-      <Text style={styles.eyebrow}>ALOYZ</Text>
-      <Text style={styles.title}>{title}</Text>
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      <View style={styles.headerRow}>
+        <Image source={require("../../assets/logo.jpg")} style={styles.headerLogo} accessibilityLabel="Aloyz" />
+        <View style={styles.headerCopy}>
+          <Text style={[styles.title, dark && styles.darkTitle]} numberOfLines={1}>{title}</Text>
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Menüyü aç" onPress={() => router.push("/(app)/more" as Href)} style={[styles.headerMenu, dark && styles.darkHeaderMenu]}>
+          <Menu size={20} color={dark ? colors.white : colors.text} />
+        </Pressable>
+      </View>
+      {subtitle ? <Text style={[styles.subtitle, dark && styles.darkSubtitle]}>{subtitle}</Text> : null}
     </View>
   );
 }
@@ -193,20 +204,32 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   scrollContent: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg },
   header: { gap: spacing.xs, marginBottom: spacing.xs },
-  eyebrow: { color: colors.primary, fontSize: 11, fontWeight: "800", letterSpacing: 1.4 },
-  title: { color: colors.text, fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  headerLogo: { width: 34, height: 34, borderRadius: 8 },
+  headerCopy: { flex: 1, minWidth: 0 },
+  headerMenu: { width: 38, height: 38, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceMuted },
+  eyebrow: { color: colors.brand, fontSize: 11, fontWeight: "800", letterSpacing: 1.4 },
+  title: { color: colors.text, fontSize: 22, fontWeight: "700", letterSpacing: -0.25 },
+  darkTitle: { color: colors.white },
   subtitle: { color: colors.textMuted, fontSize: 14, lineHeight: 21 },
+  darkSubtitle: { color: "#CBD5E1" },
+  darkHeaderMenu: { backgroundColor: "#1F2937" },
   card: {
-    borderRadius: radii.lg,
+    borderRadius: radii.sm,
     borderColor: colors.border,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     backgroundColor: colors.surface,
     padding: spacing.lg,
     gap: spacing.md,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
   },
   button: {
     minHeight: 48,
-    borderRadius: radii.md,
+    borderRadius: radii.sm,
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.lg,
     alignItems: "center",
@@ -224,7 +247,7 @@ const styles = StyleSheet.create({
   label: { color: colors.text, fontSize: 13, fontWeight: "700" },
   input: {
     minHeight: 48,
-    borderRadius: radii.md,
+    borderRadius: radii.sm,
     borderColor: colors.border,
     borderWidth: 1,
     backgroundColor: colors.surface,

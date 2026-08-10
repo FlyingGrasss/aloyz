@@ -38,12 +38,12 @@ function MoreContent() {
   }
 
   return (
-    <ScrollScreen>
-      <PageHeader title="Tüm özellikler" {...(user?.email ? { subtitle: user.email } : {})} />
+    <ScrollScreen style={styles.menuScreen}>
+      <PageHeader dark title="Tüm özellikler" {...(user?.email ? { subtitle: user.email } : {})} />
       {dashboardFeatureGroups.map((group) => (
         <View key={group.label} style={styles.group}>
-          <Text style={uiStyles.sectionTitle}>{group.label}</Text>
-          <Card style={styles.menuCard}>
+          <Text style={[uiStyles.sectionTitle, styles.groupTitle]}>{group.label}</Text>
+          <Card style={[styles.menuCard, styles.darkCard]}>
             {group.items.map((item) => (
               <MenuRow
                 key={item.id}
@@ -54,8 +54,8 @@ function MoreContent() {
           </Card>
         </View>
       ))}
-      <Text style={uiStyles.sectionTitle}>Dışa aktarma ve yasal</Text>
-      <Card style={styles.menuCard}>
+      <Text style={[uiStyles.sectionTitle, styles.groupTitle]}>Dışa aktarma ve yasal</Text>
+      <Card style={[styles.menuCard, styles.darkCard]}>
         <MenuRow label="Müşterileri CSV olarak paylaş" icon={<Download color={colors.primary} size={19} />} onPress={() => void exportCustomers()} />
         <MenuRow label="Gizlilik politikası" icon={<Shield color={colors.primary} size={19} />} onPress={() => router.push("/legal/privacy")} />
         <MenuRow label="Kullanım koşulları" icon={<ScrollText color={colors.primary} size={19} />} onPress={() => router.push("/legal/terms")} />
@@ -76,11 +76,14 @@ function MenuRow({ label, icon, onPress }: { label: string; icon?: React.ReactNo
 }
 
 const styles = StyleSheet.create({
+  menuScreen: { backgroundColor: colors.sidebar },
   group: { gap: spacing.sm },
+  groupTitle: { color: "#CBD5E1", fontSize: 13, textTransform: "uppercase", letterSpacing: 0.4 },
   menuCard: { padding: spacing.sm, gap: 0 },
+  darkCard: { backgroundColor: "#1F2937", borderColor: "#334155", shadowOpacity: 0 },
   menuRow: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.sm, borderRadius: radii.md },
   pressed: { backgroundColor: colors.surfaceMuted },
   iconBox: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
-  menuLabel: { flex: 1, color: colors.text, fontSize: 15, fontWeight: "700" },
-  chevron: { color: colors.textMuted, fontSize: 28, lineHeight: 28 },
+  menuLabel: { flex: 1, color: "#F8FAFC", fontSize: 15, fontWeight: "700" },
+  chevron: { color: "#94A3B8", fontSize: 28, lineHeight: 28 },
 });

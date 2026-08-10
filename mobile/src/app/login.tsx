@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { Redirect } from "expo-router";
 import { LogIn } from "lucide-react-native";
 import { Button, Card, Field, ScrollScreen } from "@/components/ui";
@@ -47,16 +47,12 @@ export default function LoginScreen() {
   return (
     <ScrollScreen>
       <View style={styles.brand}>
-        <View style={styles.logo}>
-          <Text style={styles.logoText}>A</Text>
-        </View>
-        <Text style={styles.title}>Aloyz</Text>
-        <Text style={styles.subtitle}>İşletmenizi her yerden yönetin.</Text>
+        <Image source={require("../../assets/logo.jpg")} style={styles.logo} accessibilityLabel="Aloyz" />
       </View>
       <Card style={styles.card}>
-        <Text style={styles.cardTitle}>İşletme paneline giriş</Text>
+        <Text style={styles.cardTitle}>Aloyz</Text>
         <Text style={styles.copy}>
-          E-posta ve şifrenizle veya Google hesabınızla devam edin.
+          Google hesabınızla veya yöneticinizin oluşturduğu şifreyle giriş yapın.
         </Text>
         <Field label="E-posta" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
         <Field label="Şifre" value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" />
@@ -78,11 +74,8 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  brand: { alignItems: "center", gap: spacing.sm, marginTop: spacing.xl },
-  logo: { width: 72, height: 72, borderRadius: 22, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
-  logoText: { color: colors.white, fontSize: 36, fontWeight: "900" },
-  title: { color: colors.text, fontSize: 36, fontWeight: "900", letterSpacing: -1 },
-  subtitle: { color: colors.textMuted, fontSize: 15 },
+  brand: { alignItems: "center", marginTop: spacing.xl, marginBottom: spacing.xl },
+  logo: { width: 52, height: 52, borderRadius: 12 },
   card: { gap: spacing.lg },
   cardTitle: { color: colors.text, fontSize: 20, fontWeight: "800" },
   copy: { color: colors.textMuted, fontSize: 14, lineHeight: 21 },

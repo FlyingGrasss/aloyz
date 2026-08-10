@@ -12,13 +12,15 @@ function isAllowedRedirect(value: string) {
   try {
     const url = new URL(value);
     const scheme = url.protocol.replace(":", "").toLowerCase();
-    const configured = (process.env.MOBILE_AUTH_REDIRECT_SCHEMES || "aloyz")
+    // Expo Go uses an `exp://` redirect while development builds use `aloyz://`.
+    // Keep the scheme allow-list explicit, but do not gate Expo Go on NODE_ENV:
+    // Vercel correctly runs this route in production even when the client is Expo Go.
+    const configured = (process.env.MOBILE_AUTH_REDIRECT_SCHEMES || "aloyz,exp")
       .split(",")
       .map((item) => item.trim().toLowerCase())
       .filter(Boolean);
 
-    return configured.includes(scheme) ||
-      (process.env.NODE_ENV !== "production" && scheme === "exp");
+    return configured.includes(scheme);
   } catch {
     return false;
   }

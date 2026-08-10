@@ -199,6 +199,7 @@ export default function AdminPage() {
           email: newEmail,
           name: newName,
           type: newType,
+          password: newPassword,
         }),
       })
 
@@ -208,6 +209,7 @@ export default function AdminPage() {
         setNewEmail('')
         setNewName('')
         setNewType('')
+        setNewPassword('')
         // Refresh businesses
         fetchAdminData()
         setActiveTab('businesses')
@@ -866,7 +868,7 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {false && b.owner?.id && (
+                        {b.owner?.id && (
                           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 bg-amber-50 p-3 rounded-xl border border-amber-200/70">
                             <div className="flex items-center gap-3">
                               <Label className="text-xs font-bold text-amber-800 shrink-0 w-28">Yeni Şifre:</Label>
@@ -990,7 +992,7 @@ export default function AdminPage() {
               <CardContent>
                 <form onSubmit={handleCreateUser} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="hidden">
+                    <div className="space-y-2">
                       <Label htmlFor="cName">İşletme Yetkilisi / Şirket İsmi</Label>
                       <Input
                         id="cName"
@@ -1024,13 +1026,13 @@ export default function AdminPage() {
                         placeholder="isletme@sistem.com"
                       />
                     </div>
-                    <div className="hidden">
+                    <div className="space-y-2">
                       <Label htmlFor="cPassword">Giriş Şifresi</Label>
                       <Input
                         id="cPassword"
                         type="password"
                         required
-                        disabled
+                        minLength={8}
                         value={newPassword}
                         onChange={e => setNewPassword(e.target.value)}
                         placeholder="••••••••"

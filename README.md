@@ -33,6 +33,10 @@ Copy `mobile/.env.example` to `mobile/.env.local` and set the deployed or LAN-ac
 
 ```env
 EXPO_PUBLIC_API_URL=https://www.aloyz.co
+# Optional for a native Google account picker in an EAS development build.
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=
+# Optional iOS OAuth client URL scheme for native Google sign-in.
+EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME=
 ```
 
 Start Expo on the local network with the required SDK 54 command:
@@ -42,9 +46,9 @@ cd mobile
 pnpm exec expo start --lan
 ```
 
-The mobile app uses Expo Router, strict TypeScript, React Native primitives, SecureStore for the opaque session token, and AsyncStorage for non-sensitive preferences. Native Google login opens the existing web Auth.js flow and exchanges a short-lived one-time code for a revocable mobile session.
+The mobile app uses Expo Router, strict TypeScript, React Native primitives, SecureStore for the opaque session token, and AsyncStorage for non-sensitive preferences. Expo Go uses the existing web Auth.js flow and exchanges a short-lived one-time code for a revocable mobile session. EAS development/production builds can use the native Google account picker when `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` and the Google Cloud Android/iOS client configuration are supplied; the native module is not available in Expo Go.
 
-Production deep links use `aloyz://`. Set `MOBILE_AUTH_REDIRECT_SCHEMES` on the Next.js deployment only if an additional production scheme is required. Development accepts Expo Go's `exp:` callback scheme; production does not.
+Production deep links use `aloyz://`. Expo Go uses an `exp://` callback, which is also allowed by the mobile callback route. Set `MOBILE_AUTH_REDIRECT_SCHEMES` on the Next.js deployment only when replacing the default `aloyz,exp` allow-list.
 
 ## Checks
 

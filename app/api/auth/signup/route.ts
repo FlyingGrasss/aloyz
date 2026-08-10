@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { hash } from "bcryptjs";
 import { createSlugBase, normalizeEmail } from "@/lib/businessAccess";
 import { defaultAccessTill } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
@@ -16,16 +17,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const { email, name, type, phone, address, website, city, district } = await request.json();
+    const { email, name, type, phone, address, website, city, district, password } = await request.json();
     const normalizedEmail = normalizeEmail(String(email || ""));
     const businessName = String(name || "").trim();
+    const newPassword = String(password || "");
 
-    if (!normalizedEmail || !businessName) {
+    if (!normalizedEmail || !businessName || newPassword.length < 8) {
       return NextResponse.json(
-        { error: "E-posta ve işletme adı zorunludur." },
+        { error: "E-posta, işletme adı ve en az 8 karakterli şifre zorunludur." },
         { status: 400 },
       );
     }
+    const passwordHash = await hash(newPassword, 12);
 
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.upsert({
@@ -34,12 +37,14 @@ export async function POST(request: Request) {
           name: businessName,
           role: "business",
           approvalStatus: "APPROVED",
+          password_hash: passwordHash,
         },
         create: {
           email: normalizedEmail,
           name: businessName,
           role: "business",
           approvalStatus: "APPROVED",
+          password_hash: passwordHash,
         },
       });
 
