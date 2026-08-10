@@ -1,6 +1,7 @@
 {
   "name": "@aloyz/mobile",
   "version": "1.0.0",
+  "packageManager": "pnpm@10.14.0",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start --lan",
