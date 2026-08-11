@@ -1,12 +1,13 @@
-import { useState } from "react";
-import { Alert, Image, StyleSheet, Switch, Text, View } from "react-native";
-import { Redirect, useLocalSearchParams } from "expo-router";
+import { useMemo, useState } from "react";
+import { Alert, Image, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Redirect, useLocalSearchParams, useRouter, type Href } from "expo-router";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { BusinessGate } from "@/components/BusinessGate";
 import { EntityManager, type EntityField } from "@/components/EntityManager";
 import { CheckoutManager, SalesManager } from "@/components/OperationalManagers";
 import { Button, Card, Field, MessageState, PageHeader, ScrollScreen, StatusPill, uiStyles } from "@/components/ui";
+import { SelectField } from "@/components/SelectField";
 import { decodeFeatureId, featureLabel, type DashboardFeatureId } from "@/domain/dashboardNavigation";
 import type { Business, Conversation } from "@/domain/models";
 import { useBusiness } from "@/providers/BusinessProvider";
@@ -40,38 +41,39 @@ function FeatureContent({ view }: { view: DashboardFeatureId }) {
 }
 
 function CalendarFeature({ business }: { business: Business }) {
+  const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(today());
+  const [selectedStaffId, setSelectedStaffId] = useState("all");
   const appointments = business.appointments
-    .filter((item) => item.date === selectedDate)
+    .filter((item) => item.date === selectedDate && (selectedStaffId === "all" || item.staffId === selectedStaffId))
     .sort((a, b) => a.time.localeCompare(b.time));
   const checkouts = business.checkouts
-    .filter((item) => item.date === selectedDate)
+    .filter((item) => item.date === selectedDate && (selectedStaffId === "all" || item.staffId === selectedStaffId || item.lines?.some((line) => String(line.staffId || "") === selectedStaffId)))
     .sort((a, b) => `${a.hour}:${a.minute}`.localeCompare(`${b.hour}:${b.minute}`));
+  const slots = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
 
   return (
     <ScrollScreen>
       <PageHeader title="Randevu takvimi" subtitle={business.calendarId ? "Google Takvim bağlı" : "Yerel dashboard kayıtları"} />
       <Card>
+        <SelectField label="Personel" value={selectedStaffId} options={[{ value: "all", label: "Tüm personel" }, ...business.staff.map((staff) => ({ value: staff.id, label: staff.name }))]} onChange={setSelectedStaffId} />
         <Field label="Görüntülenecek tarih" value={selectedDate} onChangeText={setSelectedDate} placeholder="YYYY-AA-GG" />
         <View style={styles.dateActions}>
-          <Button variant="secondary" onPress={() => setSelectedDate(offsetDate(selectedDate, -1))}>Önceki gün</Button>
+          <Button variant="secondary" onPress={() => setSelectedDate(offsetDate(selectedDate, -1))}>‹</Button>
           <Button variant="secondary" onPress={() => setSelectedDate(today())}>Bugün</Button>
-          <Button variant="secondary" onPress={() => setSelectedDate(offsetDate(selectedDate, 1))}>Sonraki gün</Button>
+          <Button variant="secondary" onPress={() => setSelectedDate(offsetDate(selectedDate, 1))}>›</Button>
+          <Button onPress={() => router.push("/feature/visit--list?create=1" as Href)}>Yeni adisyon</Button>
         </View>
       </Card>
-      <Text style={uiStyles.sectionTitle}>Randevular</Text>
-      {appointments.map((item) => (
-        <Card key={item.id}>
-          <View style={uiStyles.between}><Text style={styles.itemTitle}>{item.time} · {item.customerName}</Text><StatusPill label={item.status} /></View>
-          <Text style={uiStyles.body}>{item.phone}{item.description ? ` · ${item.description}` : ""}</Text>
-        </Card>
-      ))}
-      {!appointments.length ? <Card><Text style={uiStyles.body}>Bu tarihte randevu yok.</Text></Card> : null}
-      <Text style={uiStyles.sectionTitle}>Adisyonlar</Text>
-      {checkouts.map((item) => (
-        <Card key={item.id}><Text style={styles.itemTitle}>{item.hour}:{item.minute} · {item.customerName}</Text><Text style={uiStyles.body}>{money(item.amount)} · {item.status}</Text></Card>
-      ))}
-      {!checkouts.length ? <Card><Text style={uiStyles.body}>Bu tarihte adisyon yok.</Text></Card> : null}
+      <Card style={styles.calendarCard}>
+        <Text style={styles.calendarDate}>{new Date(`${selectedDate}T12:00:00`).toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long" })}</Text>
+        {slots.map((hour) => {
+          const hourAppointments = appointments.filter((item) => item.time.startsWith(`${hour}:`));
+          const hourCheckouts = checkouts.filter((item) => item.hour === hour);
+          return <View key={hour} style={styles.calendarRow}><Text style={styles.calendarHour}>{hour}:00</Text><View style={styles.calendarCell}>{hourAppointments.map((item) => <Pressable key={item.id} onPress={() => router.push("/(app)/appointments" as Href)} style={[styles.calendarEvent, styles.appointmentEvent]}><Text style={styles.calendarEventTitle}>{item.time} · {item.customerName}</Text><Text style={styles.calendarEventBody}>{item.description || item.status}</Text></Pressable>)}{hourCheckouts.map((item) => <Pressable key={item.id} onPress={() => router.push("/feature/visit--list" as Href)} style={[styles.calendarEvent, styles.checkoutEvent]}><Text style={styles.calendarEventTitle}>{item.hour}:{item.minute} · {item.customerName}</Text><Text style={styles.calendarEventBody}>{checkoutLineNames(item, business)}</Text></Pressable>)}{!hourAppointments.length && !hourCheckouts.length ? <View style={styles.emptySlot} /> : null}</View></View>;
+        })}
+        {!appointments.length && !checkouts.length ? <Text style={uiStyles.body}>Bu tarihte randevu veya adisyon yok.</Text> : null}
+      </Card>
     </ScrollScreen>
   );
 }
@@ -81,6 +83,7 @@ function MessagingFeature({ view, business }: { view: DashboardFeatureId; busine
   const channel = view.includes("instagram") ? "instagram" : view.endsWith("sent-reminders") ? null : "whatsapp";
   const setup = view.endsWith("/setup") || view.endsWith("/register");
   const conversations = business.conversations.filter((item) => !channel || item.channel === channel);
+  if (view === "messaging/whatsapp/sent-reminders") return <AutomaticMessagesFeature business={business} />;
   if (setup) return <ConnectionFeature view={view} business={business} />;
   if (selected) return <ConversationDetail conversation={selected} onBack={() => setSelected(null)} />;
   return (
@@ -88,6 +91,75 @@ function MessagingFeature({ view, business }: { view: DashboardFeatureId; busine
       <PageHeader title={featureLabel(view)} subtitle={`${conversations.length} görüşme`} />
       {conversations.map((conversation) => <ConversationCard key={conversation.id} conversation={conversation} onPress={() => setSelected(conversation)} />)}
       {!conversations.length ? <Card><Text style={uiStyles.body}>Bu kanalda henüz mesaj bulunmuyor.</Text></Card> : null}
+    </ScrollScreen>
+  );
+}
+
+type MessageRow = {
+  id: string;
+  customer: string;
+  channel: string;
+  phone: string;
+  status: "Gönderildi" | "Okundu";
+  date: string;
+  sentAt: string;
+};
+
+function AutomaticMessagesFeature({ business }: { business: Business }) {
+  const router = useRouter();
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [period, setPeriod] = useState("Tümü");
+  const [status, setStatus] = useState("Tümü");
+  const [latestFirst, setLatestFirst] = useState(true);
+  const rows = useMemo<MessageRow[]>(() => business.conversations.flatMap((conversation) => {
+    const messages = Array.isArray(conversation.messages) ? conversation.messages : [];
+    const customer = conversation.customerName || conversation.instagramUsername || conversation.customerPhone || conversation.customerJid;
+    return messages.map((raw, index) => {
+      const message = raw && typeof raw === "object" ? raw as Record<string, unknown> : { text: String(raw || "") };
+      const updatedAt = conversation.updatedAt || conversation.createdAt || new Date().toISOString();
+      const role = String(message.role || message.sender || "assistant");
+      return {
+        id: `${conversation.id}-${index}`,
+        customer,
+        channel: conversation.channel === "instagram" ? "Instagram" : "WhatsApp",
+        phone: conversation.customerPhone || "-",
+        status: role === "model" || role === "assistant" ? "Gönderildi" : "Okundu",
+        date: updatedAt.slice(0, 10),
+        sentAt: updatedAt,
+      };
+    });
+  }), [business.conversations]);
+  const filteredRows = useMemo(() => {
+    const query = customerQuery.trim().toLocaleLowerCase("tr-TR");
+    return rows
+      .filter((row) => !query || row.customer.toLocaleLowerCase("tr-TR").startsWith(query))
+      .filter((row) => period === "Tümü" || isMessageInPeriod(row.date, period))
+      .filter((row) => status === "Tümü" || row.status === status)
+      .sort((left, right) => {
+        const difference = new Date(right.sentAt).getTime() - new Date(left.sentAt).getTime();
+        return latestFirst ? difference : -difference;
+      });
+  }, [customerQuery, latestFirst, period, rows, status]);
+  const counts = useMemo(() => ({
+    Tümü: rows.length,
+    Gönderildi: rows.filter((row) => row.status === "Gönderildi").length,
+    Okundu: rows.filter((row) => row.status === "Okundu").length,
+  }), [rows]);
+
+  return (
+    <ScrollScreen>
+      <PageHeader title="Tüm Mesajlar" subtitle={`${filteredRows.length} mesaj`} />
+      <Card>
+        <Field label="Müşteri" value={customerQuery} onChangeText={setCustomerQuery} placeholder="Tümü" />
+        <SelectField label="Sıralama" value={latestFirst ? "latest" : "oldest"} options={[{ value: "latest", label: "En yeni önce" }, { value: "oldest", label: "En eski önce" }]} onChange={(value) => setLatestFirst(value === "latest")} />
+        <SelectField label="Tarih aralığı" value={period} options={[{ value: "Bu ay", label: "Bu ay" }, { value: "Bugün", label: "Bugün" }, { value: "Tümü", label: "Tümü" }]} onChange={setPeriod} />
+        <View style={styles.statusFilters}>
+          {(["Tümü", "Gönderildi", "Okundu"] as const).map((label) => <Pressable key={label} onPress={() => setStatus(label)} style={[styles.statusFilter, status === label && styles.statusFilterActive]}><Text style={[styles.statusFilterText, status === label && styles.statusFilterTextActive]}>{label} {counts[label]}</Text></Pressable>)}
+        </View>
+        <Button variant="secondary" onPress={() => router.push("/feature/setup--salon-bot-settings" as Href)}>Bot ayarlarına git</Button>
+      </Card>
+      {filteredRows.map((row) => <Card key={row.id}><View style={uiStyles.between}><Text style={styles.itemTitle}>{row.customer}</Text><StatusPill label={row.channel} /></View><Text style={uiStyles.body}>{row.phone} · {row.date}</Text><Text style={uiStyles.body}>{row.status} · {row.sentAt === "-" ? "-" : new Date(row.sentAt).toLocaleString("tr-TR")}</Text></Card>)}
+      {!filteredRows.length ? <Card><Text style={uiStyles.body}>Bu filtrelerle eşleşen mesaj bulunmuyor.</Text></Card> : null}
     </ScrollScreen>
   );
 }
@@ -203,23 +275,40 @@ function ConnectionFeature({ view, business }: { view: DashboardFeatureId; busin
 }
 
 function ReportFeature({ view, business }: { view: DashboardFeatureId; business: Business }) {
-  const now = new Date();
-  const [from, setFrom] = useState(new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10));
-  const [to, setTo] = useState(today());
+  const [period, setPeriod] = useState("Bu ay");
+  const [sortDesc, setSortDesc] = useState(true);
+  const { from, to } = reportBounds(period);
   const checkouts = business.checkouts.filter((item) => withinPeriod(item.date, from, to));
-  const sales = [...nestedRows(business, "productSales"), ...nestedRows(business, "packageSales")].filter((item) => withinPeriod(String(item.date || ""), from, to));
+  const productSales = nestedRows(business, "productSales").filter((item) => withinPeriod(String(item.date || ""), from, to));
+  const packageSales = nestedRows(business, "packageSales").filter((item) => withinPeriod(String(item.date || ""), from, to));
   const expenses = nestedRows(business, "expenses").filter((item) => withinPeriod(String(item.date || ""), from, to));
-  const checkoutTotal = sumRecords(checkouts, "amount");
-  const salesTotal = sumRecords(sales, "total");
+  const payments = nestedRows(business, "payments").filter((item) => withinPeriod(String(item.date || ""), from, to));
+  const receivables = nestedRows(business, "receivables");
+  const debts = nestedRows(business, "debts");
+  const commissions = nestedRows(business, "commissions").filter((item) => withinPeriod(String(item.date || ""), from, to));
+  const checkoutTotal = checkouts.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const expenseTotal = sumRecords(expenses, "amount");
-  const staffCounts = business.staff.map((staff) => ({ staff, count: checkouts.filter((item) => String(item.staffId || "") === staff.id).length }));
+  const productTotal = sumRecords(productSales, "total");
+  const packageTotal = sumRecords(packageSales, "total");
+  const paymentTotal = sumRecords(payments, "amount");
+  const receivableRemaining = receivables.reduce((sum, item) => sum + Math.max(0, Number(item.amount || 0) - Number(item.paidAmount || 0)), 0);
+  const debtRemaining = debts.reduce((sum, item) => sum + Math.max(0, Number(item.amount || 0) - Number(item.paidAmount || 0)), 0);
+  const staffRows = business.staff.map((staff) => {
+    const staffCheckouts = checkouts.filter((item) => item.staffId === staff.id || item.lines?.some((line) => String(line.staffId || "") === staff.id));
+    const serviceTotal = staffCheckouts.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const commission = commissions.filter((item) => String(item.staffId || "") === staff.id).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const latestActivity = [...staffCheckouts.map((item) => item.date), ...commissions.filter((item) => String(item.staffId || "") === staff.id).map((item) => String(item.date || ""))].filter(Boolean).sort().at(-1) || "-";
+    return { staff, serviceCount: staffCheckouts.length, serviceTotal, commission, net: serviceTotal - commission, latestActivity };
+  }).sort((left, right) => sortDesc ? right.latestActivity.localeCompare(left.latestActivity) : left.latestActivity.localeCompare(right.latestActivity));
 
   async function exportReport() {
     const rows = view === "report/staff"
-      ? [["Personel", "Adisyon"], ...staffCounts.map(({ staff, count }) => [staff.name, String(count)])]
-      : [["Kalem", "Tutar"], ["Adisyon", String(checkoutTotal)], ["Ürün ve paket", String(salesTotal)], ["Masraf", String(expenseTotal)], ["Net", String(checkoutTotal + salesTotal - expenseTotal)]];
+      ? [["Personel", "Hizmet", "Hizmet tutarı", "Komisyon", "Net", "Son işlem"], ...staffRows.map((row) => [row.staff.name, String(row.serviceCount), String(row.serviceTotal), String(row.commission), String(row.net), row.latestActivity])]
+      : view === "report/sales"
+        ? [["Kalem", "Tutar"], ["Ürün satışları", String(productTotal)], ["Paket satışları", String(packageTotal)], ["Hizmet toplamı", String(checkoutTotal)]]
+        : [["Kalem", "Tutar"], ["Hizmet toplamı", String(checkoutTotal)], ["Ürün satışları", String(productTotal)], ["Paket satışları", String(packageTotal)], ["Tahsilatlar", String(paymentTotal)], ["Masraflar", String(expenseTotal)], ["Net kasa", String(paymentTotal - expenseTotal)]];
     try {
-      await shareCsv(`aloyz-${view.replace("/", "-")}-${from}-${to}.csv`, rows);
+      await shareCsv(`aloyz-${view.replace("/", "-")}-${period}.csv`, rows);
     } catch (caught) {
       Alert.alert("Rapor paylaşılamadı", caught instanceof Error ? caught.message : "Lütfen yeniden deneyin.");
     }
@@ -227,18 +316,26 @@ function ReportFeature({ view, business }: { view: DashboardFeatureId; business:
 
   return (
     <ScrollScreen>
-      <PageHeader title={featureLabel(view)} subtitle="Canlı işletme verilerinden hesaplanır." />
+      <PageHeader title={featureLabel(view)} subtitle={`${period} dönemindeki işletme verileri`} />
       <Card>
-        <Field label="Başlangıç" value={from} onChangeText={setFrom} placeholder="YYYY-AA-GG" />
-        <Field label="Bitiş" value={to} onChangeText={setTo} placeholder="YYYY-AA-GG" />
-        <Button variant="secondary" onPress={() => void exportReport()}>CSV olarak paylaş</Button>
+        <SelectField label="Dönem" value={period} options={[{ value: "Bu ay", label: "Bu ay" }, { value: "Bugün", label: "Bugün" }, { value: "Tümü", label: "Tümü" }]} onChange={setPeriod} />
+        <View style={styles.reportActions}>
+          {view !== "report/staff" ? <Button variant="secondary" onPress={() => setSortDesc((value) => !value)}>{sortDesc ? "Yeni → Eski" : "Eski → Yeni"}</Button> : null}
+          <Button variant="secondary" onPress={() => void exportReport()}>İndir</Button>
+        </View>
       </Card>
-      {view === "report/staff" ? staffCounts.map(({ staff, count }) => <Card key={staff.id}><Text style={styles.itemTitle}>{staff.name}</Text><Text style={uiStyles.body}>{count} adisyon</Text></Card>) : (
+      {view === "report/staff" ? staffRows.map((row) => <Card key={row.staff.id}><Text style={styles.itemTitle}>{row.staff.name}</Text><Text style={uiStyles.body}>{row.serviceCount} hizmet · {money(row.serviceTotal)}</Text><Text style={uiStyles.body}>Komisyon: {money(row.commission)} · Net: {money(row.net)}</Text><Text style={uiStyles.body}>Son işlem: {row.latestActivity}</Text></Card>) : view === "report/sales" ? (
+        <View style={styles.metricGrid}><Metric label="Ürün satışları" value={money(productTotal)} /><Metric label="Paket satışları" value={money(packageTotal)} /><Metric label="Hizmet toplamı" value={money(checkoutTotal)} /></View>
+      ) : (
         <View style={styles.metricGrid}>
-          <Metric label="Adisyon" value={money(checkoutTotal)} />
-          <Metric label="Ürün ve paket" value={money(salesTotal)} />
-          <Metric label="Masraf" value={money(expenseTotal)} />
-          <Metric label="Net" value={money(checkoutTotal + salesTotal - expenseTotal)} />
+          <Metric label="Hizmet toplamı" value={money(checkoutTotal)} />
+          <Metric label="Ürün satışları" value={money(productTotal)} />
+          <Metric label="Paket satışları" value={money(packageTotal)} />
+          <Metric label="Tahsilatlar" value={money(paymentTotal)} />
+          <Metric label="Masraflar" value={money(expenseTotal)} />
+          <Metric label="Alacaklar" value={money(receivableRemaining)} />
+          <Metric label="Borçlar" value={money(debtRemaining)} />
+          <Metric label="Net kasa" value={money(paymentTotal - expenseTotal)} />
         </View>
       )}
     </ScrollScreen>
@@ -340,6 +437,7 @@ function SetupFeature({ view, business }: { view: DashboardFeatureId; business: 
   return (
     <ScrollScreen>
       <PageHeader title={featureLabel(view)} subtitle={`${rows.length} kayıt`} />
+      {view.startsWith("other/") ? <FinanceSummary view={view} business={business} /> : null}
       {isBot ? (
         <Card>
           <Toggle label="WhatsApp otomasyonu" value={Boolean(business.botSettings.whatsapp)} onChange={(value) => void toggleBot("whatsapp", value)} />
@@ -359,6 +457,14 @@ function SetupFeature({ view, business }: { view: DashboardFeatureId; business: 
       ) : null}
     </ScrollScreen>
   );
+}
+
+function FinanceSummary({ view, business }: { view: DashboardFeatureId; business: Business }) {
+  const rows = recordRows(view, business);
+  const amount = rows.reduce((sum, row) => sum + Number(row.amount || row.total || 0), 0);
+  const remaining = rows.reduce((sum, row) => sum + Math.max(0, Number(row.amount || row.total || 0) - Number(row.paidAmount || 0)), 0);
+  const label = view.includes("receivable") ? "Açık alacak" : view.includes("debt") ? "Açık borç" : view.includes("expense") ? "Toplam masraf" : view.includes("commission") ? "Toplam komisyon" : "Toplam tahsilat";
+  return <View style={styles.financeSummary}><Metric label={label} value={money(view.includes("receivable") || view.includes("debt") ? remaining : amount)} /><Metric label="Kayıt" value={String(rows.length)} /></View>;
 }
 
 function BookingSettingsFeature({ business }: { business: Business }) {
@@ -622,8 +728,29 @@ function withinPeriod(date: string, from: string, to: string) {
   return Boolean(date) && (!from || date >= from) && (!to || date <= to);
 }
 
+function reportBounds(period: string) {
+  const now = new Date();
+  const todayValue = now.toISOString().slice(0, 10);
+  if (period === "Bugün") return { from: todayValue, to: todayValue };
+  if (period === "Tümü") return { from: "", to: "" };
+  return { from: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10), to: todayValue };
+}
+
+function isMessageInPeriod(date: string, period: string) {
+  if (period === "Tümü") return true;
+  const now = new Date();
+  const todayValue = now.toISOString().slice(0, 10);
+  if (period === "Bugün") return date === todayValue;
+  return date.slice(0, 7) === todayValue.slice(0, 7);
+}
+
 function money(value: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(value);
+}
+
+function checkoutLineNames(checkout: Business["checkouts"][number], business: Business) {
+  const lines = checkout.lines || [];
+  return lines.map((line) => business.services.find((service) => service.id === String(line.serviceId || ""))?.name).filter(Boolean).join(", ") || business.services.find((service) => service.id === checkout.serviceId)?.name || "Adisyon";
 }
 
 function offsetDate(value: string, amount: number) {
@@ -640,9 +767,27 @@ const styles = StyleSheet.create({
   profileImage: { width: 64, height: 64, borderRadius: radii.lg },
   qrImage: { width: "100%", aspectRatio: 1, borderRadius: radii.md, backgroundColor: colors.white },
   metricGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
+  financeSummary: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
+  reportActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   metric: { flexBasis: 140, flexGrow: 1 },
   metricValue: { color: colors.text, fontSize: 21, fontWeight: "900" },
   dateActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  calendarCard: { padding: spacing.md, gap: 0 },
+  calendarDate: { color: colors.text, fontSize: 16, fontWeight: "800", paddingBottom: spacing.md, textTransform: "capitalize" },
+  calendarRow: { minHeight: 64, flexDirection: "row", borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  calendarHour: { width: 52, paddingTop: spacing.sm, color: colors.textMuted, fontSize: 11, fontWeight: "700" },
+  calendarCell: { flex: 1, minHeight: 64, paddingVertical: spacing.xs, gap: spacing.xs },
+  emptySlot: { flex: 1, minHeight: 48, backgroundColor: "#FFFDF0" },
+  calendarEvent: { borderRadius: radii.sm, borderLeftWidth: 4, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, backgroundColor: colors.surface },
+  appointmentEvent: { borderLeftColor: "#5F86B6" },
+  checkoutEvent: { borderLeftColor: "#24A647" },
+  calendarEventTitle: { color: colors.text, fontSize: 12, fontWeight: "800" },
+  calendarEventBody: { color: colors.textMuted, fontSize: 11 },
+  statusFilters: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  statusFilter: { borderRadius: radii.pill, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  statusFilterActive: { backgroundColor: colors.surfaceMuted, borderColor: colors.text },
+  statusFilterText: { color: colors.textMuted, fontSize: 12, fontWeight: "700" },
+  statusFilterTextActive: { color: colors.text },
   messageBubble: { maxWidth: "86%", padding: spacing.md, borderRadius: radii.lg, gap: spacing.xs },
   customerMessage: { alignSelf: "flex-end", backgroundColor: colors.primary },
   assistantMessage: { alignSelf: "flex-start", backgroundColor: colors.text },
