@@ -76,22 +76,22 @@ export function DashboardChromeProvider({ children }: PropsWithChildren) {
   const [searchTerm, setSearchTerm] = useState("");
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
-  const goTo = useCallback((id: DashboardFeatureId) => {
+  const goTo = useCallback((id: DashboardFeatureId, create = false) => {
     setDrawerOpen(false);
     setQuickCreateOpen(false);
     setProfileOpen(false);
     if (id === "dashboard") {
       router.replace("/(app)" as Href);
     } else if (id === "booking/list") {
-      router.push("/(app)/appointments" as Href);
+      router.push((create ? `/feature/${encodeFeatureId("visit/list")}?create=1` : "/(app)/appointments") as Href);
     } else if (id === "client/list") {
-      router.push("/(app)/customers" as Href);
+      router.push((create ? "/(app)/customers?create=1" : "/(app)/customers") as Href);
     } else if (id === "setup/general") {
       router.push("/(app)/business/profile" as Href);
     } else if (id === "setup/working-hours") {
       router.push("/(app)/business/hours" as Href);
     } else {
-      router.push(`/feature/${encodeFeatureId(id)}` as Href);
+      router.push(`/feature/${encodeFeatureId(id)}${create ? "?create=1" : ""}` as Href);
     }
   }, [router]);
 
@@ -141,7 +141,9 @@ export function DashboardChromeProvider({ children }: PropsWithChildren) {
                       <Text style={styles.groupLabel}>{group.label}</Text>
                       <ChevronDown size={17} color="#CBD5E1" style={expanded ? styles.rotated : undefined} />
                     </Pressable>
-                    {expanded ? group.items.map((item) => (
+                    {expanded ? group.label === "Mesajlaşma" ? (
+                      <MessagingDrawerItems items={group.items} openGroups={openGroups} onToggle={(key) => setOpenGroups((current) => ({ ...current, [key]: !current[key] }))} onSelect={goTo} />
+                    ) : group.items.map((item) => (
                       <DrawerItem key={item.id} compact icon={iconFor(item.id)} label={item.label} onPress={() => goTo(item.id)} />
                     )) : null}
                   </View>
@@ -164,7 +166,7 @@ export function DashboardChromeProvider({ children }: PropsWithChildren) {
               <Pressable accessibilityLabel="Yeni oluştur menüsünü kapat" onPress={() => setQuickCreateOpen(false)}><X size={20} color={colors.text} /></Pressable>
             </View>
             {quickCreateItems.map((item) => (
-              <Pressable key={item.id} style={({ pressed }) => [styles.createItem, pressed && styles.createItemPressed]} onPress={() => goTo(item.id)}>
+              <Pressable key={item.id} style={({ pressed }) => [styles.createItem, pressed && styles.createItemPressed]} onPress={() => goTo(item.id, true)}>
                 <item.icon size={18} color={colors.textMuted} />
                 <Text style={styles.createLabel}>{item.label}</Text>
                 <ChevronRight size={17} color={colors.textMuted} />
@@ -237,6 +239,56 @@ function DrawerItem({ icon: Icon, label, onPress, compact = false }: { icon: Luc
   return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.drawerItem, compact && styles.drawerItemCompact, pressed && styles.drawerItemPressed]}><Icon size={compact ? 16 : 18} color={compact ? "#CBD5E1" : colors.white} /><Text style={[styles.drawerItemLabel, compact && styles.drawerItemLabelCompact]} numberOfLines={1}>{label}</Text></Pressable>;
 }
 
+function MessagingDrawerItems({
+  items,
+  openGroups,
+  onToggle,
+  onSelect,
+}: {
+  items: Array<{ id: DashboardFeatureId; label: string }>;
+  openGroups: Record<string, boolean>;
+  onToggle: (key: string) => void;
+  onSelect: (id: DashboardFeatureId) => void;
+}) {
+  const allMessages = items.find((item) => item.id === "messaging/whatsapp/sent-reminders");
+  const whatsapp = items.filter((item) => item.id.startsWith("messaging/whatsapp/") && item.id !== "messaging/whatsapp/sent-reminders");
+  const instagram = items.filter((item) => item.id.startsWith("messaging/instagram/"));
+  return (
+    <View style={styles.nestedGroups}>
+      {allMessages ? <DrawerItem compact icon={ImageIcon} label={allMessages.label} onPress={() => onSelect(allMessages.id)} /> : null}
+      <MessagingSubGroup label="WhatsApp" icon={ImageIcon} items={whatsapp} open={Boolean(openGroups.whatsapp)} onToggle={() => onToggle("whatsapp")} onSelect={onSelect} />
+      <MessagingSubGroup label="Instagram" icon={ImageIcon} items={instagram} open={Boolean(openGroups.instagram)} onToggle={() => onToggle("instagram")} onSelect={onSelect} />
+    </View>
+  );
+}
+
+function MessagingSubGroup({
+  label,
+  icon: Icon,
+  items,
+  open,
+  onToggle,
+  onSelect,
+}: {
+  label: string;
+  icon: LucideIcon;
+  items: Array<{ id: DashboardFeatureId; label: string }>;
+  open: boolean;
+  onToggle: () => void;
+  onSelect: (id: DashboardFeatureId) => void;
+}) {
+  return (
+    <View style={styles.messagingSubGroup}>
+      <Pressable style={styles.subGroupButton} onPress={onToggle}>
+        <Text style={styles.subGroupLabel}>{label}</Text>
+        <Icon size={16} color="#CBD5E1" />
+        <ChevronDown size={15} color="#CBD5E1" style={open ? styles.rotated : undefined} />
+      </Pressable>
+      {open ? <View style={styles.subGroupItems}>{items.map((item) => <DrawerItem key={item.id} compact icon={ImageIcon} label={item.label} onPress={() => onSelect(item.id)} />)}</View> : null}
+    </View>
+  );
+}
+
 function ProfileItem({ label, onPress }: { label: string; onPress: () => void }) {
   return <Pressable style={({ pressed }) => [styles.profileItem, pressed && styles.createItemPressed]} onPress={onPress}><Text style={styles.createLabel}>{label}</Text><ChevronRight size={17} color={colors.textMuted} /></Pressable>;
 }
@@ -305,6 +357,11 @@ const styles = StyleSheet.create({
   drawerItemPressed: { backgroundColor: "rgba(255,255,255,0.1)" },
   drawerItemLabel: { color: colors.white, flex: 1, fontSize: 14, fontWeight: "600" },
   drawerItemLabelCompact: { color: "#CBD5E1", fontSize: 13, fontWeight: "500" },
+  nestedGroups: { gap: spacing.xs },
+  messagingSubGroup: { borderRadius: 8, backgroundColor: "rgba(255,255,255,0.04)" },
+  subGroupButton: { minHeight: 38, paddingHorizontal: spacing.sm, flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  subGroupLabel: { color: "#CBD5E1", flex: 1, fontSize: 13, fontWeight: "600" },
+  subGroupItems: { paddingLeft: spacing.sm, paddingBottom: 3 },
   drawerGroup: { marginTop: spacing.xs, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.05)", paddingVertical: 3 },
   groupButton: { minHeight: 42, paddingHorizontal: spacing.sm, flexDirection: "row", alignItems: "center" },
   groupLabel: { color: colors.white, flex: 1, fontSize: 14, fontWeight: "700" },

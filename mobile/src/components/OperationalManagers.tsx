@@ -1,4 +1,4 @@
-import { useState, type PropsWithChildren } from "react";
+import { useEffect, useState, type PropsWithChildren } from "react";
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { Plus, Trash2, X } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,7 +10,7 @@ import { colors, radii, spacing } from "@/theme/tokens";
 
 type CheckoutDraftLine = { id: string; staffId: string; serviceId: string; duration: number; amount: number };
 
-export function CheckoutManager({ business }: { business: Business }) {
+export function CheckoutManager({ business, autoOpen = false }: { business: Business; autoOpen?: boolean }) {
   const { save } = useBusiness();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -27,6 +27,10 @@ export function CheckoutManager({ business }: { business: Business }) {
   const staffOptions = business.staff.map((item) => ({ value: item.id, label: item.name, subtitle: item.role }));
   const completed = lines.filter((line) => line.staffId && line.serviceId);
   const total = completed.reduce((sum, line) => sum + line.amount, 0);
+
+  useEffect(() => {
+    if (autoOpen) setOpen(true);
+  }, [autoOpen]);
 
   function reset() {
     setCustomerId(""); setCustomerName(""); setDate(today());
@@ -121,7 +125,7 @@ export function CheckoutManager({ business }: { business: Business }) {
   );
 }
 
-export function SalesManager({ business, kind }: { business: Business; kind: "product" | "package" }) {
+export function SalesManager({ business, kind, autoOpen = false }: { business: Business; kind: "product" | "package"; autoOpen?: boolean }) {
   const { save } = useBusiness();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -153,6 +157,10 @@ export function SalesManager({ business, kind }: { business: Business; kind: "pr
   const total = kind === "product"
     ? productLines.reduce((sum, line) => sum + line.quantity * line.amount, 0)
     : packageLines.reduce((sum, line) => sum + line.quantity * line.amount, 0);
+
+  useEffect(() => {
+    if (autoOpen) setOpen(true);
+  }, [autoOpen]);
 
   function selectCustomer(id: string) { setCustomerId(id); setCustomerName(business.customers.find((item) => item.id === id)?.name || ""); }
   function reset() {

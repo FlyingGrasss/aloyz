@@ -11,6 +11,7 @@ import {
   type TextInputProps,
   View,
   type ViewStyle,
+  type StyleProp,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { LucideIcon } from "lucide-react-native";
@@ -50,7 +51,7 @@ export function PageHeader({ title, subtitle, dark = false }: { title: string; s
   );
 }
 
-export function Card({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) {
+export function Card({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
   return <View style={[styles.card, style]}>{children}</View>;
 }
 

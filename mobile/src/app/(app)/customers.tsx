@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Alert, StyleSheet, TextInput, View } from "react-native";
 import { Search } from "lucide-react-native";
+import { useLocalSearchParams } from "expo-router";
 import { BusinessGate } from "@/components/BusinessGate";
 import { EntityManager, type EntityField } from "@/components/EntityManager";
 import { PageHeader, ScrollScreen } from "@/components/ui";
@@ -30,6 +31,7 @@ export default function CustomersScreen() {
 function CustomersContent() {
   const { business, save } = useBusiness();
   const chrome = useOptionalDashboardChrome();
+  const params = useLocalSearchParams<{ create?: string | string[] }>();
   const [localQuery, setLocalQuery] = useState("");
   const query = chrome?.searchTerm || localQuery;
   const allCustomers = business?.customers || [];
@@ -80,6 +82,7 @@ function CustomersContent() {
         getTitle={(item) => String(item.name || "İsimsiz müşteri")}
         getSubtitle={(item) => [item.countryCode, item.phone, item.email].filter(Boolean).join(" ")}
         onChange={persist}
+        autoOpen={params.create === "1" || (Array.isArray(params.create) && params.create[0] === "1")}
       />
     </ScrollScreen>
   );

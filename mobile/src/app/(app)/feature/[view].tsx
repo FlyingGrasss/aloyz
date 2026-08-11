@@ -405,6 +405,8 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
 
 function RecordFeature({ view, business }: { view: DashboardFeatureId; business: Business }) {
   const { save } = useBusiness();
+  const params = useLocalSearchParams<{ create?: string | string[] }>();
+  const autoOpen = params.create === "1" || (Array.isArray(params.create) && params.create[0] === "1");
   const rows = view === "visit/list" ? business.checkouts : recordRows(view, business);
   const config = recordManagerConfig(view, business);
 
@@ -421,9 +423,9 @@ function RecordFeature({ view, business }: { view: DashboardFeatureId; business:
   return (
     <ScrollScreen>
       <PageHeader title={featureLabel(view)} subtitle={`${rows.length} kayıt`} />
-      {view === "visit/list" ? <CheckoutManager business={business} /> : null}
-      {view === "product_sale/list" ? <SalesManager business={business} kind="product" /> : null}
-      {view === "package_sale/list" ? <SalesManager business={business} kind="package" /> : null}
+      {view === "visit/list" ? <CheckoutManager business={business} autoOpen={autoOpen} /> : null}
+      {view === "product_sale/list" ? <SalesManager business={business} kind="product" autoOpen={autoOpen} /> : null}
+      {view === "package_sale/list" ? <SalesManager business={business} kind="package" autoOpen={autoOpen} /> : null}
       {!(["visit/list", "product_sale/list", "package_sale/list"] as DashboardFeatureId[]).includes(view) && config ? (
         <EntityManager
           records={rows as ManagedRecord[]}
@@ -433,6 +435,7 @@ function RecordFeature({ view, business }: { view: DashboardFeatureId; business:
           getTitle={(row) => String(row.title || row.customerName || row.personName || row.name || row.date || "Kayıt")}
           getSubtitle={(row) => config.subtitle(row)}
           onChange={saveRows}
+          autoOpen={autoOpen}
         />
       ) : null}
       {!(["visit/list", "product_sale/list", "package_sale/list"] as DashboardFeatureId[]).includes(view) && !config ? <Card><Text style={uiStyles.body}>Bu görünüm için kayıt düzenleyicisi bulunamadı.</Text></Card> : null}

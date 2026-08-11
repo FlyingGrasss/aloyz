@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -39,6 +39,7 @@ type EntityManagerProps<T extends Entity> = {
   getSubtitle?: (record: T) => string;
   onChange: (records: T[]) => Promise<void>;
   createDefaults?: Partial<T>;
+  autoOpen?: boolean;
 };
 
 export function EntityManager<T extends Entity>({
@@ -50,12 +51,25 @@ export function EntityManager<T extends Entity>({
   getSubtitle,
   onChange,
   createDefaults,
+  autoOpen = false,
 }: EntityManagerProps<T>) {
   const [editing, setEditing] = useState<T | null>(null);
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
+  const autoOpened = useRef(false);
   const modalVisible = creating || editing !== null;
+
+  useEffect(() => {
+    if (!autoOpen) {
+      autoOpened.current = false;
+      return;
+    }
+    if (!autoOpened.current) {
+      autoOpened.current = true;
+      openCreate();
+    }
+  }, [autoOpen]);
 
   const initialDraft = useMemo(() => {
     const values: Record<string, unknown> = {};

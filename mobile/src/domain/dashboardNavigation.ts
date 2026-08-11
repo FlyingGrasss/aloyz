@@ -1,4 +1,5 @@
 export type DashboardFeatureId =
+  | "dashboard"
   | "calendar"
   | "booking/list"
   | "visit/list"
@@ -60,15 +61,15 @@ export const dashboardFeatureGroups: DashboardFeatureGroup[] = [
   {
     label: "Mesajlaşma",
     items: [
-      { id: "messaging/whatsapp/sent-reminders", label: "Tüm mesajlar" },
-      { id: "messaging/whatsapp/register", label: "WhatsApp kurulumu" },
-      { id: "messaging/whatsapp/list", label: "WhatsApp mesajları" },
-      { id: "messaging/instagram/setup", label: "Instagram kurulumu" },
-      { id: "messaging/instagram/list", label: "Instagram mesajları" },
+      { id: "messaging/whatsapp/sent-reminders", label: "Tüm Mesajlar" },
+      { id: "messaging/whatsapp/register", label: "WP Kurulumu" },
+      { id: "messaging/whatsapp/list", label: "Mesajlar" },
+      { id: "messaging/instagram/setup", label: "IG Kurulumu" },
+      { id: "messaging/instagram/list", label: "Mesajlar" },
     ],
   },
   {
-    label: "Diğer kayıtlar",
+    label: "Diğer",
     items: [
       { id: "other/commissions", label: "Randevu komisyonları" },
       { id: "other/expense/list", label: "Masraflar" },

@@ -19,18 +19,19 @@ function OverviewContent() {
   const { business, save } = useBusiness();
   const [activeTab, setActiveTab] = useState<ActivityTab>("appointments");
   if (!business) return null;
+  const currentBusiness = business;
 
   const appointments = business.appointments || [];
   const checkouts = business.checkouts || [];
   const receivables = (business.promotions.receivables || []).filter((item) => item.amount > item.paidAmount);
-  const upcomingBirthdays = useMemo(() => getUpcomingBirthdays(business.customers || []), [business.customers]);
+  const upcomingBirthdays = useMemo(() => getUpcomingBirthdays(business?.customers || []), [business?.customers]);
   const contactsCount = (business.customers || []).length + (business.conversations || []).length;
 
   async function markReceivableReminder(id: string) {
     await save({
       promotions: {
-        ...business.promotions,
-        receivables: (business.promotions.receivables || []).map((item) => item.id === id
+        ...currentBusiness.promotions,
+        receivables: (currentBusiness.promotions.receivables || []).map((item) => item.id === id
           ? { ...item, status: "Hatırlatıldı", reminderSentAt: new Date().toISOString() }
           : item),
       },
