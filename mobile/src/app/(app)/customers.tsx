@@ -6,6 +6,7 @@ import { EntityManager, type EntityField } from "@/components/EntityManager";
 import { PageHeader, ScrollScreen } from "@/components/ui";
 import type { CustomerProfile } from "@/domain/models";
 import { useBusiness } from "@/providers/BusinessProvider";
+import { useOptionalDashboardChrome } from "@/providers/DashboardChromeProvider";
 import { colors, radii, spacing } from "@/theme/tokens";
 
 const customerFields: EntityField[] = [
@@ -28,7 +29,9 @@ export default function CustomersScreen() {
 
 function CustomersContent() {
   const { business, save } = useBusiness();
-  const [query, setQuery] = useState("");
+  const chrome = useOptionalDashboardChrome();
+  const [localQuery, setLocalQuery] = useState("");
+  const query = chrome?.searchTerm || localQuery;
   const allCustomers = business?.customers || [];
   const customers = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("tr-TR");
@@ -59,7 +62,10 @@ function CustomersContent() {
         <Search color={colors.textMuted} size={19} />
         <TextInput
           value={query}
-          onChangeText={setQuery}
+          onChangeText={(value) => {
+            setLocalQuery(value);
+            chrome?.setSearchTerm(value);
+          }}
           placeholder="Ad, telefon veya e-posta ara"
           placeholderTextColor={colors.textMuted}
           style={styles.searchInput}

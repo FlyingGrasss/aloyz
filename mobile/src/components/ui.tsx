@@ -1,7 +1,6 @@
 import type { PropsWithChildren, ReactNode } from "react";
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,17 +14,18 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { LucideIcon } from "lucide-react-native";
-import { Menu } from "lucide-react-native";
-import { type Href, useRouter } from "expo-router";
+import { useOptionalDashboardChrome } from "@/providers/DashboardChromeProvider";
 import { colors, radii, spacing } from "@/theme/tokens";
 
 export function Screen({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) {
-  return <SafeAreaView style={[styles.screen, style]} edges={["top", "left", "right"]}>{children}</SafeAreaView>;
+  const chrome = useOptionalDashboardChrome();
+  return <SafeAreaView style={[styles.screen, style]} edges={chrome ? ["left", "right"] : ["top", "left", "right"]}>{children}</SafeAreaView>;
 }
 
 export function ScrollScreen({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) {
+  const chrome = useOptionalDashboardChrome();
   return (
-    <SafeAreaView style={[styles.screen, style]} edges={["top", "left", "right"]}>
+    <SafeAreaView style={[styles.screen, style]} edges={chrome ? ["left", "right"] : ["top", "left", "right"]}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -42,18 +42,9 @@ export function ScrollScreen({ children, style }: PropsWithChildren<{ style?: Vi
 }
 
 export function PageHeader({ title, subtitle, dark = false }: { title: string; subtitle?: string; dark?: boolean }) {
-  const router = useRouter();
   return (
     <View style={styles.header}>
-      <View style={styles.headerRow}>
-        <Image source={require("../../assets/logo.jpg")} style={styles.headerLogo} accessibilityLabel="Aloyz" />
-        <View style={styles.headerCopy}>
-          <Text style={[styles.title, dark && styles.darkTitle]} numberOfLines={1}>{title}</Text>
-        </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Menüyü aç" onPress={() => router.push("/(app)/more" as Href)} style={[styles.headerMenu, dark && styles.darkHeaderMenu]}>
-          <Menu size={20} color={dark ? colors.white : colors.text} />
-        </Pressable>
-      </View>
+      <Text style={[styles.title, dark && styles.darkTitle]} numberOfLines={1}>{title}</Text>
       {subtitle ? <Text style={[styles.subtitle, dark && styles.darkSubtitle]}>{subtitle}</Text> : null}
     </View>
   );
