@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored / generated bundles that are not project source.
+    "salonappy/**",
+    "mobile/.expo/**",
+    "scratch/**",
+    "test-results/**",
   ]),
 ]);
 
