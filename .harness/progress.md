@@ -19,10 +19,12 @@
   - Package sales table now shows used and remaining/quantity.
   - Web customer list hides email/Instagram/notes on small screens and shows name + phone + chevron.
   - Daily calendar view now uses colored staff columns; weekly/monthly appointment cards use staff colors.
+  - Mobile web calendar now defaults to daily staff columns instead of the weekly day grid.
+  - Added a mobile topbar customer search row; search matches both names and normalized phone digits.
 - Verification run:
   - `pnpm exec tsc --noEmit` passed.
   - Local package usage unit test passed: apply, idempotent, restore, delete restore, cancelled, different customer.
-  - Targeted ESLint still reports pre-existing DashboardApp/calendar Google-sync errors; `lib/packageUsage.ts` and sales/customer files are clean.
+  - Targeted ESLint: `lib/packageUsage.ts`, sales, customers, customer-picker, and shell are clean; calendar has only the pre-existing Google-sync errors.
 - Evidence recorded: none yet; end-to-end UI verification pending.
 - Commits: `72f7201`.
 - Known risks:

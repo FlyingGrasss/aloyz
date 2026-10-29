@@ -26,7 +26,8 @@
       "verification": [
         "pnpm exec tsc --noEmit",
         "Open Randevu takvimi: default view is Haftalık görünüm, interval 60 Dakika; the grid fills the panel with no right-side gap.",
-        "Switch to Günlük görünüm: staff appear as colored columns.",
+        "On a phone-width browser, the calendar automatically uses Günlük görünüm with colored staff columns.",
+        "Switch to Günlük görünüm on desktop: staff appear as colored columns.",
         "Empty time rows are visibly shorter than rows with appointments.",
         "Click an appointment card: modal opens for that appointment and can save edits or cancel it.",
         "Canceled appointments disappear from the calendar.",
@@ -73,6 +74,27 @@
       ],
       "evidence": null,
       "notes": "Code complete; manual responsive verification pending."
+    },
+    {
+      "id": "mobile-customer-search",
+      "priority": 26,
+      "area": "dashboard/search",
+      "title": "Mobile customer search by name and phone",
+      "user_visible_behavior": "The Müşteri ara input is visible in the mobile web topbar and matches customers by name or phone digits, including 0/+90 formatted numbers.",
+      "files": [
+        "components/dashboard/app/shell.tsx",
+        "components/dashboard/app/customers.tsx",
+        "components/dashboard/app/customer-picker.tsx"
+      ],
+      "status": "not_started",
+      "verification": [
+        "pnpm exec tsc --noEmit",
+        "At phone width, the Müşteri ara input is visible below the topbar.",
+        "Searching a name filters the customer list.",
+        "Searching 0532..., 532..., or +90 532... matches the same customer phone."
+      ],
+      "evidence": null,
+      "notes": "Code complete; manual mobile search verification pending."
     },
     {
       "id": "appointment-list-cleanup",

@@ -72,13 +72,19 @@ export function CustomerPicker({
 
   const matches = useMemo(() => {
     const query = value.trim().toLocaleLowerCase("tr-TR");
+    const phoneQuery = query
+      .replace(/\D/g, "")
+      .replace(/^90/, "")
+      .replace(/^0/, "");
     if (!query) return baseRows.slice(0, 6);
     return baseRows
       .filter(
         (item) =>
-          item.name.toLocaleLowerCase("tr-TR").startsWith(query) ||
-          (item.phone || "").toLocaleLowerCase("tr-TR").startsWith(query) ||
-          (item.email || "").toLocaleLowerCase("tr-TR").startsWith(query),
+          item.name.toLocaleLowerCase("tr-TR").includes(query) ||
+          (item.phone || "").toLocaleLowerCase("tr-TR").includes(query) ||
+          (item.email || "").toLocaleLowerCase("tr-TR").includes(query) ||
+          (phoneQuery.length > 0 &&
+            (item.phone || "").replace(/\D/g, "").includes(phoneQuery)),
       )
       .slice(0, 6);
   }, [baseRows, value]);

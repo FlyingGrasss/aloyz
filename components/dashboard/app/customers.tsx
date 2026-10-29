@@ -92,9 +92,13 @@ export function ContactsPage({
     setCustomerPageState({ searchTerm, page });
   const savedCustomers = business.customers || [];
   const normalizedSearch = searchTerm.trim().toLocaleLowerCase("tr-TR");
+  const phoneSearch = normalizedSearch
+    .replace(/\D/g, "")
+    .replace(/^90/, "")
+    .replace(/^0/, "");
   const filteredSavedCustomers = savedCustomers.filter((customer) => {
     if (!normalizedSearch) return true;
-    return [
+    const textMatches = [
       customer.name,
       customer.phone,
       customer.email,
@@ -105,6 +109,12 @@ export function ContactsPage({
       .some((value) =>
         String(value).toLocaleLowerCase("tr-TR").includes(normalizedSearch),
       );
+    const phoneMatches =
+      phoneSearch.length > 0 &&
+      String(customer.phone || "")
+        .replace(/\D/g, "")
+        .includes(phoneSearch);
+    return textMatches || phoneMatches;
   });
   const filteredContacts = contacts.filter((contact) => {
     const channelMatch =

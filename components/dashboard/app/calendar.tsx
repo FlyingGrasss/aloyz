@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   Bell,
   CalendarDays,
@@ -90,6 +90,18 @@ type CalendarColumn = {
   color?: string;
 };
 
+function useMediaQuery(query: string) {
+  return useSyncExternalStore(
+    (onChange) => {
+      const media = window.matchMedia(query);
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(query).matches,
+    () => false,
+  );
+}
+
 export function CalendarPage({
   selectedDate,
   business,
@@ -124,9 +136,14 @@ export function CalendarPage({
   const [googleSyncMessage, setGoogleSyncMessage] = useState("");
   const [refreshNonce, setRefreshNonce] = useState(0);
   const calendarScrollRef = useRef<HTMLDivElement | null>(null);
+  const isMobileViewport = useMediaQuery("(max-width: 767px)");
   const staff = business.staff || [];
   const calendarSettings = business.bookingSettings || {};
   const calendarView = normalizeCalendarView(calendarSettings.calendarView);
+  const effectiveCalendarView =
+    isMobileViewport && calendarView === "Haftalık görünüm"
+      ? "Günlük görünüm"
+      : calendarView;
   const calendarWidth = Number(calendarSettings.calendarWidth || "80");
   const slotInterval = Number(
     String(calendarSettings.calendarSlotInterval || "60 Dakika").match(/\d+/)?.[0] ||
@@ -140,7 +157,7 @@ export function CalendarPage({
         : "text-slate-800";
   const weekStart = getWeekStart(selectedDate);
   const visibleDates =
-    calendarView === "Haftalık görünüm"
+    effectiveCalendarView === "Haftalık görünüm"
       ? Array.from({ length: 7 }, (_, index) => addDays(weekStart, index))
       : [selectedDate];
   const monthDates = getMonthGridDates(selectedDate);
@@ -190,7 +207,7 @@ export function CalendarPage({
     });
   }
   const calendarColumns: CalendarColumn[] =
-    calendarView === "Günlük görünüm"
+    effectiveCalendarView === "Günlük görünüm"
       ? dayColumns.length > 0
         ? dayColumns
         : [
@@ -299,7 +316,7 @@ export function CalendarPage({
 
   useEffect(() => {
     const container = calendarScrollRef.current;
-    if (!container || calendarView === "Aylık görünüm") return;
+    if (!container || effectiveCalendarView === "Aylık görünüm") return;
     if (!visibleDates.includes(today)) return;
     window.setTimeout(() => {
       const currentRow = container.querySelector<HTMLElement>(
@@ -307,7 +324,13 @@ export function CalendarPage({
       );
       currentRow?.scrollIntoView({ block: "center" });
     }, 50);
-  }, [calendarView, selectedDate, slotInterval, today, visibleDates.join("|")]);
+  }, [
+    effectiveCalendarView,
+    selectedDate,
+    slotInterval,
+    today,
+    visibleDates.join("|"),
+  ]);
   return (
     <div className="space-y-3">
       <Breadcrumb
@@ -409,7 +432,7 @@ export function CalendarPage({
           </div>
         )}
         <div ref={calendarScrollRef} className="max-h-[calc(100vh-220px)] overflow-auto sm:max-h-[calc(100vh-180px)]">
-          {calendarView === "Aylık görünüm" ? (
+          {effectiveCalendarView === "Aylık görünüm" ? (
             <div
               className="grid"
               style={{
@@ -486,7 +509,7 @@ export function CalendarPage({
               className="grid"
               style={{
                 minWidth: Math.round(
-                  (calendarView === "Haftalık görünüm" ? 980 : 680) *
+                  (effectiveCalendarView === "Haftalık görünüm" ? 980 : 680) *
                     (calendarWidth / 100),
                 ),
                 gridTemplateColumns:
