@@ -332,9 +332,8 @@ export function CalendarPage({
         <div ref={calendarScrollRef} className="max-h-[calc(100vh-220px)] overflow-auto sm:max-h-[calc(100vh-180px)]">
           {calendarView === "Aylık görünüm" ? (
             <div
-              className="grid max-lg:!w-full"
+              className="grid"
               style={{
-                width: `${calendarWidth}%`,
                 minWidth: Math.round(840 * (calendarWidth / 100)),
                 gridTemplateColumns: "repeat(7, minmax(90px, 1fr))",
               }}
@@ -402,9 +401,8 @@ export function CalendarPage({
             </div>
           ) : (
             <div
-              className="grid max-lg:!w-full"
+              className="grid"
               style={{
-                width: `${calendarWidth}%`,
                 minWidth: Math.round(
                   (calendarView === "Haftalık görünüm" ? 980 : 680) *
                     (calendarWidth / 100),
