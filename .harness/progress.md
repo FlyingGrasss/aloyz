@@ -7,7 +7,7 @@
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
 - Last known green commit: `413724f` for typecheck; manual UI verification pending
 - Highest priority unfinished feature: `package-session-usage`
-- Current blocker: the business currently has no package sale rows; the last package sale was deleted. Recreate a sale or restore the backup before testing usage.
+- Current blocker: none.
 
 ## Session record
 
@@ -22,11 +22,15 @@
   - Mobile web calendar now defaults to daily staff columns instead of the weekly day grid.
   - Added a mobile topbar customer search row; search matches both names and normalized phone digits.
   - Package sale modal now stays open if the server save fails instead of closing and losing the entry.
-  - Customer detail now shows the customer's package lines with Kalan X/Y and Kullanılan X.
-  - Confirmed the business currently has 0 package sales; the last sale was deleted.
+  - Customer detail now shows package total, paid amount, Kalan X/Y and Kullanılan X.
+  - Confirmed the business had 0 package sales; the last manual sale was deleted.
+  - Fetched 7,945 Salonappy package sales slowly (16 sequential pages, no block).
+  - Imported 2,714 active 2025+ package sales (1.54 MB compact JSON) and linked them to existing customer IDs.
+  - Added 100/page pagination to Paket satışları.
 - Verification run:
   - `pnpm exec tsc --noEmit` passed.
-  - Local package usage unit test passed: apply, idempotent, restore, delete restore, cancelled, different customer.
+  - Package usage performance test: 2,714 sales normalized in 44 ms; Seher's package 8 -> 7.
+  - Package helper tests: apply, idempotent, restore, delete restore, cancelled, different customer.
   - Targeted ESLint: `lib/packageUsage.ts`, sales, customers, customer-picker, and shell are clean; calendar has only the pre-existing Google-sync errors.
 - Evidence recorded: none yet; end-to-end UI verification pending.
 - Commits: `72f7201`, `413724f`.

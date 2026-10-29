@@ -55,10 +55,11 @@
         "Local unit test: cancelled checkout and different customer do not deduct.",
         "UI: mark a checkout Geldi and confirm package sales show Kullanılan=1 and Kalan kullanım=7/8.",
         "UI: remove Geldi and confirm the session is restored.",
-        "Open a customer detail: package lines show Kalan X/Y and Kullanılan X."
+        "Open a customer detail: package lines show total, paid, Kalan X/Y and Kullanılan X.",
+        "Paket satışları with Tümü shows 2,714 imported active packages and paginates 100/page."
       ],
       "evidence": null,
-      "notes": "Pure usage helper, server-side diff logic, and customer-detail package summary implemented. Local unit test passed; end-to-end UI verification pending. The business currently has 0 package sales because the last one was deleted; recreate one or restore the backup before testing."
+      "notes": "Imported 2,714 active 2025+ Salonappy package sales (1.54 MB compact JSON). Seher Abdullah's 8-session package now links to the existing customer and shows 8/8. Paket satışları is paginated 100/page. Pure usage helper test: 8 -> 7 in 44 ms. Manual UI verification pending."
     },
     {
       "id": "customer-list-mobile",

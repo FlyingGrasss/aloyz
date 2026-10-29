@@ -490,7 +490,11 @@ export function CustomerModal({
                   {packageSales.map((sale) => (
                     <div key={sale.id}>
                       <div className="text-xs font-medium text-slate-700">
-                        {sale.total} TL · {sale.date}
+                        {sale.total} TL · Ödenen {sale.paidAmount} TL
+                        {sale.total > sale.paidAmount
+                          ? ` · Kalan ödeme ${sale.total - sale.paidAmount} TL`
+                          : ""}{" "}
+                        · {sale.date}
                       </div>
                       <div className="mt-1 space-y-1">
                         {sale.lines.map((line) => {

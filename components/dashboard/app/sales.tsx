@@ -4,6 +4,8 @@ import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   Plus,
   RefreshCw,
@@ -185,6 +187,10 @@ export function PackageSalesPage({
   const [deletingSale, setDeletingSale] = useState<PackageSaleItem | null>(null);
   const [period, setPeriod] = useState("Bu ay");
   const [sortDesc, setSortDesc] = useState(true);
+  const [pageState, setPageState] = useState({
+    key: "Bu ay-true",
+    page: 1,
+  });
   const promotions = normalizePromotions(business.promotions);
   const allSales = promotions.packageSales || [];
   const sales = filterSalesByPeriod(allSales, period).sort(
@@ -193,7 +199,20 @@ export function PackageSalesPage({
         ? b.date.localeCompare(a.date)
         : a.date.localeCompare(b.date),
   );
-  const total = sales.reduce((sum, sale) => sum + sale.total, 0);
+  const pageKey = `${period}-${sortDesc}`;
+  const pageSize = 100;
+  const totalPages = Math.max(1, Math.ceil(sales.length / pageSize));
+  const currentPage = Math.min(
+    pageState.key === pageKey ? pageState.page : 1,
+    totalPages,
+  );
+  const visibleSales = sales.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+  const pageTotal = visibleSales.reduce((sum, sale) => sum + sale.total, 0);
+  const setCurrentPage = (page: number) =>
+    setPageState({ key: pageKey, page });
 
   async function saveSale(
     sale: PackageSaleItem,
@@ -304,7 +323,7 @@ export function PackageSalesPage({
           </tr>
         </thead>
         <tbody>
-          {sales.map((sale) => {
+          {visibleSales.map((sale) => {
             const quantity = sale.lines.reduce((sum, line) => sum + line.quantity, 0);
             const used = sale.lines.reduce(
               (sum, line) => sum + (line.used ?? 0),
@@ -363,12 +382,39 @@ export function PackageSalesPage({
           })}
           <tr className="border-b border-slate-200 bg-slate-50 font-semibold">
             <td colSpan={14} className="px-3 py-3">
-              Sayfadaki paket satışlarının toplam tutarı: {total} TL
+              Sayfadaki paket satışlarının toplam tutarı: {pageTotal} TL
             </td>
           </tr>
           <tr className="bg-slate-50 font-semibold">
             <td colSpan={14} className="px-3 py-3">
-              Toplam kayıt sayısı: {sales.length}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>Toplam kayıt sayısı: {sales.length}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-normal text-slate-500">
+                    Sayfa {currentPage} / {totalPages}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    aria-label="Önceki sayfa"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                  >
+                    <ChevronLeft />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    aria-label="Sonraki sayfa"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                  >
+                    <ChevronRight />
+                  </Button>
+                </div>
+              </div>
             </td>
           </tr>
         </tbody>
