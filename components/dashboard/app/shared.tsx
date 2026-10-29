@@ -271,6 +271,9 @@ export type PackageSaleLine = {
   serviceId: string;
   quantity: number;
   amount: number;
+  used?: number;
+  remaining?: number;
+  usedCheckoutIds?: string[];
 };
 
 export type PackageSaleItem = {

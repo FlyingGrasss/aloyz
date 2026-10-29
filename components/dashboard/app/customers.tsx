@@ -170,14 +170,15 @@ export function ContactsPage({
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[840px] text-left text-sm">
+          <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-3">Müşteri</th>
                 <th className="px-4 py-3">Telefon</th>
-                <th className="px-4 py-3">E-posta</th>
-                <th className="px-4 py-3">Instagram</th>
-                <th className="px-4 py-3">Not</th>
+                <th className="hidden px-4 py-3 md:table-cell">E-posta</th>
+                <th className="hidden px-4 py-3 md:table-cell">Instagram</th>
+                <th className="hidden px-4 py-3 md:table-cell">Not</th>
+                <th className="w-8 px-2 py-3 md:hidden" aria-label="Detay" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -188,23 +189,28 @@ export function ContactsPage({
                   className="cursor-pointer hover:bg-slate-50"
                 >
                   <td className="px-4 py-3 font-semibold text-slate-800">
-                    {customer.name}
+                    {customer.name.toLocaleUpperCase("tr-TR")}
                   </td>
                   <td className="px-4 py-3 text-slate-600">
-                    {[customer.countryCode, customer.phone].filter(Boolean).join(" ") || "-"}
+                    {customer.phone || "-"}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{customer.email || "-"}</td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="hidden px-4 py-3 text-slate-600 md:table-cell">
+                    {customer.email || "-"}
+                  </td>
+                  <td className="hidden px-4 py-3 text-slate-600 md:table-cell">
                     {customer.instagramUsername || "-"}
                   </td>
-                  <td className="max-w-[340px] truncate px-4 py-3 text-slate-600">
+                  <td className="hidden max-w-[340px] truncate px-4 py-3 text-slate-600 md:table-cell">
                     {customer.notes || "-"}
+                  </td>
+                  <td className="px-2 py-3 text-slate-400 md:hidden">
+                    <ChevronRight className="size-4" />
                   </td>
                 </tr>
               ))}
               {filteredSavedCustomers.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                  <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
                     Müşteri kaydı bulunamadı.
                   </td>
                 </tr>

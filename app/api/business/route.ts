@@ -7,6 +7,10 @@ import {
   getSessionUser,
   isApprovedUser,
 } from "@/lib/businessAccess";
+import {
+  applyCheckoutAttendanceUsage,
+  normalizePackageSales,
+} from "@/lib/packageUsage";
 import { compileSystemPrompt } from "@/lib/promptCompiler";
 import { prisma } from "@/lib/prisma";
 import { NextRequest } from "next/server";
@@ -247,6 +251,19 @@ export async function POST(request: NextRequest) {
       canManageSetup,
     );
     try {
+      const existingBusiness = await prisma.business.findUnique({
+        where: { id: accessibleBusiness.id },
+        select: { checkouts: true, promotions: true },
+      });
+      if (existingBusiness && payload.checkouts !== undefined) {
+        payload.promotions = applyCheckoutAttendanceUsage({
+          previousCheckouts: existingBusiness.checkouts,
+          nextCheckouts: payload.checkouts,
+          promotions: payload.promotions ?? existingBusiness.promotions,
+        });
+      } else if (payload.promotions !== undefined) {
+        payload.promotions = normalizePackageSales(payload.promotions);
+      }
       const business = await prisma.business.update({
         where: { id: accessibleBusiness.id },
         data: payload,

@@ -68,6 +68,28 @@ import {
 import { CheckoutModal } from "./checkouts";
 import { CustomerModal } from "./customers";
 
+const STAFF_COLORS = [
+  "#f59e0b",
+  "#16a34a",
+  "#7c3aed",
+  "#e11d48",
+  "#db2777",
+  "#9333ea",
+  "#dc2626",
+  "#0d9488",
+  "#2563eb",
+  "#65a30d",
+];
+
+type CalendarColumn = {
+  key: string;
+  label: string;
+  sublabel: string;
+  date: string;
+  staffId?: string;
+  color?: string;
+};
+
 export function CalendarPage({
   selectedDate,
   business,
@@ -128,6 +150,63 @@ export function CalendarPage({
     (appointment) => appointment.status !== "CANCELED",
   );
   const checkouts = business.checkouts || [];
+  const visibleStaff = staff.filter(
+    (member) => member.calendarVisible !== false,
+  );
+  const staffColorById = (staffId: string | null | undefined) => {
+    const index = visibleStaff.findIndex((member) => member.id === staffId);
+    return STAFF_COLORS[(index < 0 ? 0 : index) % STAFF_COLORS.length];
+  };
+  const dayStaff =
+    selectedStaffId === "all"
+      ? visibleStaff
+      : visibleStaff.filter((member) => member.id === selectedStaffId);
+  const hasUnassignedDayItems =
+    visibleAppointments.some(
+      (appointment) =>
+        appointment.date === selectedDate && !appointment.staffId,
+    ) ||
+    checkouts.some(
+      (checkout) =>
+        checkout.date === selectedDate &&
+        getCheckoutStaffIds(checkout).length === 0,
+    );
+  const dayColumns: CalendarColumn[] = dayStaff.map((member) => ({
+    key: `staff-${member.id}`,
+    label: member.name,
+    sublabel: formatDateLong(selectedDate),
+    date: selectedDate,
+    staffId: member.id,
+    color: staffColorById(member.id),
+  }));
+  if (hasUnassignedDayItems) {
+    dayColumns.push({
+      key: "staff-unassigned",
+      label: "Atanmamış",
+      sublabel: formatDateLong(selectedDate),
+      date: selectedDate,
+      staffId: "__unassigned__",
+      color: "#64748b",
+    });
+  }
+  const calendarColumns: CalendarColumn[] =
+    calendarView === "Günlük görünüm"
+      ? dayColumns.length > 0
+        ? dayColumns
+        : [
+            {
+              key: `date-${selectedDate}`,
+              label: formatDateLong(selectedDate),
+              sublabel: "Personel yok",
+              date: selectedDate,
+            },
+          ]
+      : visibleDates.map((date) => ({
+          key: date,
+          label: formatDateLong(date),
+          sublabel: calendarId || "Takvim",
+          date,
+        }));
 
   useEffect(() => {
     if (!calendarId) {
@@ -247,7 +326,7 @@ export function CalendarPage({
               className="w-full sm:w-44"
               options={[
                 { value: "all", label: "Tüm personel" },
-                ...staff.map((member) => ({
+                ...visibleStaff.map((member) => ({
                   value: member.id,
                   label: member.name,
                 })),
@@ -379,7 +458,10 @@ export function CalendarPage({
                         key={appointment.id}
                         type="button"
                         onClick={() => openAppointment(appointment)}
-                        className="mb-1 block w-full truncate rounded bg-[#5f86b6] px-1.5 py-0.5 text-left text-[11px] font-medium text-white"
+                        className="mb-1 block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium text-white"
+                        style={{
+                          backgroundColor: staffColorById(appointment.staffId),
+                        }}
                       >
                         {appointment.time} {appointment.customerName}
                       </button>
@@ -408,22 +490,31 @@ export function CalendarPage({
                     (calendarWidth / 100),
                 ),
                 gridTemplateColumns:
-                  "52px repeat(" + visibleDates.length + ", minmax(100px, 1fr))",
+                  "52px repeat(" +
+                  calendarColumns.length +
+                  ", minmax(100px, 1fr))",
               }}
             >
               <div className="border-r border-slate-200 bg-slate-50" />
-              {visibleDates.map((date) => (
+              {calendarColumns.map((column) => (
                 <div
-                  key={date}
+                  key={column.key}
                   className={[
-                    "sticky top-0 z-10 border-b border-r border-slate-200 px-4 py-2 text-center text-xs font-semibold",
-                    date === today
-                      ? "bg-[#f4efcf] text-slate-800"
-                      : "bg-[#e8f4e3] text-green-800",
+                    "sticky top-0 z-10 border-b border-r border-slate-200 px-3 py-2 text-center text-xs font-semibold",
+                    column.color
+                      ? "text-white"
+                      : column.date === today
+                        ? "bg-[#f4efcf] text-slate-800"
+                        : "bg-[#e8f4e3] text-green-800",
                   ].join(" ")}
+                  style={
+                    column.color
+                      ? { backgroundColor: column.color }
+                      : undefined
+                  }
                 >
-                  <div>{formatDateLong(date)}</div>
-                  <div className="font-normal">{calendarId || "Takvim"}</div>
+                  <div>{column.label}</div>
+                  <div className="font-normal">{column.sublabel}</div>
                 </div>
               ))}
               {slots.map((slot) => {
@@ -433,33 +524,55 @@ export function CalendarPage({
                   slot.minute,
                   slotInterval,
                 );
-                const slotCells = visibleDates.map((date) => {
+                const slotCells = calendarColumns.map((column) => {
                   const slotAppointments = visibleAppointments.filter(
-                    (appointment) =>
-                      appointment.date === date &&
-                      isInSlot(
+                    (appointment) => {
+                      if (appointment.date !== column.date) return false;
+                      if (column.staffId === "__unassigned__") {
+                        if (appointment.staffId) return false;
+                      } else if (column.staffId) {
+                        if (appointment.staffId !== column.staffId) return false;
+                      } else if (
+                        selectedStaffId !== "all" &&
+                        appointment.staffId !== selectedStaffId
+                      ) {
+                        return false;
+                      }
+                      return isInSlot(
                         appointment.time,
                         slot.hour,
                         slot.minute,
                         slotInterval,
-                      ) &&
-                      (selectedStaffId === "all" ||
-                        (appointment as Appointment & { staffId?: string })
-                          .staffId === selectedStaffId),
+                      );
+                    },
                   );
-                  const slotCheckouts = checkouts.filter(
-                    (checkout) =>
-                      checkout.date === date &&
-                      isInSlot(
-                        checkout.hour + ":" + checkout.minute,
-                        slot.hour,
-                        slot.minute,
-                        slotInterval,
-                      ) &&
-                      (selectedStaffId === "all" ||
-                        getCheckoutStaffIds(checkout).includes(selectedStaffId)),
-                  );
-                  return { date, slotAppointments, slotCheckouts };
+                  const slotCheckouts = checkouts.filter((checkout) => {
+                    if (checkout.date !== column.date) return false;
+                    const checkoutStaffIds = getCheckoutStaffIds(checkout);
+                    if (column.staffId === "__unassigned__") {
+                      if (checkoutStaffIds.length > 0) return false;
+                    } else if (column.staffId) {
+                      if (!checkoutStaffIds.includes(column.staffId)) return false;
+                    } else if (
+                      selectedStaffId !== "all" &&
+                      !checkoutStaffIds.includes(selectedStaffId)
+                    ) {
+                      return false;
+                    }
+                    return isInSlot(
+                      checkout.hour + ":" + checkout.minute,
+                      slot.hour,
+                      slot.minute,
+                      slotInterval,
+                    );
+                  });
+                  return {
+                    key: column.key,
+                    date: column.date,
+                    color: column.color,
+                    slotAppointments,
+                    slotCheckouts,
+                  };
                 });
                 const slotHasItems = slotCells.some(
                   (cell) =>
@@ -485,44 +598,56 @@ export function CalendarPage({
                     >
                       {slot.label}
                     </div>
-                    {slotCells.map(({ date, slotAppointments, slotCheckouts }) => (
-                      <div
-                        key={date + "-" + slot.label}
-                        className={[
-                          "border-b border-r border-slate-200",
-                          slotHasItems ? "py-1" : "py-0",
-                          date === today
-                            ? isCurrentSlot
-                              ? "bg-[#f7efc0] dark:bg-amber-500/20"
-                              : "bg-[#fff8d8]"
-                            : "bg-[#fffde9]",
-                        ].join(" ")}
-                        style={{ minHeight: rowHeight }}
-                      >
-                        {slotAppointments.map((appointment) => (
-                          <div
-                            key={appointment.id}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => openAppointment(appointment)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                openAppointment(appointment);
-                              }
-                            }}
-                            className={[
-                              "mx-2 mt-1 cursor-pointer rounded border-l-4 border-[#5f86b6] bg-white px-2 py-1.5 text-xs shadow-sm transition-colors hover:bg-slate-50",
-                              calendarTextClass,
-                            ].join(" ")}
-                          >
-                            <div className="font-semibold">
-                              {appointment.time} - {appointment.customerName}
+                    {slotCells.map(
+                      ({
+                        key,
+                        date,
+                        color,
+                        slotAppointments,
+                        slotCheckouts,
+                      }) => (
+                        <div
+                          key={key + "-" + slot.label}
+                          className={[
+                            "border-b border-r border-slate-200",
+                            slotHasItems ? "py-1" : "py-0",
+                            date === today
+                              ? isCurrentSlot
+                                ? "bg-[#f7efc0] dark:bg-amber-500/20"
+                                : "bg-[#fff8d8]"
+                              : "bg-[#fffde9]",
+                          ].join(" ")}
+                          style={{ minHeight: rowHeight }}
+                        >
+                          {slotAppointments.map((appointment) => (
+                            <div
+                              key={appointment.id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => openAppointment(appointment)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  openAppointment(appointment);
+                                }
+                              }}
+                              className={[
+                                "mx-2 mt-1 cursor-pointer rounded border-l-4 bg-white px-2 py-1.5 text-xs shadow-sm transition-colors hover:bg-slate-50",
+                                calendarTextClass,
+                              ].join(" ")}
+                              style={{
+                                borderLeftColor:
+                                  color ||
+                                  staffColorById(appointment.staffId),
+                              }}
+                            >
+                              <div className="font-semibold">
+                                {appointment.time} - {appointment.customerName}
+                              </div>
+                              <div className="line-clamp-2 leading-snug text-slate-500">
+                                {appointment.description || appointment.status}
+                              </div>
                             </div>
-                            <div className="line-clamp-2 leading-snug text-slate-500">
-                              {appointment.description || appointment.status}
-                            </div>
-                          </div>
-                        ))}
+                          ))}
                         {slotCheckouts.map((checkout) => (
                           <div
                             key={checkout.id}

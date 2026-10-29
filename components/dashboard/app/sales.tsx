@@ -80,8 +80,9 @@ export function ProductSalesPage({
   }
 
   return (
-    <SalesShell
-      title="Ürün satışları"
+    <>
+      <SalesShell
+        title="Ürün satışları"
       newLabel="Yeni"
       period={period}
       onPeriodChange={setPeriod}
@@ -151,6 +152,7 @@ export function ProductSalesPage({
           </tr>
         </tbody>
       </table>
+      </SalesShell>
       {modalOpen && (
         <ProductSaleModal
           business={business}
@@ -165,7 +167,7 @@ export function ProductSalesPage({
           onSubmit={saveSale}
         />
       )}
-    </SalesShell>
+    </>
   );
 }
 
@@ -199,14 +201,34 @@ export function PackageSalesPage({
   ) {
     setModalOpen(false);
     setEditingSale(null);
-    const exists = allSales.some((item) => item.id === sale.id);
+    const normalizedSale: PackageSaleItem = {
+      ...sale,
+      lines: sale.lines.map((line) => {
+        const quantity = Math.max(0, Number(line.quantity) || 0);
+        const used = Math.min(quantity, Math.max(0, Number(line.used) || 0));
+        const remaining = Math.min(
+          quantity - used,
+          Math.max(0, Number(line.remaining ?? quantity - used) || 0),
+        );
+        return {
+          ...line,
+          quantity,
+          used,
+          remaining,
+          usedCheckoutIds: line.usedCheckoutIds ?? [],
+        };
+      }),
+    };
+    const exists = allSales.some((item) => item.id === normalizedSale.id);
     await onUpdateAndSave({
       promotions: {
         ...promotions,
         packages,
         packageSales: exists
-          ? allSales.map((item) => (item.id === sale.id ? sale : item))
-          : [sale, ...allSales],
+          ? allSales.map((item) =>
+              item.id === normalizedSale.id ? normalizedSale : item,
+            )
+          : [normalizedSale, ...allSales],
       },
     });
   }
@@ -232,8 +254,9 @@ export function PackageSalesPage({
   }
 
   return (
-    <SalesShell
-      title="Paket satışları"
+    <>
+      <SalesShell
+        title="Paket satışları"
       newLabel="Yeni"
       period={period}
       onPeriodChange={setPeriod}
@@ -281,6 +304,17 @@ export function PackageSalesPage({
         <tbody>
           {sales.map((sale) => {
             const quantity = sale.lines.reduce((sum, line) => sum + line.quantity, 0);
+            const used = sale.lines.reduce(
+              (sum, line) => sum + (line.used ?? 0),
+              0,
+            );
+            const remaining = sale.lines.reduce(
+              (sum, line) =>
+                sum +
+                (line.remaining ??
+                  Math.max(0, line.quantity - (line.used ?? 0))),
+              0,
+            );
             return (
               <tr key={sale.id} className="border-b border-slate-100">
                 <td className="px-3 py-3">
@@ -312,8 +346,10 @@ export function PackageSalesPage({
                   {sale.lines.map((line) => serviceName(business, line.serviceId) || line.name).join(", ")}
                 </td>
                 <td className="px-3 py-3">{quantity}</td>
-                <td className="px-3 py-3">0</td>
-                <td className="px-3 py-3">{quantity}</td>
+                <td className="px-3 py-3">{used}</td>
+                <td className="px-3 py-3">
+                  {remaining} / {quantity}
+                </td>
                 <td className="px-3 py-3">{sale.total} TL</td>
                 <td className="px-3 py-3">{sale.paidAmount} TL</td>
                 <td className="px-3 py-3">{sale.total - sale.paidAmount} TL</td>
@@ -335,6 +371,7 @@ export function PackageSalesPage({
           </tr>
         </tbody>
       </table>
+      </SalesShell>
       {modalOpen && (
         <PackageSaleModal
           key={editingSale?.id ?? "new"}
@@ -364,7 +401,7 @@ export function PackageSalesPage({
           onConfirm={() => void removeSale(deletingSale)}
         />
       )}
-    </SalesShell>
+    </>
   );
 }
 
@@ -746,7 +783,13 @@ export function PackageSaleModal({
   } | null>(null);
   const [lines, setLines] = useState<PackageSaleLine[]>(() =>
     sale && sale.lines.length > 0
-      ? sale.lines.map((line) => ({ ...line }))
+      ? sale.lines.map((line) => ({
+          ...line,
+          used: line.used ?? 0,
+          remaining:
+            line.remaining ?? Math.max(0, line.quantity - (line.used ?? 0)),
+          usedCheckoutIds: line.usedCheckoutIds ?? [],
+        }))
       : [
           {
             id: createId(),
@@ -756,6 +799,9 @@ export function PackageSaleModal({
             serviceId: "",
             quantity: 1,
             amount: 0,
+            used: 0,
+            remaining: 1,
+            usedCheckoutIds: [],
           },
         ],
   );
@@ -802,6 +848,12 @@ export function PackageSaleModal({
                 serviceId: item.serviceId,
                 quantity: item.quantity,
                 amount: item.price,
+                used: line.used ?? 0,
+                remaining: Math.max(
+                  0,
+                  item.quantity - (line.used ?? 0),
+                ),
+                usedCheckoutIds: line.usedCheckoutIds ?? [],
               }
             : line,
         ),
@@ -1050,9 +1102,16 @@ function PackageLineEditor({
     <div className="grid grid-cols-[72px_110px_1fr_92px_32px] gap-2">
       <Input
         value={line.quantity}
-        onChange={(event) =>
-          onChange({ ...line, quantity: parseNumber(event.target.value, 1) })
-        }
+        onChange={(event) => {
+          const quantity = parseNumber(event.target.value, 1);
+          const used = Math.min(quantity, Math.max(0, line.used ?? 0));
+          onChange({
+            ...line,
+            quantity,
+            used,
+            remaining: Math.max(0, quantity - used),
+          });
+        }}
         placeholder="Miktar"
       />
       <NativeSelect

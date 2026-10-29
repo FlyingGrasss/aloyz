@@ -6,10 +6,30 @@
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
 - Last known green commit: `f6525a6` for typecheck; manual UI verification pending
-- Highest priority unfinished feature: `calendar-ux`
+- Highest priority unfinished feature: `package-session-usage`
 - Current blocker: none
 
 ## Session record
+
+### 2026-10-29 — Package session usage, responsive customer list, staff columns
+- Completed:
+  - Fixed package-sale delete dialog rendering by moving it outside the table scroll container.
+  - Added `used`, `remaining`, and `usedCheckoutIds` to package sale lines.
+  - Added server-side checkout attendance diff logic: Geldi deducts one session, Gelmedi/deletion restores it.
+  - Package sales table now shows used and remaining/quantity.
+  - Web customer list hides email/Instagram/notes on small screens and shows name + phone + chevron.
+  - Daily calendar view now uses colored staff columns; weekly/monthly appointment cards use staff colors.
+- Verification run:
+  - `pnpm exec tsc --noEmit` passed.
+  - Local package usage unit test passed: apply, idempotent, restore, delete restore, cancelled, different customer.
+  - Targeted ESLint still reports pre-existing DashboardApp/calendar Google-sync errors; `lib/packageUsage.ts` and sales/customer files are clean.
+- Evidence recorded: none yet; end-to-end UI verification pending.
+- Commits: none yet for this batch.
+- Known risks:
+  - Server-side usage is applied through `/api/business`; admin-mode updates use a separate route and are not covered.
+  - Package line with empty serviceId falls back to any remaining package for that customer.
+  - Calendar daily staff columns and responsive customer table need manual visual verification.
+- Next best action: verify the three UI flows manually, then commit and push.
 
 ### 2026-10-29 — Sevim Alan import follow-up: Turkish data, calendar UX, appointment editing
 - Completed:

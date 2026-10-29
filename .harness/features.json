@@ -5,7 +5,7 @@
     "install": "pnpm install",
     "verify": [
       "pnpm exec tsc --noEmit",
-      "pnpm exec eslint components/dashboard/app/calendar.tsx components/dashboard/app/overview.tsx components/dashboard/app/pages.tsx components/dashboard/DashboardApp.tsx app/api/appointments/[id]/route.ts"
+      "pnpm exec eslint lib/packageUsage.ts components/dashboard/app/sales.tsx components/dashboard/app/customers.tsx components/dashboard/app/calendar.tsx app/api/business/route.ts"
     ],
     "start": "pnpm dev"
   },
@@ -14,25 +14,65 @@
       "id": "calendar-ux",
       "priority": 10,
       "area": "dashboard/calendar",
-      "title": "Calendar defaults, density, and appointment edit modal",
-      "user_visible_behavior": "The calendar opens weekly at 60-minute intervals and 80% width, empty hours are compact, and clicking an appointment opens an edit/cancel modal for that appointment.",
+      "title": "Calendar defaults, density, staff columns, and appointment edit modal",
+      "user_visible_behavior": "The calendar opens weekly at 60-minute intervals, daily view uses colored staff columns, empty hours are compact, the grid fills the panel, and clicking an appointment opens an edit/cancel modal.",
       "files": [
         "components/dashboard/app/calendar.tsx",
         "components/dashboard/app/pages.tsx",
         "components/dashboard/DashboardApp.tsx",
         "app/api/appointments/[id]/route.ts"
       ],
-      "status": "in_progress",
+      "status": "not_started",
       "verification": [
         "pnpm exec tsc --noEmit",
-        "Open Randevu takvimi: default view is Haftalık görünüm, interval 60 Dakika, width 80%.",
+        "Open Randevu takvimi: default view is Haftalık görünüm, interval 60 Dakika; the grid fills the panel with no right-side gap.",
+        "Switch to Günlük görünüm: staff appear as colored columns.",
         "Empty time rows are visibly shorter than rows with appointments.",
         "Click an appointment card: modal opens for that appointment and can save edits or cancel it.",
         "Canceled appointments disappear from the calendar.",
         "Google Calendar cards do not open the local edit modal."
       ],
       "evidence": null,
-      "notes": "Code committed in 983c2dd and typecheck passes. Manual UI verification is the only remaining step. The business bookingSettings stores calendarView=Haftalık görünüm, calendarWidth=80, calendarSlotInterval=60 Dakika."
+      "notes": "Code complete and typecheck passes; manual UI verification pending. Kept out of in_progress while package-session-usage is active."
+    },
+    {
+      "id": "package-session-usage",
+      "priority": 15,
+      "area": "dashboard/package-sales",
+      "title": "Deduct package sessions when a checkout is marked Geldi",
+      "user_visible_behavior": "When a checkout attendance is set to Geldi, one session is deducted from the matching package sale and the package sales table shows used/remaining counts such as 1 used, 7/8 remaining.",
+      "files": [
+        "lib/packageUsage.ts",
+        "app/api/business/route.ts",
+        "components/dashboard/app/sales.tsx",
+        "components/dashboard/app/shared.tsx"
+      ],
+      "status": "in_progress",
+      "verification": [
+        "pnpm exec tsc --noEmit",
+        "Local unit test: apply Geldi -> used 1, remaining 7; repeat -> unchanged; Gelmedi/delete -> restored to 8.",
+        "Local unit test: cancelled checkout and different customer do not deduct.",
+        "UI: mark a checkout Geldi and confirm package sales show Kullanılan=1 and Kalan kullanım=7/8.",
+        "UI: remove Geldi and confirm the session is restored."
+      ],
+      "evidence": null,
+      "notes": "Pure usage helper and server-side diff logic implemented. Local unit test passed; end-to-end UI verification pending."
+    },
+    {
+      "id": "customer-list-mobile",
+      "priority": 25,
+      "area": "dashboard/customers",
+      "title": "Responsive customer list matching the mobile layout",
+      "user_visible_behavior": "On small screens the web customer list shows name and phone as clean tappable rows with a chevron; email, Instagram, and notes remain on desktop.",
+      "files": ["components/dashboard/app/customers.tsx"],
+      "status": "not_started",
+      "verification": [
+        "pnpm exec tsc --noEmit",
+        "Mobile web width: customer table shows Müşteri and Telefon only, plus a chevron; no horizontal scroll needed.",
+        "Desktop: email, Instagram, and notes columns are still visible."
+      ],
+      "evidence": null,
+      "notes": "Code complete; manual responsive verification pending."
     },
     {
       "id": "appointment-list-cleanup",
@@ -52,7 +92,7 @@
         "A multi-service booking (e.g. gülşen tanyıldız on 2026-10-29 14:00) appears once in Randevular with both services listed."
       ],
       "evidence": null,
-      "notes": "Code committed in 983c2dd. Manual UI verification pending; kept out of in_progress so calendar-ux remains the single active feature."
+      "notes": "Code committed in 983c2dd. Manual UI verification pending."
     },
     {
       "id": "salonappy-data-translation",
