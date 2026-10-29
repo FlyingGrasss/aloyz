@@ -64,6 +64,8 @@ import {
   GOOGLE_SERVICE_ACCOUNT_EMAIL,
 } from "./shared";
 
+const CUSTOMER_PAGE_SIZE = 100;
+
 export function ContactsPage({
   business,
   contacts,
@@ -80,6 +82,14 @@ export function ContactsPage({
   const [editingCustomer, setEditingCustomer] =
     useState<CustomerProfile | null>(null);
   const [contactFilter, setContactFilter] = useState("all");
+  const [customerPageState, setCustomerPageState] = useState({
+    searchTerm,
+    page: 1,
+  });
+  const customerPage =
+    customerPageState.searchTerm === searchTerm ? customerPageState.page : 1;
+  const setCustomerPage = (page: number) =>
+    setCustomerPageState({ searchTerm, page });
   const savedCustomers = business.customers || [];
   const normalizedSearch = searchTerm.trim().toLocaleLowerCase("tr-TR");
   const filteredSavedCustomers = savedCustomers.filter((customer) => {
@@ -114,13 +124,34 @@ export function ContactsPage({
       );
   });
 
+  const totalCustomerPages = Math.max(
+    1,
+    Math.ceil(filteredSavedCustomers.length / CUSTOMER_PAGE_SIZE),
+  );
+  const currentCustomerPage = Math.min(customerPage, totalCustomerPages);
+  const visibleCustomers = filteredSavedCustomers.slice(
+    (currentCustomerPage - 1) * CUSTOMER_PAGE_SIZE,
+    currentCustomerPage * CUSTOMER_PAGE_SIZE,
+  );
+  const firstVisibleCustomer =
+    filteredSavedCustomers.length === 0
+      ? 0
+      : (currentCustomerPage - 1) * CUSTOMER_PAGE_SIZE + 1;
+  const lastVisibleCustomer = Math.min(
+    currentCustomerPage * CUSTOMER_PAGE_SIZE,
+    filteredSavedCustomers.length,
+  );
+
   async function saveCustomer(customer: CustomerProfile) {
     const exists = savedCustomers.some((item) => item.id === customer.id);
     const next = exists
       ? savedCustomers.map((item) => (item.id === customer.id ? customer : item))
       : [customer, ...savedCustomers];
-    setEditingCustomer(null);
-    await onUpdateAndSave({ customers: next });
+    const saved = await onUpdateAndSave({ customers: next });
+    if (saved) {
+      setEditingCustomer(null);
+      setCustomerPage(1);
+    }
   }
 
   return (
@@ -131,7 +162,9 @@ export function ContactsPage({
           <div>
             <h1 className="text-lg font-semibold">Müşteriler</h1>
             <p className="text-sm text-slate-500">
-              {filteredSavedCustomers.length} kayıt gösteriliyor
+              {filteredSavedCustomers.length === 0
+                ? "0 kayıt"
+                : `${firstVisibleCustomer}–${lastVisibleCustomer} / ${filteredSavedCustomers.length} kayıt`}
               {searchTerm ? ', arama: "' + searchTerm + '"' : ""}
             </p>
           </div>
@@ -148,7 +181,7 @@ export function ContactsPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredSavedCustomers.map((customer) => (
+              {visibleCustomers.map((customer) => (
                 <tr
                   key={customer.id}
                   onClick={() => setEditingCustomer(customer)}
@@ -179,6 +212,41 @@ export function ContactsPage({
             </tbody>
           </table>
         </div>
+        {filteredSavedCustomers.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-sm">
+            <span className="text-slate-500">
+              Sayfa {currentCustomerPage} / {totalCustomerPages}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Önceki sayfa"
+                disabled={currentCustomerPage <= 1}
+                onClick={() =>
+                  setCustomerPage(Math.max(1, currentCustomerPage - 1))
+                }
+              >
+                <ChevronLeft />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Sonraki sayfa"
+                disabled={currentCustomerPage >= totalCustomerPages}
+                onClick={() =>
+                  setCustomerPage(
+                    Math.min(totalCustomerPages, currentCustomerPage + 1),
+                  )
+                }
+              >
+                <ChevronRight />
+              </Button>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="rounded bg-white shadow-sm">

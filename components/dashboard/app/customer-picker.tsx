@@ -32,41 +32,56 @@ export function CustomerPicker({
   onCreateCustomer: (name: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const baseRows = useMemo(() => {
+    const rows: CustomerSelection[] = [];
+    const seen = new Set<string>();
+    const keyFor = (item: CustomerSelection) => {
+      const phone = String(item.phone || "").replace(/\D/g, "");
+      if (phone) return `phone:${phone}`;
+      const email = String(item.email || "").trim().toLocaleLowerCase("tr-TR");
+      if (email) return `email:${email}`;
+      return `${item.source}:${item.id || item.name.toLocaleLowerCase("tr-TR")}`;
+    };
+    const push = (item: CustomerSelection) => {
+      const key = keyFor(item);
+      if (seen.has(key)) return;
+      seen.add(key);
+      rows.push(item);
+    };
+
+    for (const customer of customers) {
+      push({
+        id: customer.id,
+        name: customer.name,
+        phone: [customer.countryCode, customer.phone].filter(Boolean).join(" "),
+        email: customer.email,
+        source: "customer",
+      });
+    }
+    for (const contact of contacts) {
+      push({
+        id: `contact:${contact.id}`,
+        name: contact.name,
+        phone: contact.phone,
+        email: contact.username,
+        source: "contact",
+      });
+    }
+    return rows;
+  }, [contacts, customers]);
+
   const matches = useMemo(() => {
     const query = value.trim().toLocaleLowerCase("tr-TR");
-    const customerRows: CustomerSelection[] = customers.map((customer) => ({
-      id: customer.id,
-      name: customer.name,
-      phone: [customer.countryCode, customer.phone].filter(Boolean).join(" "),
-      email: customer.email,
-      source: "customer",
-    }));
-    const contactRows: CustomerSelection[] = contacts.map((contact) => ({
-      id: `contact:${contact.id}`,
-      name: contact.name,
-      phone: contact.phone,
-      email: contact.username,
-      source: "contact",
-    }));
-    return [...customerRows, ...contactRows]
-      .filter((item, index, list) => {
-        const firstIndex = list.findIndex(
-          (other) =>
-            other.name.toLocaleLowerCase("tr-TR") ===
-            item.name.toLocaleLowerCase("tr-TR"),
-        );
-        return firstIndex === index;
-      })
-      .filter((item) => {
-        if (!query) return true;
-        return (
+    if (!query) return baseRows.slice(0, 6);
+    return baseRows
+      .filter(
+        (item) =>
           item.name.toLocaleLowerCase("tr-TR").startsWith(query) ||
           (item.phone || "").toLocaleLowerCase("tr-TR").startsWith(query) ||
-          (item.email || "").toLocaleLowerCase("tr-TR").startsWith(query)
-        );
-      })
+          (item.email || "").toLocaleLowerCase("tr-TR").startsWith(query),
+      )
       .slice(0, 6);
-  }, [contacts, customers, value]);
+  }, [baseRows, value]);
 
   return (
     <div className="relative">
