@@ -78,6 +78,7 @@ export function CalendarPage({
   onDateChange,
   onUpdateAndSave,
   onSelectView,
+  onAppointmentUpdated,
 }: {
   selectedDate: string;
   business: Business;
@@ -88,8 +89,11 @@ export function CalendarPage({
   onDateChange: (date: string) => void;
   onUpdateAndSave: (fields: Partial<Business>) => Promise<boolean>;
   onSelectView: (view: ViewId) => void;
+  onAppointmentUpdated?: (appointment: Appointment) => void;
 }) {
   const [modal, setModal] = useState<"checkout" | "customer" | null>(null);
+  const [selectedAppointment, setSelectedAppointment] =
+    useState<Appointment | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [selectedStaffId, setSelectedStaffId] = useState("all");
@@ -101,7 +105,7 @@ export function CalendarPage({
   const staff = business.staff || [];
   const calendarSettings = business.bookingSettings || {};
   const calendarView = normalizeCalendarView(calendarSettings.calendarView);
-  const calendarWidth = Number(calendarSettings.calendarWidth || "100");
+  const calendarWidth = Number(calendarSettings.calendarWidth || "80");
   const slotInterval = Number(
     String(calendarSettings.calendarSlotInterval || "60 Dakika").match(/\d+/)?.[0] ||
       "60",
@@ -120,21 +124,10 @@ export function CalendarPage({
   const monthDates = getMonthGridDates(selectedDate);
   const today = formatDateInIstanbul(new Date());
   const currentTime = formatTimeInIstanbul(new Date());
-  const visibleAppointments = [...appointments, ...googleAppointments];
-  const dayAppointments = visibleAppointments.filter(
-    (appointment) =>
-      appointment.date === selectedDate &&
-      (selectedStaffId === "all" ||
-        (appointment as Appointment & { staffId?: string }).staffId ===
-          selectedStaffId),
+  const visibleAppointments = [...appointments, ...googleAppointments].filter(
+    (appointment) => appointment.status !== "CANCELED",
   );
   const checkouts = business.checkouts || [];
-  const dayCheckouts = checkouts.filter(
-    (checkout) =>
-      checkout.date === selectedDate &&
-      (selectedStaffId === "all" ||
-        getCheckoutStaffIds(checkout).includes(selectedStaffId)),
-  );
 
   useEffect(() => {
     if (!calendarId) {
@@ -216,6 +209,14 @@ export function CalendarPage({
     date.setDate(date.getDate() + days);
     onDateChange(date.toISOString().slice(0, 10));
   };
+
+  function openAppointment(appointment: Appointment) {
+    if (appointment.id.startsWith("google-")) {
+      onSelectView("booking/list");
+      return;
+    }
+    setSelectedAppointment(appointment);
+  }
 
   useEffect(() => {
     const container = calendarScrollRef.current;
@@ -331,10 +332,11 @@ export function CalendarPage({
         <div ref={calendarScrollRef} className="max-h-[calc(100vh-220px)] overflow-auto sm:max-h-[calc(100vh-180px)]">
           {calendarView === "Aylık görünüm" ? (
             <div
-              className="grid"
+              className="grid max-lg:!w-full"
               style={{
+                width: `${calendarWidth}%`,
                 minWidth: Math.round(840 * (calendarWidth / 100)),
-                gridTemplateColumns: "repeat(7, minmax(116px, 1fr))",
+                gridTemplateColumns: "repeat(7, minmax(90px, 1fr))",
               }}
             >
               {["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((day) => (
@@ -377,7 +379,7 @@ export function CalendarPage({
                       <button
                         key={appointment.id}
                         type="button"
-                        onClick={() => onSelectView("booking/list")}
+                        onClick={() => openAppointment(appointment)}
                         className="mb-1 block w-full truncate rounded bg-[#5f86b6] px-1.5 py-0.5 text-left text-[11px] font-medium text-white"
                       >
                         {appointment.time} {appointment.customerName}
@@ -400,14 +402,15 @@ export function CalendarPage({
             </div>
           ) : (
             <div
-              className="grid"
+              className="grid max-lg:!w-full"
               style={{
+                width: `${calendarWidth}%`,
                 minWidth: Math.round(
                   (calendarView === "Haftalık görünüm" ? 980 : 680) *
                     (calendarWidth / 100),
                 ),
                 gridTemplateColumns:
-                  "52px repeat(" + visibleDates.length + ", minmax(128px, 1fr))",
+                  "52px repeat(" + visibleDates.length + ", minmax(100px, 1fr))",
               }}
             >
               <div className="border-r border-slate-200 bg-slate-50" />
@@ -432,6 +435,40 @@ export function CalendarPage({
                   slot.minute,
                   slotInterval,
                 );
+                const slotCells = visibleDates.map((date) => {
+                  const slotAppointments = visibleAppointments.filter(
+                    (appointment) =>
+                      appointment.date === date &&
+                      isInSlot(
+                        appointment.time,
+                        slot.hour,
+                        slot.minute,
+                        slotInterval,
+                      ) &&
+                      (selectedStaffId === "all" ||
+                        (appointment as Appointment & { staffId?: string })
+                          .staffId === selectedStaffId),
+                  );
+                  const slotCheckouts = checkouts.filter(
+                    (checkout) =>
+                      checkout.date === date &&
+                      isInSlot(
+                        checkout.hour + ":" + checkout.minute,
+                        slot.hour,
+                        slot.minute,
+                        slotInterval,
+                      ) &&
+                      (selectedStaffId === "all" ||
+                        getCheckoutStaffIds(checkout).includes(selectedStaffId)),
+                  );
+                  return { date, slotAppointments, slotCheckouts };
+                });
+                const slotHasItems = slotCells.some(
+                  (cell) =>
+                    cell.slotAppointments.length > 0 ||
+                    cell.slotCheckouts.length > 0,
+                );
+                const rowHeight = slotHasItems ? 64 : 20;
                 return (
                   <div
                     key={slot.label}
@@ -440,103 +477,80 @@ export function CalendarPage({
                   >
                     <div
                       className={[
-                        "border-r border-b border-slate-200 px-2 py-2 text-right text-xs text-slate-500",
+                        "border-r border-b border-slate-200 px-2 text-right text-xs text-slate-500",
+                        slotHasItems ? "py-2" : "py-0.5 text-[10px]",
                         isCurrentSlot
                           ? "bg-[#f4efcf] font-semibold dark:bg-amber-500/25 dark:text-amber-100"
                           : "bg-slate-50",
                       ].join(" ")}
+                      style={{ minHeight: rowHeight }}
                     >
                       {slot.label}
                     </div>
-                    {visibleDates.map((date) => {
-                      const slotAppointments = visibleAppointments.filter(
-                        (appointment) =>
-                          appointment.date === date &&
-                          isInSlot(
-                            appointment.time,
-                            slot.hour,
-                            slot.minute,
-                            slotInterval,
-                          ) &&
-                          (selectedStaffId === "all" ||
-                            (appointment as Appointment & { staffId?: string })
-                              .staffId === selectedStaffId),
-                      );
-                      const slotCheckouts = checkouts.filter(
-                        (checkout) =>
-                          checkout.date === date &&
-                          isInSlot(
-                            checkout.hour + ":" + checkout.minute,
-                            slot.hour,
-                            slot.minute,
-                            slotInterval,
-                          ) &&
-                          (selectedStaffId === "all" ||
-                            getCheckoutStaffIds(checkout).includes(selectedStaffId)),
-                      );
-                      return (
-                        <div
-                          key={date + "-" + slot.label}
-                          className={[
-                            "min-h-[64px] border-b border-r border-slate-200 py-1",
-                            date === today
-                              ? isCurrentSlot
-                                ? "bg-[#f7efc0] dark:bg-amber-500/20"
-                                : "bg-[#fff8d8]"
-                              : "bg-[#fffde9]",
-                          ].join(" ")}
-                        >
-                          {slotAppointments.map((appointment) => (
-                            <div
-                              key={appointment.id}
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => onSelectView("booking/list")}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" || event.key === " ") {
-                                  onSelectView("booking/list");
-                                }
-                              }}
-                              className={[
-                                "mx-2 mt-1 rounded border-l-4 border-[#5f86b6] bg-white px-3 py-2 text-xs shadow-sm",
-                                calendarTextClass,
-                              ].join(" ")}
-                            >
-                              <div className="font-semibold">
-                                {appointment.time} - {appointment.customerName}
-                              </div>
-                              <div className="truncate text-slate-500">
-                                {appointment.description || appointment.status}
-                              </div>
+                    {slotCells.map(({ date, slotAppointments, slotCheckouts }) => (
+                      <div
+                        key={date + "-" + slot.label}
+                        className={[
+                          "border-b border-r border-slate-200",
+                          slotHasItems ? "py-1" : "py-0",
+                          date === today
+                            ? isCurrentSlot
+                              ? "bg-[#f7efc0] dark:bg-amber-500/20"
+                              : "bg-[#fff8d8]"
+                            : "bg-[#fffde9]",
+                        ].join(" ")}
+                        style={{ minHeight: rowHeight }}
+                      >
+                        {slotAppointments.map((appointment) => (
+                          <div
+                            key={appointment.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => openAppointment(appointment)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                openAppointment(appointment);
+                              }
+                            }}
+                            className={[
+                              "mx-2 mt-1 cursor-pointer rounded border-l-4 border-[#5f86b6] bg-white px-2 py-1.5 text-xs shadow-sm transition-colors hover:bg-slate-50",
+                              calendarTextClass,
+                            ].join(" ")}
+                          >
+                            <div className="font-semibold">
+                              {appointment.time} - {appointment.customerName}
                             </div>
-                          ))}
-                          {slotCheckouts.map((checkout) => (
-                            <div
-                              key={checkout.id}
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => onSelectView("visit/list")}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" || event.key === " ") {
-                                  onSelectView("visit/list");
-                                }
-                              }}
-                              className={[
-                                "mx-2 mt-1 rounded border-l-4 border-[#24a647] bg-white px-3 py-2 text-xs shadow-sm",
-                                calendarTextClass,
-                              ].join(" ")}
-                            >
-                              <div className="font-semibold">
-                                {checkout.hour}:{checkout.minute} - {checkout.customerName}
-                              </div>
-                              <div className="truncate text-slate-500">
-                                {getCheckoutServiceSummary(business, checkout)}
-                              </div>
+                            <div className="line-clamp-2 leading-snug text-slate-500">
+                              {appointment.description || appointment.status}
                             </div>
-                          ))}
-                        </div>
-                      );
-                    })}
+                          </div>
+                        ))}
+                        {slotCheckouts.map((checkout) => (
+                          <div
+                            key={checkout.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => onSelectView("visit/list")}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                onSelectView("visit/list");
+                              }
+                            }}
+                            className={[
+                              "mx-2 mt-1 cursor-pointer rounded border-l-4 border-[#24a647] bg-white px-2 py-1.5 text-xs shadow-sm transition-colors hover:bg-slate-50",
+                              calendarTextClass,
+                            ].join(" ")}
+                          >
+                            <div className="font-semibold">
+                              {checkout.hour}:{checkout.minute} - {checkout.customerName}
+                            </div>
+                            <div className="line-clamp-2 leading-snug text-slate-500">
+                              {getCheckoutServiceSummary(business, checkout)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
                   </div>
                 );
               })}
@@ -567,6 +581,17 @@ export function CalendarPage({
           onSubmit={createCustomer}
         />
       )}
+      {selectedAppointment && (
+        <AppointmentEditModal
+          appointment={selectedAppointment}
+          business={business}
+          onClose={() => setSelectedAppointment(null)}
+          onSaved={(updated) => {
+            onAppointmentUpdated?.(updated);
+            setSelectedAppointment(null);
+          }}
+        />
+      )}
       {settingsOpen && (
         <CalendarSettingsModal
           settings={business.bookingSettings || {}}
@@ -587,18 +612,322 @@ export function CalendarPage({
   );
 }
 
+function AppointmentEditModal({
+  appointment,
+  business,
+  onClose,
+  onSaved,
+}: {
+  appointment: Appointment;
+  business: Business;
+  onClose: () => void;
+  onSaved: (appointment: Appointment) => void;
+}) {
+  const currentService = (business.services || []).find(
+    (service) => service.id === appointment.serviceId,
+  );
+  const currentStaff = (business.staff || []).find(
+    (staff) => staff.id === appointment.staffId,
+  );
+  const parts = String(appointment.description || "")
+    .split(" · ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const sourceRef =
+    parts.find((part) => part.startsWith("Salonappy #")) || "";
+  const initialNote = parts
+    .filter(
+      (part) =>
+        part !== currentService?.name &&
+        part !== currentStaff?.name &&
+        part !== sourceRef,
+    )
+    .join(" · ");
+
+  const [form, setForm] = useState({
+    customerName: appointment.customerName || "",
+    phone: appointment.phone || "",
+    date: appointment.date || "",
+    time: appointment.time || "",
+    serviceId: appointment.serviceId || "",
+    staffId: appointment.staffId || "",
+    note: initialNote,
+    status: appointment.status || "CONFIRMED",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [confirmCancel, setConfirmCancel] = useState(false);
+
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    return () => previous?.focus();
+  }, []);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !saving) onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose, saving]);
+
+  async function cancelAppointment() {
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/appointments/${appointment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "CANCELED" }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Randevu iptal edilemedi.");
+      }
+      onSaved(data.appointment as Appointment);
+    } catch (cancelError) {
+      setError(
+        cancelError instanceof Error
+          ? cancelError.message
+          : "Randevu iptal edilemedi.",
+      );
+      setConfirmCancel(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function save() {
+    if (!form.customerName.trim()) {
+      setError("Müşteri adı zorunlu.");
+      return;
+    }
+    if (!form.date || !form.time) {
+      setError("Tarih ve saat zorunlu.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    const serviceName = (business.services || []).find(
+      (service) => service.id === form.serviceId,
+    )?.name;
+    const staffName = (business.staff || []).find(
+      (staff) => staff.id === form.staffId,
+    )?.name;
+    const description = [
+      serviceName,
+      staffName,
+      form.note.trim(),
+      sourceRef,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    try {
+      const response = await fetch(`/api/appointments/${appointment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: form.customerName,
+          phone: form.phone,
+          date: form.date,
+          time: form.time,
+          serviceId: form.serviceId || null,
+          staffId: form.staffId || null,
+          description,
+          status: form.status,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Randevu güncellenemedi.");
+      }
+      onSaved(data.appointment as Appointment);
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Randevu güncellenemedi.",
+      );
+      setConfirmCancel(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Randevuyu düzenle"
+    >
+      <section className="w-full max-w-2xl rounded bg-white shadow-xl">
+        <ModalHeader title="Randevuyu düzenle" onClose={onClose} />
+        <div className="grid gap-3 p-4 sm:grid-cols-2">
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Müşteri
+            <Input
+              autoFocus
+              value={form.customerName}
+              onChange={(event) =>
+                setForm({ ...form, customerName: event.target.value })
+              }
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Telefon
+            <Input
+              value={form.phone}
+              inputMode="tel"
+              onChange={(event) =>
+                setForm({ ...form, phone: event.target.value })
+              }
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Tarih
+            <Input
+              type="date"
+              value={form.date}
+              onChange={(event) =>
+                setForm({ ...form, date: event.target.value })
+              }
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Saat
+            <Input
+              type="time"
+              value={form.time}
+              onChange={(event) =>
+                setForm({ ...form, time: event.target.value })
+              }
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Hizmet
+            <NativeSelect
+              value={form.serviceId}
+              onChange={(value) => setForm({ ...form, serviceId: value })}
+              options={[
+                { value: "", label: "Hizmet seçilmedi" },
+                ...(business.services || []).map((service) => ({
+                  value: service.id,
+                  label: service.name,
+                })),
+              ]}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Personel
+            <NativeSelect
+              value={form.staffId}
+              onChange={(value) => setForm({ ...form, staffId: value })}
+              options={[
+                { value: "", label: "Personel seçilmedi" },
+                ...(business.staff || []).map((staff) => ({
+                  value: staff.id,
+                  label: staff.name,
+                })),
+              ]}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700 sm:col-span-2">
+            Not
+            <Textarea
+              rows={3}
+              value={form.note}
+              onChange={(event) =>
+                setForm({ ...form, note: event.target.value })
+              }
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Durum
+            <NativeSelect
+              value={form.status}
+              onChange={(value) => setForm({ ...form, status: value })}
+              options={[
+                { value: "REQUESTED", label: "Talep" },
+                { value: "CONFIRMED", label: "Onaylı" },
+                { value: "COMPLETED", label: "Tamamlandı" },
+                { value: "CANCELED", label: "İptal" },
+              ]}
+            />
+          </label>
+        </div>
+        {error && (
+          <div className="mx-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+        {confirmCancel && (
+          <div className="mx-4 mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <p className="font-semibold">Bu randevu iptal edilsin mi?</p>
+            <p className="mt-1">
+              Randevu takvimden kaldırılır; kayıt geçmişte “İptal” olarak kalır.
+            </p>
+            <div className="mt-3 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setConfirmCancel(false)}
+              >
+                Vazgeç
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={saving}
+                onClick={cancelAppointment}
+              >
+                Evet, iptal et
+              </Button>
+            </div>
+          </div>
+        )}
+        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 px-4 py-3">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Kapat
+          </Button>
+          {form.status !== "CANCELED" && !confirmCancel && (
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={saving}
+              onClick={() => setConfirmCancel(true)}
+            >
+              İptal et
+            </Button>
+          )}
+          <Button
+            type="button"
+            disabled={saving || confirmCancel}
+            onClick={() => save()}
+            className="bg-[#24a647] text-white"
+          >
+            {saving ? "Kaydediliyor..." : "Kaydet"}
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function AppointmentsPage({
   appointments,
   business,
+  onAppointmentUpdated,
 }: {
   appointments: Appointment[];
   business: Business;
+  onAppointmentUpdated?: (appointment: Appointment) => void;
 }) {
-  const [sourceFilter, setSourceFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [staffFilter, setStaffFilter] = useState("all");
   const [selectedRow, setSelectedRow] = useState<AppointmentListRow | null>(null);
-  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
+  const [editingAppointment, setEditingAppointment] =
+    useState<Appointment | null>(null);
   const [statusSavingId, setStatusSavingId] = useState<string | null>(null);
   const [statusError, setStatusError] = useState("");
 
@@ -611,6 +940,8 @@ export function AppointmentsPage({
     return {
       id: `checkout-${checkout.id}`,
       rawId: checkout.id,
+      rawIds: [],
+      appointments: [],
       kind: "checkout" as const,
       customerName: checkout.customerName,
       phone: customer?.phone || "-",
@@ -620,44 +951,89 @@ export function AppointmentsPage({
       status: checkout.attendance || checkout.status || "-",
       staffId: staffIds[0] || "",
       serviceId: checkout.serviceId || "",
-      sourceKey: "checkout",
-      source: "Adisyon",
     };
   });
-  const appointmentRows = appointments.map((appointment) => {
-    const sourceKey = getAppointmentSourceKey(appointment);
-    return {
-      id: `appointment-${appointment.id}`,
-      rawId: appointment.id,
-      kind: "appointment" as const,
-      customerName: appointment.customerName,
-      phone: appointment.phone || "-",
-      date: appointment.date,
-      time: appointment.time,
-      description: appointment.description,
-      status: statusOverrides[appointment.id] || appointment.status,
-      staffId: appointment.staffId || "",
-      serviceId: appointment.serviceId || "",
-      sourceKey,
-      source: getAppointmentSourceLabel(sourceKey),
-    };
-  });
+  const appointmentGroups = new Map<string, Appointment[]>();
+  for (const appointment of appointments) {
+    const key = getAppointmentGroupKey(appointment);
+    const group = appointmentGroups.get(key) || [];
+    group.push(appointment);
+    appointmentGroups.set(key, group);
+  }
+  const appointmentRows = [...appointmentGroups.entries()].map(
+    ([key, group]) => {
+      const first = group[0];
+      const serviceNames = Array.from(
+        new Set(
+          group.map((appointment) =>
+            getAppointmentServiceName(business, appointment),
+          ),
+        ),
+      );
+      const notes = Array.from(
+        new Set(
+          group
+            .map((appointment) => getAppointmentNoteText(business, appointment))
+            .filter(Boolean),
+        ),
+      );
+      const statuses = Array.from(
+        new Set(group.map((appointment) => appointment.status)),
+      );
+      const times = Array.from(
+        new Set(group.map((appointment) => appointment.time)),
+      ).sort();
+      const staffIds = Array.from(
+        new Set(group.map((appointment) => appointment.staffId).filter(Boolean)),
+      );
+      const serviceIds = Array.from(
+        new Set(
+          group.map((appointment) => appointment.serviceId).filter(Boolean),
+        ),
+      );
+      return {
+        id: `appointment-group-${key}`,
+        rawId: first.id,
+        rawIds: group.map((appointment) => appointment.id),
+        appointments: group,
+        kind: "appointment" as const,
+        customerName: first.customerName,
+        phone: group.find((appointment) => appointment.phone)?.phone || "-",
+        date: first.date,
+        time: times.join(" / "),
+        description:
+          [serviceNames.join(" + "), notes.join(" · ")]
+            .filter(Boolean)
+            .join(" · ") || first.description,
+        status: statuses.length === 1 ? statuses[0] || "CONFIRMED" : "MIXED",
+        staffId: staffIds.length === 1 ? staffIds[0] || "" : "",
+        serviceId: serviceIds.length === 1 ? serviceIds[0] || "" : "",
+      };
+    },
+  );
   const rows: AppointmentListRow[] = [...checkoutRows, ...appointmentRows].sort((a, b) =>
     `${b.date}T${b.time}`.localeCompare(`${a.date}T${a.time}`),
   );
   const filteredRows = rows.filter((row) => {
-    const sourceMatches = sourceFilter === "all" || row.sourceKey === sourceFilter;
-    const statusMatches = statusFilter === "all" || row.status === statusFilter;
-    const staffMatches = staffFilter === "all" || row.staffId === staffFilter;
-    return sourceMatches && statusMatches && staffMatches;
+    const statusMatches =
+      statusFilter === "all" ||
+      row.status === statusFilter ||
+      row.appointments.some((appointment) => appointment.status === statusFilter);
+    const staffMatches =
+      staffFilter === "all" ||
+      row.staffId === staffFilter ||
+      row.appointments.some((appointment) => appointment.staffId === staffFilter);
+    return statusMatches && staffMatches;
   });
 
-  async function updateAppointmentStatus(row: AppointmentListRow, status: string) {
-    if (row.kind !== "appointment") return;
+  async function updateAppointmentStatus(
+    appointment: Appointment,
+    status: string,
+  ) {
     setStatusError("");
-    setStatusSavingId(row.id);
+    setStatusSavingId(appointment.id);
     try {
-      const response = await fetch(`/api/appointments/${row.rawId}`, {
+      const response = await fetch(`/api/appointments/${appointment.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
@@ -666,11 +1042,27 @@ export function AppointmentsPage({
       if (!response.ok) {
         throw new Error(data.error || "Randevu güncellenemedi.");
       }
-      const nextStatus = data.appointment?.status || status;
-      setStatusOverrides((current) => ({ ...current, [row.rawId]: nextStatus }));
-      setSelectedRow((current) =>
-        current?.id === row.id ? { ...current, status: nextStatus } : current,
-      );
+      if (data.appointment) {
+        const updated = data.appointment as Appointment;
+        onAppointmentUpdated?.(updated);
+        setSelectedRow((current) => {
+          if (!current) return current;
+          const appointments = current.appointments.map((item) =>
+            item.id === updated.id ? { ...item, ...updated } : item,
+          );
+          const statuses = new Set(
+            appointments.map((appointment) => appointment.status),
+          );
+          return {
+            ...current,
+            appointments,
+            status:
+              statuses.size === 1
+                ? Array.from(statuses)[0] || "CONFIRMED"
+                : "MIXED",
+          };
+        });
+      }
     } catch (error) {
       setStatusError(error instanceof Error ? error.message : "Randevu güncellenemedi.");
     } finally {
@@ -693,21 +1085,11 @@ export function AppointmentsPage({
               Randevular ({filteredRows.length})
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Adisyon kaynaklı kayıtlar burada görünür; durum işlemleri gerçek randevu kayıtlarında yapılır.
+              Randevuları ve adisyon kayıtlarını burada görüntüleyin; düzenleme
+              ve iptal işlemleri satır detayından yapılır.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <select
-              value={sourceFilter}
-              onChange={(event) => setSourceFilter(event.target.value)}
-              className="h-9 rounded border border-slate-300 bg-white px-3 text-sm"
-            >
-              <option value="all">Tüm kaynaklar</option>
-              <option value="checkout">Adisyon</option>
-              <option value="public">Online randevu</option>
-              <option value="bot">Bot</option>
-              <option value="google">Google / diğer</option>
-            </select>
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
@@ -746,9 +1128,8 @@ export function AppointmentsPage({
                 <th className="px-3 py-3">Telefon</th>
                 <th className="px-3 py-3">Tarih</th>
                 <th className="px-3 py-3">Saat</th>
-                <th className="px-3 py-3">Not</th>
+                <th className="px-3 py-3">Hizmetler</th>
                 <th className="px-3 py-3">Durum</th>
-                <th className="px-3 py-3">Kaynak</th>
                 <th className="px-3 py-3 text-right">İşlem</th>
               </tr>
             </thead>
@@ -763,7 +1144,6 @@ export function AppointmentsPage({
                   <td className="px-3 py-3">{appointment.time}</td>
                   <td className="px-3 py-3">{appointment.description}</td>
                   <td className="px-3 py-3">{formatAppointmentStatus(appointment.status)}</td>
-                  <td className="px-3 py-3">{appointment.source}</td>
                   <td className="px-3 py-3">
                     <div className="flex justify-end gap-2">
                       <Button
@@ -774,38 +1154,6 @@ export function AppointmentsPage({
                       >
                         Detay
                       </Button>
-                      {appointment.kind === "appointment" && appointment.status === "REQUESTED" && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={statusSavingId === appointment.id}
-                          onClick={() => updateAppointmentStatus(appointment, "CONFIRMED")}
-                        >
-                          Onayla
-                        </Button>
-                      )}
-                      {appointment.kind === "appointment" && appointment.status === "CONFIRMED" && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={statusSavingId === appointment.id}
-                          onClick={() => updateAppointmentStatus(appointment, "COMPLETED")}
-                        >
-                          Tamamlandı
-                        </Button>
-                      )}
-                      {appointment.kind === "appointment" && appointment.status !== "CANCELED" && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={statusSavingId === appointment.id}
-                          onClick={() => updateAppointmentStatus(appointment, "CANCELED")}
-                        >
-                          İptal
-                        </Button>
-                      )}
                     </div>
                   </td>
                 </tr>
@@ -813,7 +1161,7 @@ export function AppointmentsPage({
               {filteredRows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={7}
                     className="px-3 py-10 text-center text-slate-400"
                   >
                     Randevu yok.
@@ -829,71 +1177,122 @@ export function AppointmentsPage({
           <div className="w-full max-w-xl rounded bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
               <div>
-                <h2 className="text-lg font-semibold text-slate-800">Randevu detayı</h2>
-                <p className="text-sm text-slate-500">{selectedRow.customerName}</p>
+                <h2 className="text-lg font-semibold text-slate-800">
+                  Randevu detayı
+                </h2>
+                <p className="text-sm text-slate-500">
+                  {selectedRow.customerName}
+                </p>
               </div>
-              <Button type="button" variant="outline" size="icon-sm" onClick={() => setSelectedRow(null)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                onClick={() => setSelectedRow(null)}
+              >
                 <X className="size-4" />
               </Button>
             </div>
+            {statusError && (
+              <div className="mx-4 mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {statusError}
+              </div>
+            )}
             <div className="grid gap-3 p-4 text-sm sm:grid-cols-2">
               <InfoRow label="Telefon" value={selectedRow.phone} />
-              <InfoRow label="Tarih" value={`${selectedRow.date} ${selectedRow.time}`} />
-              <InfoRow label="Durum" value={formatAppointmentStatus(selectedRow.status)} />
-              <InfoRow label="Kaynak" value={selectedRow.source} />
               <InfoRow
-                label="Personel"
-                value={
-                  (business.staff || []).find((staff) => staff.id === selectedRow.staffId)?.name ||
-                  "Belirtilmemiş"
-                }
+                label="Tarih"
+                value={`${selectedRow.date} ${selectedRow.time}`}
               />
               <InfoRow
-                label="Hizmet"
-                value={
-                  (business.services || []).find((service) => service.id === selectedRow.serviceId)?.name ||
-                  selectedRow.description
-                }
+                label="Durum"
+                value={formatAppointmentStatus(selectedRow.status)}
               />
-              <div className="sm:col-span-2">
-                <InfoRow label="Not" value={selectedRow.description || "-"} />
-              </div>
+              {selectedRow.kind === "checkout" && (
+                <div className="sm:col-span-2">
+                  <InfoRow label="Not" value={selectedRow.description || "-"} />
+                </div>
+              )}
             </div>
             {selectedRow.kind === "appointment" && (
-              <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 px-4 py-3">
-                {selectedRow.status === "REQUESTED" && (
-                  <Button
-                    type="button"
-                    disabled={statusSavingId === selectedRow.id}
-                    onClick={() => updateAppointmentStatus(selectedRow, "CONFIRMED")}
-                  >
-                    Onayla
-                  </Button>
-                )}
-                {selectedRow.status === "CONFIRMED" && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={statusSavingId === selectedRow.id}
-                    onClick={() => updateAppointmentStatus(selectedRow, "COMPLETED")}
-                  >
-                    Tamamlandı
-                  </Button>
-                )}
-                {selectedRow.status !== "CANCELED" && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={statusSavingId === selectedRow.id}
-                    onClick={() => updateAppointmentStatus(selectedRow, "CANCELED")}
-                  >
-                    İptal et
-                  </Button>
-                )}
+              <div className="border-t border-slate-200 px-4 py-3">
+                <h3 className="mb-2 text-sm font-semibold text-slate-700">
+                  Hizmetler
+                </h3>
+                <div className="divide-y divide-slate-100">
+                  {selectedRow.appointments.map((appointment) => {
+                    const serviceName = getAppointmentServiceName(
+                      business,
+                      appointment,
+                    );
+                    const staffName = getAppointmentStaffName(
+                      business,
+                      appointment,
+                    );
+                    const note = getAppointmentNoteText(business, appointment);
+                    return (
+                      <div
+                        key={appointment.id}
+                        className="flex flex-wrap items-start justify-between gap-2 py-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-slate-800">
+                            {serviceName}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {appointment.time} ·{" "}
+                            {staffName || "Personel belirtilmemiş"} ·{" "}
+                            {formatAppointmentStatus(appointment.status)}
+                          </div>
+                          {note && (
+                            <div className="mt-1 text-xs text-slate-500">
+                              {note}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditingAppointment(appointment)}
+                          >
+                            Düzenle
+                          </Button>
+                          {appointment.status !== "CANCELED" && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={statusSavingId === appointment.id}
+                              onClick={() =>
+                                updateAppointmentStatus(appointment, "CANCELED")
+                              }
+                            >
+                              İptal
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
         </div>
+      )}
+      {editingAppointment && (
+        <AppointmentEditModal
+          appointment={editingAppointment}
+          business={business}
+          onClose={() => setEditingAppointment(null)}
+          onSaved={(updated) => {
+            onAppointmentUpdated?.(updated);
+            setEditingAppointment(null);
+            setSelectedRow(null);
+          }}
+        />
       )}
     </div>
   );
@@ -902,6 +1301,8 @@ export function AppointmentsPage({
 type AppointmentListRow = {
   id: string;
   rawId: string;
+  rawIds: string[];
+  appointments: Appointment[];
   kind: "appointment" | "checkout";
   customerName: string;
   phone: string;
@@ -911,30 +1312,60 @@ type AppointmentListRow = {
   status: string;
   staffId: string;
   serviceId: string;
-  sourceKey: string;
-  source: string;
 };
-
-function getAppointmentSourceKey(appointment: Appointment) {
-  const source = String(appointment.source || "").toLowerCase();
-  const eventId = String(appointment.eventId || "").toLowerCase();
-  if (source === "public" || eventId.startsWith("public-")) return "public";
-  if (source === "bot" || eventId.startsWith("bot-")) return "bot";
-  return "google";
-}
-
-function getAppointmentSourceLabel(sourceKey: string) {
-  if (sourceKey === "public") return "Online randevu";
-  if (sourceKey === "bot") return "Bot";
-  return "Google / diğer";
-}
 
 function formatAppointmentStatus(status: string) {
   if (status === "REQUESTED") return "Talep";
   if (status === "CONFIRMED") return "Onaylı";
   if (status === "COMPLETED") return "Tamamlandı";
   if (status === "CANCELED") return "İptal";
+  if (status === "MIXED") return "Karma";
   return status || "-";
+}
+
+function getAppointmentGroupKey(appointment: Appointment) {
+  const eventId = String(appointment.eventId || "");
+  const match = eventId.match(
+    /^salonappy:(\d+):(?:(?:calendar|summary):)?([^:]+)/,
+  );
+  if (match) return `salonappy:${match[1]}:${match[2]}`;
+  return `appointment:${appointment.id}`;
+}
+
+function getAppointmentServiceName(
+  business: Business,
+  appointment: Appointment,
+) {
+  return (
+    (business.services || []).find(
+      (service) => service.id === appointment.serviceId,
+    )?.name ||
+    String(appointment.description || "").split(" · ")[0] ||
+    "Hizmet belirtilmemiş"
+  );
+}
+
+function getAppointmentStaffName(business: Business, appointment: Appointment) {
+  return (
+    (business.staff || []).find((staff) => staff.id === appointment.staffId)
+      ?.name || ""
+  );
+}
+
+function getAppointmentNoteText(business: Business, appointment: Appointment) {
+  const serviceName = getAppointmentServiceName(business, appointment);
+  const staffName = getAppointmentStaffName(business, appointment);
+  return String(appointment.description || "")
+    .split(" · ")
+    .map((part) => part.trim())
+    .filter(
+      (part) =>
+        part &&
+        part !== serviceName &&
+        part !== staffName &&
+        !part.startsWith("Salonappy #"),
+    )
+    .join(" · ");
 }
 
 function getCheckoutLines(checkout: CheckoutItem) {
@@ -994,8 +1425,8 @@ function getWeekStart(value: string) {
 }
 
 function normalizeCalendarView(value: string | undefined) {
-  if (value === "Haftalık görünüm" || value === "Aylık görünüm") return value;
-  return "Günlük görünüm";
+  if (value === "Günlük görünüm" || value === "Aylık görünüm") return value;
+  return "Haftalık görünüm";
 }
 
 function getMonthGridDates(value: string) {
@@ -1076,18 +1507,18 @@ function CalendarSettingsModal({
   onSave: (settings: Partial<BookingSettings>) => Promise<void>;
 }) {
   const [view, setView] = useState(normalizeCalendarView(settings.calendarView));
-  const [width, setWidth] = useState(settings.calendarWidth || "100");
+  const [width, setWidth] = useState(settings.calendarWidth || "80");
   const [slotInterval, setSlotInterval] = useState(
-    settings.calendarSlotInterval || "15 Dakika",
+    settings.calendarSlotInterval || "60 Dakika",
   );
   const [textColor, setTextColor] = useState(
     settings.calendarTextColor || "Dinamik",
   );
 
   function resetDefaults() {
-    setView("Günlük görünüm");
-    setWidth("100");
-    setSlotInterval("15 Dakika");
+    setView("Haftalık görünüm");
+    setWidth("80");
+    setSlotInterval("60 Dakika");
     setTextColor("Dinamik");
   }
 

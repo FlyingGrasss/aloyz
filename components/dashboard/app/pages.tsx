@@ -1,6 +1,13 @@
 "use client";
 
-import { Business, ContactRow, PlaceholderPage, SetupViewId, ViewId } from "./shared";
+import {
+  Appointment,
+  Business,
+  ContactRow,
+  PlaceholderPage,
+  SetupViewId,
+  ViewId,
+} from "./shared";
 import { OverviewPage } from "./overview";
 import { CalendarPage, AppointmentsPage } from "./calendar";
 import { CheckoutsPage } from "./checkouts";
@@ -41,6 +48,7 @@ export function ContentRouter({
   onTogglePatch,
   onReconnectWhatsApp,
   onDisconnectWhatsApp,
+  onAppointmentUpdated,
 }: {
   view: ViewId;
   business: Business;
@@ -64,6 +72,7 @@ export function ContentRouter({
   onTogglePatch: (field: "is_active" | "test_mode", value: boolean) => void;
   onReconnectWhatsApp: () => void;
   onDisconnectWhatsApp: () => void;
+  onAppointmentUpdated: (appointment: Appointment) => void;
 }) {
   if (view === "dashboard") {
     return (
@@ -88,6 +97,7 @@ export function ContentRouter({
         onDateChange={onDateChange}
         onUpdateAndSave={onUpdateAndSave}
         onSelectView={onSelectView}
+        onAppointmentUpdated={onAppointmentUpdated}
       />
     );
   if (view === "booking/list") {
@@ -95,6 +105,7 @@ export function ContentRouter({
       <AppointmentsPage
         appointments={business.appointments || []}
         business={business}
+        onAppointmentUpdated={onAppointmentUpdated}
       />
     );
   }

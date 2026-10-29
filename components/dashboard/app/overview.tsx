@@ -81,6 +81,33 @@ export function OverviewPage({
     "appointments",
   );
   const appointments = business.appointments || [];
+  const groupedAppointments = useMemo(() => {
+    const groups = new Map<
+      string,
+      Appointment & { groupedServiceNames: string[] }
+    >();
+    for (const appointment of appointments) {
+      const key = `${appointment.customerName}|${appointment.date}|${appointment.time}`;
+      const serviceName =
+        (business.services || []).find(
+          (service) => service.id === appointment.serviceId,
+        )?.name ||
+        appointment.description ||
+        "Hizmet belirtilmemiş";
+      const existing = groups.get(key);
+      if (existing) {
+        if (!existing.groupedServiceNames.includes(serviceName)) {
+          existing.groupedServiceNames.push(serviceName);
+        }
+      } else {
+        groups.set(key, {
+          ...appointment,
+          groupedServiceNames: [serviceName],
+        });
+      }
+    }
+    return Array.from(groups.values());
+  }, [appointments, business.services]);
   const checkouts = business.checkouts || [];
   const receivables = business.promotions?.receivables || [];
   const openReceivables = receivables.filter(
@@ -169,13 +196,12 @@ export function OverviewPage({
                 <tr>
                   <th className="px-3 py-3">Tarih</th>
                   <th className="px-3 py-3">Müşteri</th>
-                  <th className="px-3 py-3">Kaynak</th>
                   <th className="px-3 py-3">Hizmetler</th>
                   <th className="px-3 py-3">Toplam tutar</th>
                 </tr>
               </thead>
               <tbody>
-                {appointments.slice(0, 6).map((appointment) => (
+                {groupedAppointments.slice(0, 6).map((appointment) => (
                   <tr key={appointment.id} className="border-b border-slate-100">
                     <td className="px-3 py-3">
                       {appointment.date} {appointment.time}
@@ -183,9 +209,10 @@ export function OverviewPage({
                     <td className="px-3 py-3 font-medium">
                       {appointment.customerName}
                     </td>
-                    <td className="px-3 py-3 text-slate-500">Bot</td>
                     <td className="px-3 py-3 text-slate-600">
-                      {appointment.description || "-"}
+                      {appointment.groupedServiceNames.join(" + ") ||
+                        appointment.description ||
+                        "-"}
                     </td>
                     <td className="px-3 py-3 text-slate-500">-</td>
                   </tr>
@@ -198,7 +225,6 @@ export function OverviewPage({
                     <td className="px-3 py-3 font-medium">
                       {checkout.customerName}
                     </td>
-                    <td className="px-3 py-3 text-slate-500">Adisyon</td>
                     <td className="px-3 py-3 text-slate-600">
                       {checkout.notes || "-"}
                     </td>
@@ -207,10 +233,10 @@ export function OverviewPage({
                     </td>
                   </tr>
                 ))}
-                {appointments.length === 0 && checkouts.length === 0 && (
+                {groupedAppointments.length === 0 && checkouts.length === 0 && (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={4}
                       className="px-3 py-10 text-center text-sm text-slate-400"
                     >
                       Henüz açık randevu yok.

@@ -1,0 +1,74 @@
+{
+  "project": "aloyz",
+  "updated": "2026-10-29",
+  "verification": {
+    "install": "pnpm install",
+    "verify": [
+      "pnpm exec tsc --noEmit",
+      "pnpm exec eslint components/dashboard/app/calendar.tsx components/dashboard/app/overview.tsx components/dashboard/app/pages.tsx components/dashboard/DashboardApp.tsx app/api/appointments/[id]/route.ts"
+    ],
+    "start": "pnpm dev"
+  },
+  "features": [
+    {
+      "id": "calendar-ux",
+      "priority": 10,
+      "area": "dashboard/calendar",
+      "title": "Calendar defaults, density, and appointment edit modal",
+      "user_visible_behavior": "The calendar opens weekly at 60-minute intervals and 80% width, empty hours are compact, and clicking an appointment opens an edit/cancel modal for that appointment.",
+      "files": [
+        "components/dashboard/app/calendar.tsx",
+        "components/dashboard/app/pages.tsx",
+        "components/dashboard/DashboardApp.tsx",
+        "app/api/appointments/[id]/route.ts"
+      ],
+      "status": "in_progress",
+      "verification": [
+        "pnpm exec tsc --noEmit",
+        "Open Randevu takvimi: default view is Haftalık görünüm, interval 60 Dakika, width 80%.",
+        "Empty time rows are visibly shorter than rows with appointments.",
+        "Click an appointment card: modal opens for that appointment and can save edits or cancel it.",
+        "Canceled appointments disappear from the calendar.",
+        "Google Calendar cards do not open the local edit modal."
+      ],
+      "evidence": null,
+      "notes": "Code complete and typecheck passes. Manual UI verification still pending. The business bookingSettings now explicitly stores calendarView=Haftalık görünüm, calendarWidth=80, calendarSlotInterval=60 Dakika."
+    },
+    {
+      "id": "appointment-list-cleanup",
+      "priority": 20,
+      "area": "dashboard/appointments",
+      "title": "Remove source column and group multi-service bookings",
+      "user_visible_behavior": "Randevular and the dashboard appointment table no longer show the useless Kaynak/Bot column, and one customer booking with multiple services appears as one grouped row instead of several lookalike rows.",
+      "files": [
+        "components/dashboard/app/calendar.tsx",
+        "components/dashboard/app/overview.tsx"
+      ],
+      "status": "not_started",
+      "verification": [
+        "pnpm exec tsc --noEmit",
+        "Randevular table has no Kaynak column or source filter.",
+        "Dashboard appointment table has no Kaynak column.",
+        "A multi-service booking (e.g. gülşen tanyıldız on 2026-10-29 14:00) appears once in Randevular with both services listed."
+      ],
+      "evidence": null,
+      "notes": "Implementation is complete together with calendar-ux, but it is not separately marked in_progress. Manual UI verification pending."
+    },
+    {
+      "id": "salonappy-data-translation",
+      "priority": 30,
+      "area": "data-import",
+      "title": "Turkish service names and exact remaining booking details",
+      "user_visible_behavior": "Imported services and appointment descriptions use Turkish names, and the previously summary-only bookings now use their exact service/staff lines.",
+      "files": [],
+      "status": "not_started",
+      "verification": [
+        "No imported service name matches /Laser Hair Removal|Manicure|Pedicure|Eyebrow Shaping|Permanent Nail|Fake Nails|False Eyelashes|Skin Tightening|Eyelash Lifting/.",
+        "No appointment description contains those English service names.",
+        "Appointments total is 422 and source `salonappy-summary` count is 0."
+      ],
+      "evidence": null,
+      "notes": "Data changes applied and verified directly against the database; code commit pending."
+    }
+  ]
+}

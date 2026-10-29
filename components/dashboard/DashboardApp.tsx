@@ -18,6 +18,7 @@ import {
   PaymentModal,
 } from "./app/finance";
 import {
+  Appointment,
   Business,
   ViewId,
   CheckoutItem,
@@ -667,6 +668,17 @@ export function DashboardApp() {
     return saveBusiness(nextBusiness);
   }
 
+  function updateAppointmentInState(updated: Appointment) {
+    setBusiness((prev) => ({
+      ...prev,
+      appointments: (prev.appointments || []).map((appointment) =>
+        appointment.id === updated.id
+          ? { ...appointment, ...updated }
+          : appointment,
+      ),
+    }));
+  }
+
   function openQuickCreate(label: string) {
     if (!hasDashboardAccess(business.botSettings, business.createdAt)) {
       selectView("subscription");
@@ -884,6 +896,7 @@ export function DashboardApp() {
                 onTogglePatch={togglePatch}
                 onReconnectWhatsApp={reconnectWhatsApp}
                 onDisconnectWhatsApp={disconnectWhatsApp}
+                onAppointmentUpdated={updateAppointmentInState}
               />
             )}
           </main>
