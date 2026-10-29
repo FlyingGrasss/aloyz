@@ -54,10 +54,11 @@
         "Local unit test: apply Geldi -> used 1, remaining 7; repeat -> unchanged; Gelmedi/delete -> restored to 8.",
         "Local unit test: cancelled checkout and different customer do not deduct.",
         "UI: mark a checkout Geldi and confirm package sales show Kullanılan=1 and Kalan kullanım=7/8.",
-        "UI: remove Geldi and confirm the session is restored."
+        "UI: remove Geldi and confirm the session is restored.",
+        "Open a customer detail: package lines show Kalan X/Y and Kullanılan X."
       ],
       "evidence": null,
-      "notes": "Pure usage helper and server-side diff logic implemented. Local unit test passed; end-to-end UI verification pending."
+      "notes": "Pure usage helper, server-side diff logic, and customer-detail package summary implemented. Local unit test passed; end-to-end UI verification pending. The business currently has 0 package sales because the last one was deleted; recreate one or restore the backup before testing."
     },
     {
       "id": "customer-list-mobile",

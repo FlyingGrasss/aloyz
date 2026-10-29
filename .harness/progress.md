@@ -7,7 +7,7 @@
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
 - Last known green commit: `413724f` for typecheck; manual UI verification pending
 - Highest priority unfinished feature: `package-session-usage`
-- Current blocker: none
+- Current blocker: the business currently has no package sale rows; the last package sale was deleted. Recreate a sale or restore the backup before testing usage.
 
 ## Session record
 
@@ -21,6 +21,9 @@
   - Daily calendar view now uses colored staff columns; weekly/monthly appointment cards use staff colors.
   - Mobile web calendar now defaults to daily staff columns instead of the weekly day grid.
   - Added a mobile topbar customer search row; search matches both names and normalized phone digits.
+  - Package sale modal now stays open if the server save fails instead of closing and losing the entry.
+  - Customer detail now shows the customer's package lines with Kalan X/Y and Kullanılan X.
+  - Confirmed the business currently has 0 package sales; the last sale was deleted.
 - Verification run:
   - `pnpm exec tsc --noEmit` passed.
   - Local package usage unit test passed: apply, idempotent, restore, delete restore, cancelled, different customer.

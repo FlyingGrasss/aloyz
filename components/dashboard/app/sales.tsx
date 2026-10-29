@@ -69,14 +69,14 @@ export function ProductSalesPage({
     sale: ProductSaleItem,
     products: ProductCatalogItem[],
   ) {
-    setModalOpen(false);
-    await onUpdateAndSave({
+    const saved = await onUpdateAndSave({
       promotions: {
         ...promotions,
         products,
         productSales: [sale, ...(promotions.productSales || [])],
       },
     });
+    if (saved) setModalOpen(false);
   }
 
   return (
@@ -199,8 +199,6 @@ export function PackageSalesPage({
     sale: PackageSaleItem,
     packages: PackageCatalogItem[],
   ) {
-    setModalOpen(false);
-    setEditingSale(null);
     const normalizedSale: PackageSaleItem = {
       ...sale,
       lines: sale.lines.map((line) => {
@@ -220,7 +218,7 @@ export function PackageSalesPage({
       }),
     };
     const exists = allSales.some((item) => item.id === normalizedSale.id);
-    await onUpdateAndSave({
+    const saved = await onUpdateAndSave({
       promotions: {
         ...promotions,
         packages,
@@ -231,6 +229,10 @@ export function PackageSalesPage({
           : [normalizedSale, ...allSales],
       },
     });
+    if (saved) {
+      setModalOpen(false);
+      setEditingSale(null);
+    }
   }
 
   async function removeSale(sale: PackageSaleItem) {

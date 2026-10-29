@@ -34,6 +34,7 @@ import {
   ModalHeader,
   NativeSelect,
   PlaceholderPage,
+  PackageSaleItem,
   PromotionsSettings,
   ServiceItem,
   SettingsPanel,
@@ -333,6 +334,12 @@ export function ContactsPage({
         <CustomerModal
           saving={saving}
           initialCustomer={editingCustomer}
+          packageSales={(business.promotions?.packageSales || []).filter(
+            (sale) =>
+              sale.customerId === editingCustomer.id ||
+              sale.customerName.trim().toLocaleLowerCase("tr-TR") ===
+                editingCustomer.name.trim().toLocaleLowerCase("tr-TR"),
+          )}
           onClose={() => setEditingCustomer(null)}
           onSubmit={saveCustomer}
         />
@@ -345,12 +352,14 @@ export function CustomerModal({
   saving,
   initialName,
   initialCustomer,
+  packageSales = [],
   onClose,
   onSubmit,
 }: {
   saving: boolean;
   initialName?: string;
   initialCustomer?: CustomerProfile;
+  packageSales?: PackageSaleItem[];
   onClose: () => void;
   onSubmit: (customer: CustomerProfile) => void;
 }) {
@@ -466,6 +475,59 @@ export function CustomerModal({
                 })
               }
             />
+          )}
+          {initialCustomer && (
+            <div className="rounded border border-slate-200 bg-slate-50 p-3">
+              <div className="text-xs font-semibold uppercase text-slate-500">
+                Paketler
+              </div>
+              {packageSales.length === 0 ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  Bu müşteriye ait paket kaydı yok.
+                </p>
+              ) : (
+                <div className="mt-2 space-y-3">
+                  {packageSales.map((sale) => (
+                    <div key={sale.id}>
+                      <div className="text-xs font-medium text-slate-700">
+                        {sale.total} TL · {sale.date}
+                      </div>
+                      <div className="mt-1 space-y-1">
+                        {sale.lines.map((line) => {
+                          const quantity = Math.max(
+                            0,
+                            Number(line.quantity) || 0,
+                          );
+                          const used = Math.min(
+                            quantity,
+                            Math.max(0, Number(line.used) || 0),
+                          );
+                          const remaining = Math.min(
+                            quantity - used,
+                            Math.max(
+                              0,
+                              Number(line.remaining ?? quantity - used) || 0,
+                            ),
+                          );
+                          return (
+                            <div
+                              key={line.id}
+                              className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600"
+                            >
+                              <span>{line.name || "Paket"}</span>
+                              <span>
+                                Kalan {remaining}/{quantity} · Kullanılan{" "}
+                                {used}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           <Button
             type="button"
