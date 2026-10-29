@@ -1660,8 +1660,12 @@ const dashboardTranslations: Record<string, string> = {
   Yeni: "New",
   Kaydet: "Save",
   "Kaydediliyor...": "Saving...",
+  "Siliniyor...": "Deleting...",
   Düzenle: "Edit",
   Sil: "Delete",
+  "Vazgeç": "Cancel",
+  "İşlem": "Action",
+  "Kapat": "Close",
   Detay: "Details",
   Geri: "Back",
   Bugün: "Today",
@@ -1939,6 +1943,14 @@ const dashboardTranslations: Record<string, string> = {
   "Yeni paket": "New package",
   "Yeni paket ekle": "Add new package",
   "Yeni paket satışı": "New package sale",
+  "Paket satışını düzenle": "Edit package sale",
+  "Paket satışını sil": "Delete package sale",
+  "Paket toplam tutarı": "Package total price",
+  "İsimsiz müşteri": "Unnamed customer",
+  "Bu paket satışı kalıcı olarak silinecek.":
+    "This package sale will be permanently deleted.",
+  "Tutar alanına paketin toplam fiyatını girin; seans adediyle çarpılmaz.":
+    "Enter the package total price in the amount field; it is not multiplied by the session count.",
   "Yeni randevu": "New appointment",
   "Yeni randevu ve adisyon güncellemeleri.":
     "New appointment and dashboard updates.",

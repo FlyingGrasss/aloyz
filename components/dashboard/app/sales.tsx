@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   FileText,
@@ -74,7 +74,7 @@ export function ProductSalesPage({
       promotions: {
         ...promotions,
         products,
-        productSales: [sale, ...sales],
+        productSales: [sale, ...(promotions.productSales || [])],
       },
     });
   }
@@ -179,10 +179,13 @@ export function PackageSalesPage({
   onUpdateAndSave: SaveBusiness;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingSale, setEditingSale] = useState<PackageSaleItem | null>(null);
+  const [deletingSale, setDeletingSale] = useState<PackageSaleItem | null>(null);
   const [period, setPeriod] = useState("Bu ay");
   const [sortDesc, setSortDesc] = useState(true);
   const promotions = normalizePromotions(business.promotions);
-  const sales = filterSalesByPeriod(promotions.packageSales || [], period).sort(
+  const allSales = promotions.packageSales || [];
+  const sales = filterSalesByPeriod(allSales, period).sort(
     (a, b) =>
       sortDesc
         ? b.date.localeCompare(a.date)
@@ -195,13 +198,37 @@ export function PackageSalesPage({
     packages: PackageCatalogItem[],
   ) {
     setModalOpen(false);
+    setEditingSale(null);
+    const exists = allSales.some((item) => item.id === sale.id);
     await onUpdateAndSave({
       promotions: {
         ...promotions,
         packages,
-        packageSales: [sale, ...sales],
+        packageSales: exists
+          ? allSales.map((item) => (item.id === sale.id ? sale : item))
+          : [sale, ...allSales],
       },
     });
+  }
+
+  async function removeSale(sale: PackageSaleItem) {
+    const saved = await onUpdateAndSave({
+      promotions: {
+        ...promotions,
+        packageSales: allSales.filter((item) => item.id !== sale.id),
+      },
+    });
+    if (saved) setDeletingSale(null);
+  }
+
+  function openNewSale() {
+    setEditingSale(null);
+    setModalOpen(true);
+  }
+
+  function openEditSale(sale: PackageSaleItem) {
+    setEditingSale(sale);
+    setModalOpen(true);
   }
 
   return (
@@ -224,12 +251,13 @@ export function PackageSalesPage({
           ]),
         )
       }
-      onNew={() => setModalOpen(true)}
+      onNew={openNewSale}
     >
-      <table className="w-full min-w-[1060px] text-left text-sm">
+      <table className="w-full min-w-[1160px] text-left text-sm">
         <thead className="border-y border-slate-200 text-slate-700">
           <tr>
             {[
+              "İşlem",
               "Satış tarihi",
               "Müşteri",
               "Satıcı",
@@ -243,8 +271,8 @@ export function PackageSalesPage({
               "Oluşturan",
               "Geçerlilik bitişi",
               "Oluşturulma",
-            ].map((label) => (
-              <th key={label} className="px-3 py-3 font-semibold">
+            ].map((label, index) => (
+              <th key={`${label}-${index}`} className="px-3 py-3 font-semibold">
                 {label}
               </th>
             ))}
@@ -255,6 +283,28 @@ export function PackageSalesPage({
             const quantity = sale.lines.reduce((sum, line) => sum + line.quantity, 0);
             return (
               <tr key={sale.id} className="border-b border-slate-100">
+                <td className="px-3 py-3">
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      className="bg-[#5f86b6] text-white"
+                      disabled={saving}
+                      aria-label="Paket satışını düzenle"
+                      onClick={() => openEditSale(sale)}
+                    >
+                      Düzenle
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      disabled={saving}
+                      aria-label="Paket satışını sil"
+                      onClick={() => setDeletingSale(sale)}
+                    >
+                      Sil
+                    </Button>
+                  </div>
+                </td>
                 <td className="px-3 py-3">{formatDisplayDate(sale.date)}</td>
                 <td className="px-3 py-3">{sale.customerName || "-"}</td>
                 <td className="px-3 py-3">{staffName(business, sale.sellerId)}</td>
@@ -274,12 +324,12 @@ export function PackageSalesPage({
             );
           })}
           <tr className="border-b border-slate-200 bg-slate-50 font-semibold">
-            <td colSpan={13} className="px-3 py-3">
+            <td colSpan={14} className="px-3 py-3">
               Sayfadaki paket satışlarının toplam tutarı: {total} TL
             </td>
           </tr>
           <tr className="bg-slate-50 font-semibold">
-            <td colSpan={13} className="px-3 py-3">
+            <td colSpan={14} className="px-3 py-3">
               Toplam kayıt sayısı: {sales.length}
             </td>
           </tr>
@@ -287,19 +337,114 @@ export function PackageSalesPage({
       </table>
       {modalOpen && (
         <PackageSaleModal
+          key={editingSale?.id ?? "new"}
           business={business}
           packages={promotions.packages || []}
+          sale={editingSale}
           saving={saving}
           onCreateCustomer={async (customer) => {
             await onUpdateAndSave({
               customers: [customer, ...(business.customers || [])],
             });
           }}
-          onClose={() => setModalOpen(false)}
+          onClose={() => {
+            setModalOpen(false);
+            setEditingSale(null);
+          }}
           onSubmit={saveSale}
         />
       )}
+      {deletingSale && (
+        <ConfirmDialog
+          title="Paket satışını sil"
+          description={`${deletingSale.customerName.trim() || "İsimsiz müşteri"} · ${formatDisplayDate(deletingSale.date)} · ${deletingSale.total} TL`}
+          confirmMessage="Bu paket satışı kalıcı olarak silinecek."
+          pending={saving}
+          onClose={() => setDeletingSale(null)}
+          onConfirm={() => void removeSale(deletingSale)}
+        />
+      )}
     </SalesShell>
+  );
+}
+
+function ConfirmDialog({
+  title,
+  description,
+  confirmMessage = "Bu kayıt kalıcı olarak silinecek.",
+  confirmLabel = "Sil",
+  pending,
+  onClose,
+  onConfirm,
+}: {
+  title: string;
+  description: string;
+  confirmMessage?: string;
+  confirmLabel?: string;
+  pending: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !pending) onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose, pending]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/35 p-6"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !pending) onClose();
+      }}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="w-full max-w-sm rounded bg-white shadow-xl"
+      >
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <h2 className="font-semibold">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            aria-label="Kapat"
+            className="grid size-8 place-items-center rounded hover:bg-slate-100 disabled:opacity-40"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="grid gap-4 p-4">
+          <div className="grid gap-1">
+            <p className="text-sm font-medium text-slate-700">{description}</p>
+            <p className="text-sm text-slate-600">{confirmMessage}</p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              autoFocus
+              disabled={pending}
+              onClick={onClose}
+            >
+              Vazgeç
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={pending}
+              onClick={onConfirm}
+            >
+              {pending ? "Siliniyor..." : confirmLabel}
+            </Button>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -563,6 +708,7 @@ export function ProductSaleModal({
 export function PackageSaleModal({
   business,
   packages,
+  sale,
   saving,
   onCreateCustomer,
   onClose,
@@ -570,19 +716,24 @@ export function PackageSaleModal({
 }: {
   business: Business;
   packages: PackageCatalogItem[];
+  sale?: PackageSaleItem | null;
   saving: boolean;
   onCreateCustomer: (customer: CustomerProfile) => Promise<void>;
   onClose: () => void;
   onSubmit: (sale: PackageSaleItem, packages: PackageCatalogItem[]) => void;
 }) {
-  const [date, setDate] = useState(todayInput());
-  const [customerName, setCustomerName] = useState("");
-  const [customerId, setCustomerId] = useState<string | undefined>();
-  const [sellerId, setSellerId] = useState("");
-  const [notes, setNotes] = useState("");
-  const [hasExpiry, setHasExpiry] = useState(false);
-  const [openPaymentWindow, setOpenPaymentWindow] = useState(false);
-  const [createReceivable, setCreateReceivable] = useState(false);
+  const [date, setDate] = useState(sale?.date || todayInput());
+  const [customerName, setCustomerName] = useState(sale?.customerName || "");
+  const [customerId, setCustomerId] = useState<string | undefined>(sale?.customerId);
+  const [sellerId, setSellerId] = useState(sale?.sellerId || "");
+  const [notes, setNotes] = useState(sale?.notes || "");
+  const [hasExpiry, setHasExpiry] = useState(sale?.hasExpiry || false);
+  const [openPaymentWindow, setOpenPaymentWindow] = useState(
+    sale?.openPaymentWindow || false,
+  );
+  const [createReceivable, setCreateReceivable] = useState(
+    sale?.createReceivable || false,
+  );
   const [catalog, setCatalog] = useState(packages);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newPackageForLine, setNewPackageForLine] = useState<{
@@ -593,23 +744,27 @@ export function PackageSaleModal({
     packageType: string;
     serviceId: string;
   } | null>(null);
-  const [lines, setLines] = useState<PackageSaleLine[]>([
-    {
-      id: createId(),
-      packageId: "",
-      name: "",
-      packageType: "Paket tipi",
-      serviceId: "",
-      quantity: 1,
-      amount: 0,
-    },
-  ]);
-  const total = lines.reduce((sum, line) => sum + line.quantity * line.amount, 0);
+  const [lines, setLines] = useState<PackageSaleLine[]>(() =>
+    sale && sale.lines.length > 0
+      ? sale.lines.map((line) => ({ ...line }))
+      : [
+          {
+            id: createId(),
+            packageId: "",
+            name: "",
+            packageType: "Paket tipi",
+            serviceId: "",
+            quantity: 1,
+            amount: 0,
+          },
+        ],
+  );
+  const total = lines.reduce((sum, line) => sum + line.amount, 0);
 
   function submit() {
     onSubmit(
       {
-        id: createId(),
+        id: sale?.id || createId(),
         date,
         customerId,
         customerName,
@@ -621,8 +776,8 @@ export function PackageSaleModal({
         createReceivable,
         total,
         paidAmount: createReceivable ? 0 : total,
-        createdBy: "Aloyz",
-        createdAt: new Date().toISOString(),
+        createdBy: sale?.createdBy || "Aloyz",
+        createdAt: sale?.createdAt || new Date().toISOString(),
       },
       catalog,
     );
@@ -658,7 +813,10 @@ export function PackageSaleModal({
   return (
     <div className="fixed inset-0 z-50 grid place-items-start bg-slate-950/35 p-6">
       <section className="mx-auto mt-4 w-full max-w-lg rounded bg-white shadow-xl">
-        <ModalHeader title="Yeni paket satışı" onClose={onClose} />
+        <ModalHeader
+          title={sale ? "Paket satışını düzenle" : "Yeni paket satışı"}
+          onClose={onClose}
+        />
         <div className="grid gap-2 p-4">
           <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
           <CustomerPicker
@@ -673,6 +831,10 @@ export function PackageSaleModal({
             onSelect={selectCustomer}
             onCreateCustomer={(name) => setNewCustomerName(name)}
           />
+          <p className="rounded bg-slate-50 px-3 py-2 text-xs text-slate-500">
+            Tutar alanına paketin toplam fiyatını girin; seans adediyle
+            çarpılmaz.
+          </p>
           {lines.map((line) => (
             <PackageLineEditor
               key={line.id}
@@ -741,6 +903,10 @@ export function PackageSaleModal({
             >
               + Kayıtlı paketlerden seç
             </Button>
+          </div>
+          <div className="flex items-center justify-between rounded bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+            <span>Toplam tutar</span>
+            <span>{total} TL</span>
           </div>
           <NativeSelect
             value={sellerId}
@@ -920,6 +1086,7 @@ function PackageLineEditor({
       />
       <MoneyInput
         value={line.amount}
+        ariaLabel="Paket toplam tutarı"
         onChange={(amount) => onChange({ ...line, amount })}
       />
       <button
@@ -1014,9 +1181,11 @@ function CatalogSearch<T extends { id: string }>({
 
 function MoneyInput({
   value,
+  ariaLabel = "Tutar",
   onChange,
 }: {
   value: number;
+  ariaLabel?: string;
   onChange: (value: number) => void;
 }) {
   return (
@@ -1024,7 +1193,7 @@ function MoneyInput({
       <Input
         value={value}
         onChange={(event) => onChange(parseNumber(event.target.value, 0))}
-        aria-label="Tutar"
+        aria-label={ariaLabel}
         className="rounded-r-none"
       />
       <span className="grid h-8 place-items-center rounded-r border border-l-0 border-slate-300 bg-slate-50 px-3 text-xs font-semibold text-emerald-700">
