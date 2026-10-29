@@ -27,6 +27,8 @@
   - Fetched 7,945 Salonappy package sales slowly (16 sequential pages, no block).
   - Imported 2,714 active 2025+ package sales (1.54 MB compact JSON) and linked them to existing customer IDs.
   - Added 100/page pagination to Paket satışları.
+  - Added search boxes to Paket satışları, Ürün satışları, Randevular, and Adisyonlar.
+  - Added sort options for date, customer name A-Z/Z-A, and total amount on both sales pages.
 - Verification run:
   - `pnpm exec tsc --noEmit` passed.
   - Package usage performance test: 2,714 sales normalized in 44 ms; Seher's package 8 -> 7.

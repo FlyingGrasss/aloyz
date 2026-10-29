@@ -99,6 +99,43 @@
       "notes": "Code complete; manual mobile search verification pending."
     },
     {
+      "id": "sales-search-sort",
+      "priority": 27,
+      "area": "dashboard/sales",
+      "title": "Search and multi-field sort for package/product sales",
+      "user_visible_behavior": "Paket satışları and Ürün satışları have a search box and a sort selector; sorting supports date, customer name A-Z/Z-A, and total amount.",
+      "files": ["components/dashboard/app/sales.tsx"],
+      "status": "not_started",
+      "verification": [
+        "pnpm exec tsc --noEmit",
+        "Search by customer name, phone, service, seller, or amount on Paket satışları.",
+        "Sort by Müşteri (A → Z) and confirm the row order changes.",
+        "Sort by Tarih and Tutar and confirm the order changes."
+      ],
+      "evidence": null,
+      "notes": "Code complete; manual UI verification pending."
+    },
+    {
+      "id": "list-search",
+      "priority": 28,
+      "area": "dashboard/lists",
+      "title": "Search in Randevular and Adisyonlar",
+      "user_visible_behavior": "Randevular and Adisyonlar have search boxes that match customer name, phone, service, staff, and notes.",
+      "files": [
+        "components/dashboard/app/calendar.tsx",
+        "components/dashboard/app/checkouts.tsx"
+      ],
+      "status": "not_started",
+      "verification": [
+        "pnpm exec tsc --noEmit",
+        "Search a customer name in Randevular and Adisyonlar.",
+        "Search a phone number in either list.",
+        "Search a service name in either list."
+      ],
+      "evidence": null,
+      "notes": "Code complete; manual UI verification pending."
+    },
+    {
       "id": "appointment-list-cleanup",
       "priority": 20,
       "area": "dashboard/appointments",

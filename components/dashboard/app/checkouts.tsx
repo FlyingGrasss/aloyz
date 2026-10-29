@@ -87,12 +87,54 @@ export function CheckoutsPage({
   const [openActionMenu, setOpenActionMenu] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("Tümü");
   const [dateFilter, setDateFilter] = useState("Tümü");
+  const [searchTerm, setSearchTerm] = useState("");
   const [sortDesc, setSortDesc] = useState(true);
   const checkouts = business.checkouts || [];
+  const query = searchTerm.trim().toLocaleLowerCase("tr-TR");
+  const phoneQuery = query
+    .replace(/\D/g, "")
+    .replace(/^90/, "")
+    .replace(/^0/, "");
   const filteredCheckouts = filterByPeriod(
-    checkouts.filter((checkout) =>
-      statusFilter === "Tümü" ? true : checkout.status === statusFilter,
-    ),
+    checkouts.filter((checkout) => {
+      const statusMatches =
+        statusFilter === "Tümü" ? true : checkout.status === statusFilter;
+      if (!statusMatches) return false;
+      if (!query) return true;
+      const customer = (business.customers || []).find(
+        (item) =>
+          item.id === checkout.customerId ||
+          item.name.trim().toLocaleLowerCase("tr-TR") ===
+            checkout.customerName.trim().toLocaleLowerCase("tr-TR"),
+      );
+      const serviceNames = (
+        checkout.lines && checkout.lines.length > 0
+          ? checkout.lines
+          : [{ id: `${checkout.id}-line`, serviceId: checkout.serviceId }]
+      )
+        .map(
+          (line) =>
+            (business.services || []).find(
+              (service) => service.id === line.serviceId,
+            )?.name || "",
+        )
+        .join(" ");
+      const haystack = [
+        checkout.customerName,
+        customer?.phone,
+        checkout.notes,
+        serviceNames,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("tr-TR");
+      const phoneMatch =
+        phoneQuery.length > 0 &&
+        String(customer?.phone || "")
+          .replace(/\D/g, "")
+          .includes(phoneQuery);
+      return haystack.includes(query) || phoneMatch;
+    }),
     dateFilter,
     (checkout) => checkout.date,
   ).sort((a, b) => {
@@ -158,7 +200,16 @@ export function CheckoutsPage({
           <h1 className="text-xl font-semibold text-slate-700">
             Adisyonlar ({checkouts.length})
           </h1>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[200px] flex-1">
+              <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Müşteri, telefon, hizmet ara..."
+                className="h-9 rounded border-slate-300 bg-white pr-9"
+              />
+            </div>
             <NativeSelect
               value={statusFilter}
               onChange={setStatusFilter}

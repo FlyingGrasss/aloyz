@@ -9,6 +9,7 @@ import {
   FileText,
   Plus,
   RefreshCw,
+  Search,
   Settings,
   Upload,
   X,
@@ -57,14 +58,38 @@ export function ProductSalesPage({
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [period, setPeriod] = useState("Bu ay");
-  const [sortDesc, setSortDesc] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sort, setSort] = useState("date-desc");
   const promotions = normalizePromotions(business.promotions);
-  const sales = filterSalesByPeriod(promotions.productSales || [], period).sort(
-    (a, b) =>
-      sortDesc
-        ? b.date.localeCompare(a.date)
-        : a.date.localeCompare(b.date),
-  );
+  const query = searchTerm.trim().toLocaleLowerCase("tr-TR");
+  const sales = (query
+    ? promotions.productSales || []
+    : filterSalesByPeriod(promotions.productSales || [], period)
+  ).filter((sale) => {
+      if (!query) return true;
+      const haystack = [
+        sale.customerName,
+        sale.notes,
+        staffName(business, sale.sellerId),
+        ...sale.lines.map((line) => line.name),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("tr-TR");
+      return haystack.includes(query);
+    })
+    .sort((a, b) => {
+      if (sort === "name-asc") {
+        return a.customerName.localeCompare(b.customerName, "tr");
+      }
+      if (sort === "name-desc") {
+        return b.customerName.localeCompare(a.customerName, "tr");
+      }
+      if (sort === "total-desc") return b.total - a.total;
+      if (sort === "total-asc") return a.total - b.total;
+      if (sort === "date-asc") return a.date.localeCompare(b.date);
+      return b.date.localeCompare(a.date);
+    });
   const total = sales.reduce((sum, sale) => sum + sale.total, 0);
 
   async function saveSale(
@@ -85,13 +110,29 @@ export function ProductSalesPage({
     <>
       <SalesShell
         title="Ürün satışları"
-      newLabel="Yeni"
-      period={period}
-      onPeriodChange={setPeriod}
-      onRefresh={() => setSortDesc((value) => !value)}
-      onDownload={() =>
-        downloadCsv(
-          `Product Sales - ${todayFileDate()}.csv`,
+        newLabel="Yeni"
+        period={period}
+        onPeriodChange={setPeriod}
+        onRefresh={() => {
+          setSearchTerm("");
+          setSort("date-desc");
+        }}
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Müşteri, ürün, satıcı ara..."
+        sortValue={sort}
+        sortOptions={[
+          { value: "date-desc", label: "Tarih (yeni → eski)" },
+          { value: "date-asc", label: "Tarih (eski → yeni)" },
+          { value: "name-asc", label: "Müşteri (A → Z)" },
+          { value: "name-desc", label: "Müşteri (Z → A)" },
+          { value: "total-desc", label: "Tutar (yüksek → düşük)" },
+          { value: "total-asc", label: "Tutar (düşük → yüksek)" },
+        ]}
+        onSortChange={setSort}
+        onDownload={() =>
+          downloadCsv(
+            `Product Sales - ${todayFileDate()}.csv`,
           ["Satış tarihi", "Müşteri", "Ürün", "Toplam tutar", "Ödenen tutar"],
           sales.map((sale) => [
             sale.date,
@@ -186,20 +227,62 @@ export function PackageSalesPage({
   const [editingSale, setEditingSale] = useState<PackageSaleItem | null>(null);
   const [deletingSale, setDeletingSale] = useState<PackageSaleItem | null>(null);
   const [period, setPeriod] = useState("Bu ay");
-  const [sortDesc, setSortDesc] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sort, setSort] = useState("date-desc");
   const [pageState, setPageState] = useState({
-    key: "Bu ay-true",
+    key: "Bu ay-date-desc-",
     page: 1,
   });
   const promotions = normalizePromotions(business.promotions);
   const allSales = promotions.packageSales || [];
-  const sales = filterSalesByPeriod(allSales, period).sort(
-    (a, b) =>
-      sortDesc
-        ? b.date.localeCompare(a.date)
-        : a.date.localeCompare(b.date),
-  );
-  const pageKey = `${period}-${sortDesc}`;
+  const query = searchTerm.trim().toLocaleLowerCase("tr-TR");
+  const phoneQuery = query
+    .replace(/\D/g, "")
+    .replace(/^90/, "")
+    .replace(/^0/, "");
+  const sales = (query ? allSales : filterSalesByPeriod(allSales, period))
+    .filter((sale) => {
+      if (!query) return true;
+      const customer = (business.customers || []).find(
+        (item) =>
+          item.id === sale.customerId ||
+          item.name.trim().toLocaleLowerCase("tr-TR") ===
+            sale.customerName.trim().toLocaleLowerCase("tr-TR"),
+      );
+      const haystack = [
+        sale.customerName,
+        customer?.phone,
+        sale.notes,
+        String(sale.total),
+        String(sale.paidAmount),
+        staffName(business, sale.sellerId),
+        ...sale.lines.map(
+          (line) => `${line.name} ${serviceName(business, line.serviceId)}`,
+        ),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("tr-TR");
+      const phoneMatch =
+        phoneQuery.length > 0 &&
+        String(customer?.phone || "")
+          .replace(/\D/g, "")
+          .includes(phoneQuery);
+      return haystack.includes(query) || phoneMatch;
+    })
+    .sort((a, b) => {
+      if (sort === "name-asc") {
+        return a.customerName.localeCompare(b.customerName, "tr");
+      }
+      if (sort === "name-desc") {
+        return b.customerName.localeCompare(a.customerName, "tr");
+      }
+      if (sort === "total-desc") return b.total - a.total;
+      if (sort === "total-asc") return a.total - b.total;
+      if (sort === "date-asc") return a.date.localeCompare(b.date);
+      return b.date.localeCompare(a.date);
+    });
+  const pageKey = `${period}-${sort}-${searchTerm}`;
   const pageSize = 100;
   const totalPages = Math.max(1, Math.ceil(sales.length / pageSize));
   const currentPage = Math.min(
@@ -281,7 +364,23 @@ export function PackageSalesPage({
       newLabel="Yeni"
       period={period}
       onPeriodChange={setPeriod}
-      onRefresh={() => setSortDesc((value) => !value)}
+      onRefresh={() => {
+        setSearchTerm("");
+        setSort("date-desc");
+      }}
+      searchTerm={searchTerm}
+      onSearchChange={setSearchTerm}
+      searchPlaceholder="Müşteri, telefon, hizmet ara..."
+      sortValue={sort}
+      sortOptions={[
+        { value: "date-desc", label: "Tarih (yeni → eski)" },
+        { value: "date-asc", label: "Tarih (eski → yeni)" },
+        { value: "name-asc", label: "Müşteri (A → Z)" },
+        { value: "name-desc", label: "Müşteri (Z → A)" },
+        { value: "total-desc", label: "Tutar (yüksek → düşük)" },
+        { value: "total-asc", label: "Tutar (düşük → yüksek)" },
+      ]}
+      onSortChange={setSort}
       onDownload={() =>
         downloadCsv(
           `Package Sales - ${todayFileDate()}.csv`,
@@ -541,6 +640,12 @@ function SalesShell({
   onRefresh,
   onDownload,
   onNew,
+  searchTerm = "",
+  onSearchChange,
+  searchPlaceholder = "Ara...",
+  sortValue,
+  sortOptions,
+  onSortChange,
   children,
 }: {
   title: string;
@@ -550,6 +655,12 @@ function SalesShell({
   onRefresh: () => void;
   onDownload: () => void;
   onNew: () => void;
+  searchTerm?: string;
+  onSearchChange?: (value: string) => void;
+  searchPlaceholder?: string;
+  sortValue?: string;
+  sortOptions?: Array<{ value: string; label: string }>;
+  onSortChange?: (value: string) => void;
   children: React.ReactNode;
 }) {
   return (
@@ -574,10 +685,28 @@ function SalesShell({
           </div>
         </div>
         <div className="border-b border-slate-200 bg-slate-100 px-4 py-3">
-          <div className="flex flex-wrap justify-between gap-2">
-            <Button type="button" variant="secondary" onClick={onRefresh}>
-              Filtrele / Sırala
-            </Button>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              {onSearchChange && (
+                <div className="relative min-w-[200px] max-w-md flex-1">
+                  <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    value={searchTerm}
+                    onChange={(event) => onSearchChange(event.target.value)}
+                    placeholder={searchPlaceholder}
+                    className="h-9 rounded-lg border-slate-200 bg-white pr-9"
+                  />
+                </div>
+              )}
+              {sortOptions && onSortChange && (
+                <NativeSelect
+                  value={sortValue || sortOptions[0]?.value || ""}
+                  onChange={onSortChange}
+                  options={sortOptions}
+                  className="h-9 w-full sm:w-56"
+                />
+              )}
+            </div>
             <div className="flex items-center gap-1">
               <Button
                 type="button"

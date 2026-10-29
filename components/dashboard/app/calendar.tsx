@@ -1071,6 +1071,7 @@ export function AppointmentsPage({
 }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [staffFilter, setStaffFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedRow, setSelectedRow] = useState<AppointmentListRow | null>(null);
   const [editingAppointment, setEditingAppointment] =
     useState<Appointment | null>(null);
@@ -1160,6 +1161,11 @@ export function AppointmentsPage({
   const rows: AppointmentListRow[] = [...checkoutRows, ...appointmentRows].sort((a, b) =>
     `${b.date}T${b.time}`.localeCompare(`${a.date}T${a.time}`),
   );
+  const query = searchTerm.trim().toLocaleLowerCase("tr-TR");
+  const phoneQuery = query
+    .replace(/\D/g, "")
+    .replace(/^90/, "")
+    .replace(/^0/, "");
   const filteredRows = rows.filter((row) => {
     const statusMatches =
       statusFilter === "all" ||
@@ -1169,7 +1175,20 @@ export function AppointmentsPage({
       staffFilter === "all" ||
       row.staffId === staffFilter ||
       row.appointments.some((appointment) => appointment.staffId === staffFilter);
-    return statusMatches && staffMatches;
+    const staffNames = row.appointments
+      .map((appointment) => getAppointmentStaffName(business, appointment))
+      .join(" ");
+    const searchMatches =
+      !query ||
+      [row.customerName, row.phone, row.description, staffNames]
+        .join(" ")
+        .toLocaleLowerCase("tr-TR")
+        .includes(query) ||
+      (phoneQuery.length > 0 &&
+        String(row.phone || "")
+          .replace(/\D/g, "")
+          .includes(phoneQuery));
+    return statusMatches && staffMatches && searchMatches;
   });
 
   async function updateAppointmentStatus(
@@ -1236,6 +1255,15 @@ export function AppointmentsPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <div className="relative min-w-[220px] flex-1">
+              <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Müşteri, telefon, hizmet ara..."
+                className="h-9 rounded border-slate-300 bg-white pr-9"
+              />
+            </div>
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
