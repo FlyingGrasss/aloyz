@@ -5,7 +5,7 @@
 - Branch: `main`
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
-- Last known green commit: `92e9173`
+- Last known green commit: `983c2dd` for typecheck; manual UI verification pending
 - Highest priority unfinished feature: `calendar-ux`
 - Current blocker: none
 
@@ -23,15 +23,16 @@
   - Removed Kaynak/source columns from Randevular and overview.
   - Grouped multi-service Salonappy bookings in Randevular and overview.
 - Verification run:
-  - `pnpm exec tsc --noEmit` passed.
-  - DB checks: 422 appointments, 0 summary rows, 0 English service titles in imported services, 0 duplicate event IDs.
+  - `pnpm exec tsc --noEmit` passed before and after commit `983c2dd`.
+  - DB checks: 422 appointments, 0 summary rows, 0 English service titles/descriptions, 0 duplicate event IDs.
   - DB grouping check: 365 booking groups, 46 multi-service groups, 0 cross-customer/date merges.
+  - DB settings check: calendarView=Haftalık görünüm, calendarWidth=80, calendarSlotInterval=60 Dakika.
   - Targeted ESLint still reports pre-existing errors in DashboardApp/Google-sync code; no new error was identified in the new modal/grouping code.
-- Evidence recorded: none yet; manual UI verification and commit pending.
-- Commits: none this session yet.
+- Evidence recorded: `salonappy-data-translation` passing at `983c2dd`.
+- Commits: `983c2dd`.
 - Known risks:
   - Google Calendar cards remain read-only and fall back to the Randevular page instead of opening the local edit modal.
   - Manual UI verification is still required for defaults, compact rows, modal editing, and grouping.
   - The working tree still contains unrelated pre-existing mobile/dashboard changes.
 - Next best action:
-  - Manually verify the calendar and appointment list, then commit only the intended files and update evidence.
+  - Manually test the calendar and appointment list, then mark `calendar-ux` and `appointment-list-cleanup` passing if the behavior is correct.

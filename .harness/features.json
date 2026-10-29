@@ -32,7 +32,7 @@
         "Google Calendar cards do not open the local edit modal."
       ],
       "evidence": null,
-      "notes": "Code complete and typecheck passes. Manual UI verification still pending. The business bookingSettings now explicitly stores calendarView=Haftalık görünüm, calendarWidth=80, calendarSlotInterval=60 Dakika."
+      "notes": "Code committed in 983c2dd and typecheck passes. Manual UI verification is the only remaining step. The business bookingSettings stores calendarView=Haftalık görünüm, calendarWidth=80, calendarSlotInterval=60 Dakika."
     },
     {
       "id": "appointment-list-cleanup",
@@ -52,7 +52,7 @@
         "A multi-service booking (e.g. gülşen tanyıldız on 2026-10-29 14:00) appears once in Randevular with both services listed."
       ],
       "evidence": null,
-      "notes": "Implementation is complete together with calendar-ux, but it is not separately marked in_progress. Manual UI verification pending."
+      "notes": "Code committed in 983c2dd. Manual UI verification pending; kept out of in_progress so calendar-ux remains the single active feature."
     },
     {
       "id": "salonappy-data-translation",
@@ -61,14 +61,23 @@
       "title": "Turkish service names and exact remaining booking details",
       "user_visible_behavior": "Imported services and appointment descriptions use Turkish names, and the previously summary-only bookings now use their exact service/staff lines.",
       "files": [],
-      "status": "not_started",
+      "status": "passing",
       "verification": [
         "No imported service name matches /Laser Hair Removal|Manicure|Pedicure|Eyebrow Shaping|Permanent Nail|Fake Nails|False Eyelashes|Skin Tightening|Eyelash Lifting/.",
         "No appointment description contains those English service names.",
         "Appointments total is 422 and source `salonappy-summary` count is 0."
       ],
-      "evidence": null,
-      "notes": "Data changes applied and verified directly against the database; code commit pending."
+      "evidence": {
+        "date": "2026-10-29",
+        "commit": "983c2dd",
+        "commands": [
+          "read-only Prisma check: 422 appointments; summary=0; badServices=0; badAppointments=0; duplicate event IDs=0",
+          "read-only Prisma grouping check: 365 groups; 46 multi-service; 0 cross-customer/date merges",
+          "read-only Prisma businessSettings check: calendarView=Haftalık görünüm; calendarWidth=80; calendarSlotInterval=60 Dakika"
+        ],
+        "result": "All checks passed."
+      },
+      "notes": "Data changes were applied directly to the database; commit 983c2dd records the related UI/API changes."
     }
   ]
 }
