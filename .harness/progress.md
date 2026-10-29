@@ -5,7 +5,7 @@
 - Branch: `main`
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
-- Last known green commit: `f6525a6` for typecheck; manual UI verification pending
+- Last known green commit: `72f7201` for typecheck; manual UI verification pending
 - Highest priority unfinished feature: `package-session-usage`
 - Current blocker: none
 
@@ -24,7 +24,7 @@
   - Local package usage unit test passed: apply, idempotent, restore, delete restore, cancelled, different customer.
   - Targeted ESLint still reports pre-existing DashboardApp/calendar Google-sync errors; `lib/packageUsage.ts` and sales/customer files are clean.
 - Evidence recorded: none yet; end-to-end UI verification pending.
-- Commits: none yet for this batch.
+- Commits: `72f7201`.
 - Known risks:
   - Server-side usage is applied through `/api/business`; admin-mode updates use a separate route and are not covered.
   - Package line with empty serviceId falls back to any remaining package for that customer.
