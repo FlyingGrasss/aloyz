@@ -1276,7 +1276,7 @@ function PackageLineEditor({
   removable: boolean;
 }) {
   return (
-    <div className="grid grid-cols-[72px_110px_1fr_92px_32px] gap-2">
+    <div className="grid gap-2 sm:grid-cols-[72px_110px_1fr_92px_32px]">
       <Input
         value={line.quantity}
         onChange={(event) => {
@@ -1299,26 +1299,27 @@ function PackageLineEditor({
           label: value,
         }))}
       />
-      <CatalogSearch
-        value={line.name}
-        placeholder="Hizmet"
-        items={packages}
-        getLabel={(item) => item.name}
-        getSubtitle={(item) => serviceName(business, item.serviceId)}
-        createLabel="Yeni paket ekle"
-        onPick={(item) =>
+      <NativeSelect
+        value={line.serviceId}
+        onChange={(serviceId) => {
+          const service = (business.services || []).find(
+            (item) => item.id === serviceId,
+          );
           onChange({
             ...line,
-            packageId: item.id,
-            name: item.name,
-            packageType: item.type,
-            serviceId: item.serviceId,
-            quantity: item.quantity,
-            amount: item.price,
-          })
-        }
-        onCreate={(name) => onCreatePackage(name, line)}
-        onText={(name) => onChange({ ...line, name })}
+            serviceId,
+            name: service?.name || "",
+            packageType:
+              line.packageType === "Paket tipi" ? "Seans" : line.packageType,
+          });
+        }}
+        options={[
+          { value: "", label: "İşlem seçin" },
+          ...(business.services || []).map((service) => ({
+            value: service.id,
+            label: service.name,
+          })),
+        ]}
       />
       <MoneyInput
         value={line.amount}

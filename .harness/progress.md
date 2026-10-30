@@ -5,7 +5,7 @@
 - Branch: `main`
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
-- Last known green commit: `3e2fa93` for typecheck; manual UI verification pending
+- Last known green commit: `e6e0da1` for typecheck; manual UI verification pending
 - Highest priority unfinished feature: `package-session-usage`
 - Current blocker: none.
 
@@ -30,13 +30,14 @@
   - Added search boxes to Paket satışları, Ürün satışları, Randevular, and Adisyonlar.
   - Added sort options for date, customer name A-Z/Z-A, and total amount on both sales pages.
   - Added Düzenle to each package row in customer detail; can edit date, total, paid, notes, total sessions, and used sessions; remaining recalculates.
+  - Replaced the empty package-line “Hizmet” catalog search with a real İşlem selector from business.services (Lazer, Kaş, Cilt, etc.); package rows stack on mobile.
 - Verification run:
   - `pnpm exec tsc --noEmit` passed.
   - Package usage performance test: 2,714 sales normalized in 44 ms; Seher's package 8 -> 7.
   - Package helper tests: apply, idempotent, restore, delete restore, cancelled, different customer.
   - Targeted ESLint: `lib/packageUsage.ts`, sales, customers, customer-picker, and shell are clean; calendar has only the pre-existing Google-sync errors.
 - Evidence recorded: none yet; end-to-end UI verification pending.
-- Commits: `72f7201`, `413724f`, `fbe7f36`, `585b0c6`, `3e2fa93`.
+- Commits: `72f7201`, `413724f`, `fbe7f36`, `585b0c6`, `3e2fa93`, `e6e0da1`.
 - Known risks:
   - Server-side usage is applied through `/api/business`; admin-mode updates use a separate route and are not covered.
   - Package line with empty serviceId falls back to any remaining package for that customer.

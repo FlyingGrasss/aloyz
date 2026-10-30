@@ -57,10 +57,11 @@
         "UI: remove Geldi and confirm the session is restored.",
         "Open a customer detail: package lines show total, paid, Kalan X/Y and Kullanılan X.",
         "Click Düzenle on a customer package, change Kullanılan, save, and confirm Kalan updates.",
-        "Paket satışları with Tümü shows 2,714 imported active packages and paginates 100/page."
+        "Paket satışları with Tümü shows 2,714 imported active packages and paginates 100/page.",
+        "Yeni paket satışında İşlem selector lists Lazer, Kaş, Cilt, etc. and saving stores the selected serviceId."
       ],
       "evidence": null,
-      "notes": "Imported 2,714 active 2025+ Salonappy package sales (1.54 MB compact JSON). Seher Abdullah's 8-session package now links to the existing customer and shows 8/8. Customer package rows now have Düzenle for date/total/paid/notes/quantity/used; remaining is recalculated. Paket satışları is paginated 100/page. Pure usage helper test: 8 -> 7 in 44 ms. Manual UI verification pending."
+      "notes": "Imported 2,714 active 2025+ Salonappy package sales (1.54 MB compact JSON). Seher Abdullah's 8-session package now links to the existing customer and shows 8/8. Customer package rows now have Düzenle for date/total/paid/notes/quantity/used; remaining is recalculated. New package lines now have a real İşlem selector from business.services instead of the empty saved-package catalog. Paket satışları is paginated 100/page. Pure usage helper test: 8 -> 7 in 44 ms. Manual UI verification pending."
     },
     {
       "id": "customer-list-mobile",
