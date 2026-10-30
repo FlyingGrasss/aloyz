@@ -165,6 +165,18 @@ export function ContactsPage({
     }
   }
 
+  async function updatePackageSale(sale: PackageSaleItem) {
+    const packageSales = (business.promotions?.packageSales || []).map((item) =>
+      item.id === sale.id ? sale : item,
+    );
+    return onUpdateAndSave({
+      promotions: {
+        ...(business.promotions || {}),
+        packageSales,
+      },
+    });
+  }
+
   return (
     <div className="space-y-4">
       <Breadcrumb items={["Aloyz", "Müşteriler"]} />
@@ -340,6 +352,7 @@ export function ContactsPage({
               sale.customerName.trim().toLocaleLowerCase("tr-TR") ===
                 editingCustomer.name.trim().toLocaleLowerCase("tr-TR"),
           )}
+          onUpdatePackageSale={updatePackageSale}
           onClose={() => setEditingCustomer(null)}
           onSubmit={saveCustomer}
         />
@@ -353,6 +366,7 @@ export function CustomerModal({
   initialName,
   initialCustomer,
   packageSales = [],
+  onUpdatePackageSale,
   onClose,
   onSubmit,
 }: {
@@ -360,6 +374,7 @@ export function CustomerModal({
   initialName?: string;
   initialCustomer?: CustomerProfile;
   packageSales?: PackageSaleItem[];
+  onUpdatePackageSale?: (sale: PackageSaleItem) => Promise<boolean>;
   onClose: () => void;
   onSubmit: (customer: CustomerProfile) => void;
 }) {
@@ -380,6 +395,8 @@ export function CustomerModal({
       tags: [],
     },
   );
+  const [editingPackageSale, setEditingPackageSale] =
+    useState<PackageSaleItem | null>(null);
   return (
     <div className="fixed inset-0 z-[60] grid place-items-start bg-slate-950/35 p-6">
       <section className="mx-auto mt-4 w-full max-w-md rounded bg-white shadow-xl">
@@ -489,12 +506,24 @@ export function CustomerModal({
                 <div className="mt-2 space-y-3">
                   {packageSales.map((sale) => (
                     <div key={sale.id}>
-                      <div className="text-xs font-medium text-slate-700">
-                        {sale.total} TL · Ödenen {sale.paidAmount} TL
-                        {sale.total > sale.paidAmount
-                          ? ` · Kalan ödeme ${sale.total - sale.paidAmount} TL`
-                          : ""}{" "}
-                        · {sale.date}
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="text-xs font-medium text-slate-700">
+                          {sale.total} TL · Ödenen {sale.paidAmount} TL
+                          {sale.total > sale.paidAmount
+                            ? ` · Kalan ödeme ${sale.total - sale.paidAmount} TL`
+                            : ""}{" "}
+                          · {sale.date}
+                        </div>
+                        {onUpdatePackageSale && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditingPackageSale(sale)}
+                          >
+                            Düzenle
+                          </Button>
+                        )}
                       </div>
                       <div className="mt-1 space-y-1">
                         {sale.lines.map((line) => {
@@ -540,6 +569,199 @@ export function CustomerModal({
             className="bg-[#5f86b6] text-white"
           >
             Kaydet
+          </Button>
+        </div>
+      </section>
+      {editingPackageSale && onUpdatePackageSale && (
+        <PackageQuickEditModal
+          sale={editingPackageSale}
+          saving={saving}
+          onClose={() => setEditingPackageSale(null)}
+          onSave={async (sale) => {
+            const saved = await onUpdatePackageSale(sale);
+            if (saved) setEditingPackageSale(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function PackageQuickEditModal({
+  sale,
+  saving,
+  onClose,
+  onSave,
+}: {
+  sale: PackageSaleItem;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (sale: PackageSaleItem) => Promise<void>;
+}) {
+  const [date, setDate] = useState(sale.date || "");
+  const [total, setTotal] = useState(String(sale.total ?? 0));
+  const [paidAmount, setPaidAmount] = useState(String(sale.paidAmount ?? 0));
+  const [notes, setNotes] = useState(sale.notes || "");
+  const [lines, setLines] = useState(
+    sale.lines.map((line) => {
+      const quantity = Math.max(0, Number(line.quantity) || 0);
+      const used = Math.min(quantity, Math.max(0, Number(line.used) || 0));
+      return {
+        ...line,
+        quantity,
+        used,
+        remaining: Math.min(
+          quantity - used,
+          Math.max(0, Number(line.remaining ?? quantity - used) || 0),
+        ),
+      };
+    }),
+  );
+
+  function updateLine(
+    id: string,
+    patch: Partial<(typeof lines)[number]>,
+  ) {
+    setLines((current) =>
+      current.map((line) => {
+        if (line.id !== id) return line;
+        const quantity = Math.max(
+          0,
+          Number(patch.quantity ?? line.quantity) || 0,
+        );
+        const used = Math.min(
+          quantity,
+          Math.max(0, Number(patch.used ?? line.used) || 0),
+        );
+        return {
+          ...line,
+          ...patch,
+          quantity,
+          used,
+          remaining: quantity - used,
+        };
+      }),
+    );
+  }
+
+  async function submit() {
+    const normalizedLines = lines.map((line) => {
+      const quantity = Math.max(0, Number(line.quantity) || 0);
+      const used = Math.min(quantity, Math.max(0, Number(line.used) || 0));
+      return {
+        ...line,
+        quantity,
+        used,
+        remaining: quantity - used,
+      };
+    });
+    const normalizedTotal = Math.max(0, Number(total) || 0);
+    const normalizedPaid = Math.min(
+      normalizedTotal,
+      Math.max(0, Number(paidAmount) || 0),
+    );
+    await onSave({
+      ...sale,
+      date,
+      total: normalizedTotal,
+      paidAmount: normalizedPaid,
+      notes,
+      lines: normalizedLines,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-[70] grid place-items-start overflow-y-auto bg-slate-950/40 p-4">
+      <section className="mx-auto mt-4 w-full max-w-xl rounded bg-white shadow-xl">
+        <ModalHeader title="Paket bilgilerini düzenle" onClose={onClose} />
+        <div className="grid gap-3 p-4 sm:grid-cols-2">
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Satış tarihi
+            <Input
+              type="date"
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Toplam tutar
+            <Input
+              type="number"
+              value={total}
+              onChange={(event) => setTotal(event.target.value)}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Ödenen tutar
+            <Input
+              type="number"
+              value={paidAmount}
+              onChange={(event) => setPaidAmount(event.target.value)}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Not
+            <Input
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+            />
+          </label>
+          <div className="grid gap-2 sm:col-span-2">
+            {lines.map((line) => (
+              <div
+                key={line.id}
+                className="rounded border border-slate-200 bg-slate-50 p-3"
+              >
+                <div className="text-sm font-semibold text-slate-700">
+                  {line.name || "Paket"}
+                </div>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                    Toplam seans
+                    <Input
+                      type="number"
+                      min={0}
+                      value={line.quantity}
+                      onChange={(event) =>
+                        updateLine(line.id, {
+                          quantity: Number(event.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                    Kullanılan
+                    <Input
+                      type="number"
+                      min={0}
+                      value={line.used}
+                      onChange={(event) =>
+                        updateLine(line.id, {
+                          used: Number(event.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                    Kalan
+                    <Input value={line.remaining} readOnly />
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-200 px-4 py-3">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Kapat
+          </Button>
+          <Button
+            type="button"
+            disabled={saving}
+            onClick={() => void submit()}
+            className="bg-[#24a647] text-white"
+          >
+            {saving ? "Kaydediliyor..." : "Kaydet"}
           </Button>
         </div>
       </section>

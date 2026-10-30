@@ -29,6 +29,7 @@
   - Added 100/page pagination to Paket satışları.
   - Added search boxes to Paket satışları, Ürün satışları, Randevular, and Adisyonlar.
   - Added sort options for date, customer name A-Z/Z-A, and total amount on both sales pages.
+  - Added Düzenle to each package row in customer detail; can edit date, total, paid, notes, total sessions, and used sessions; remaining recalculates.
 - Verification run:
   - `pnpm exec tsc --noEmit` passed.
   - Package usage performance test: 2,714 sales normalized in 44 ms; Seher's package 8 -> 7.
