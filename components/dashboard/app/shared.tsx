@@ -257,6 +257,7 @@ export type ProductSaleItem = {
   notes: string;
   lines: ProductSaleLine[];
   paid: boolean;
+  paymentMethod?: string;
   total: number;
   paidAmount: number;
   createdBy: string;

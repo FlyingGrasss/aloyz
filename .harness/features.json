@@ -48,7 +48,7 @@
         "components/dashboard/app/sales.tsx",
         "components/dashboard/app/shared.tsx"
       ],
-      "status": "in_progress",
+      "status": "not_started",
       "verification": [
         "pnpm exec tsc --noEmit",
         "Local unit test: apply Geldi -> used 1, remaining 7; repeat -> unchanged; Gelmedi/delete -> restored to 8.",
@@ -157,6 +157,27 @@
       ],
       "evidence": null,
       "notes": "Code complete; manual UI verification pending. Nakit/EFT/Kredi Kartı are available on package sales; EFT was also added to checkout and finance payment method lists."
+    },
+    {
+      "id": "cash-register-report",
+      "priority": 14,
+      "area": "dashboard/reports",
+      "title": "Cash register by payment method and custom period",
+      "user_visible_behavior": "Kasa raporu shows Nakit, EFT, and Kredi Kartı collections, expenses, and net cash for today, this month, last month, or a custom start/end date.",
+      "files": [
+        "components/dashboard/app/reports.tsx",
+        "components/dashboard/app/sales.tsx",
+        "components/dashboard/app/shared.tsx"
+      ],
+      "status": "in_progress",
+      "verification": [
+        "pnpm exec tsc --noEmit",
+        "Kasa raporu shows Nakit/EFT/Kredi Kartı collection cards and a method breakdown table.",
+        "Select Bugün, Bu ay, Geçen ay, and Özel; the totals change accordingly.",
+        "Select Özel and enter a date range; only records in that range are counted."
+      ],
+      "evidence": null,
+      "notes": "Code complete; manual UI verification pending. Product sales now carry paymentMethod; EFT added to checkout/finance methods."
     },
     {
       "id": "appointment-list-cleanup",

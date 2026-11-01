@@ -4,6 +4,7 @@ import type React from "react";
 import { useState } from "react";
 import { CalendarDays, Download, Filter, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Breadcrumb,
   Business,
@@ -25,19 +26,54 @@ export function ReportPage({
   return <CashierReport business={business} />;
 }
 
+type CustomRange = {
+  start: string;
+  end: string;
+};
+
+function useReportFilter() {
+  const [period, setPeriod] = useState<ReportPeriod>("Bu ay");
+  const [customStart, setCustomStart] = useState(formatDateKey(new Date()));
+  const [customEnd, setCustomEnd] = useState(formatDateKey(new Date()));
+  const range: CustomRange | undefined =
+    period === "Özel"
+      ? {
+          start: customStart || customEnd || formatDateKey(new Date()),
+          end: customEnd || customStart || formatDateKey(new Date()),
+        }
+      : undefined;
+  return {
+    period,
+    setPeriod,
+    customStart,
+    customEnd,
+    setCustomStart,
+    setCustomEnd,
+    range,
+  };
+}
+
 function ReportShell({
   title,
   period,
+  customStart,
+  customEnd,
   sortDesc,
   onPeriodChange,
+  onCustomStartChange,
+  onCustomEndChange,
   onSortChange,
   showSort = true,
   children,
 }: {
   title: string;
   period: ReportPeriod;
+  customStart: string;
+  customEnd: string;
   sortDesc: boolean;
   onPeriodChange: (period: ReportPeriod) => void;
+  onCustomStartChange: (value: string) => void;
+  onCustomEndChange: (value: string) => void;
   onSortChange: () => void;
   showSort?: boolean;
   children: React.ReactNode;
@@ -48,7 +84,7 @@ function ReportShell({
       <section className="rounded bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
           <h1 className="text-xl font-semibold text-slate-700">{title}</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <select
               value={period}
               onChange={(event) => onPeriodChange(event.target.value as ReportPeriod)}
@@ -58,9 +94,28 @@ function ReportShell({
                 <option key={option}>{option}</option>
               ))}
             </select>
+            {period === "Özel" && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="date"
+                  value={customStart}
+                  onChange={(event) => onCustomStartChange(event.target.value)}
+                  className="h-8 w-36"
+                  aria-label="Başlangıç tarihi"
+                />
+                <span className="text-sm text-slate-500">—</span>
+                <Input
+                  type="date"
+                  value={customEnd}
+                  onChange={(event) => onCustomEndChange(event.target.value)}
+                  className="h-8 w-36"
+                  aria-label="Bitiş tarihi"
+                />
+              </div>
+            )}
             <Button type="button" variant="outline" onClick={() => window.print()}>
               <CalendarDays className="size-4" />
-              Tarih
+              Yazdır
             </Button>
           </div>
         </div>
@@ -90,7 +145,9 @@ function ReportShell({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => downloadReportSnapshot(title, period)}
+                onClick={() =>
+                  downloadReportSnapshot(title, period, customStart, customEnd)
+                }
               >
                 <Download className="size-4" />
                 İndir
@@ -104,8 +161,16 @@ function ReportShell({
   );
 }
 
-function downloadReportSnapshot(title: string, period: string) {
-  const rows = collectVisibleReportRows(title, period);
+function downloadReportSnapshot(
+  title: string,
+  period: string,
+  customStart: string,
+  customEnd: string,
+) {
+  const rows = collectVisibleReportRows(
+    title,
+    period === "Özel" ? `${customStart} — ${customEnd}` : period,
+  );
   const csv = rows.map((row) => row.map(escapeCsv).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -160,15 +225,27 @@ function escapeCsv(value: string) {
 }
 
 function CashierReport({ business }: { business: Business }) {
-  const [period, setPeriod] = useState<ReportPeriod>("Bu ay");
   const [sortDesc, setSortDesc] = useState(true);
-  const data = getFinancialSnapshot(business, period);
+  const {
+    period,
+    setPeriod,
+    customStart,
+    customEnd,
+    setCustomStart,
+    setCustomEnd,
+    range,
+  } = useReportFilter();
+  const data = getFinancialSnapshot(business, period, range);
   return (
     <ReportShell
       title="Kasa raporu"
       period={period}
+      customStart={customStart}
+      customEnd={customEnd}
       sortDesc={sortDesc}
       onPeriodChange={setPeriod}
+      onCustomStartChange={setCustomStart}
+      onCustomEndChange={setCustomEnd}
       onSortChange={() => setSortDesc((value) => !value)}
     >
       <div className="grid gap-3 md:grid-cols-4">
@@ -182,6 +259,27 @@ function CashierReport({ business }: { business: Business }) {
         <ReportCard label="Alacaklar" value={data.receivableRemaining} tone="warning" />
         <ReportCard label="Borçlar" value={data.debtRemaining} tone="warning" />
       </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        {["Nakit", "EFT", "Kredi Kartı"].map((method) => (
+          <ReportCard
+            key={method}
+            label={`${method} tahsilat`}
+            value={
+              data.methodTotals.find((item) => item.method === method)
+                ?.collected || 0
+            }
+          />
+        ))}
+      </div>
+      <ReportTable
+        headers={["Ödeme yöntemi", "Tahsilat", "Masraf", "Net"]}
+        rows={data.methodTotals.map((item) => [
+          item.method,
+          money(item.collected),
+          money(item.expenses),
+          money(item.net),
+        ])}
+      />
       <SummaryTable
         rows={[
           ["Toplam ciro", data.revenue],
@@ -195,17 +293,27 @@ function CashierReport({ business }: { business: Business }) {
 }
 
 function StaffReport({ business }: { business: Business }) {
-  const [period, setPeriod] = useState<ReportPeriod>("Bu ay");
   const [sortDesc, setSortDesc] = useState(true);
+  const {
+    period,
+    setPeriod,
+    customStart,
+    customEnd,
+    setCustomStart,
+    setCustomEnd,
+    range,
+  } = useReportFilter();
   const filteredCheckouts = filterByPeriod(
     business.checkouts || [],
     period,
     (checkout) => checkout.date || checkout.createdAt,
+    range,
   );
   const filteredCommissions = filterByPeriod(
     business.promotions?.commissions || [],
     period,
     (item) => getItemDate(item),
+    range,
   );
   const rows = (business.staff || []).map((staff) => {
     const checkouts = filteredCheckouts.filter((checkout) =>
@@ -241,8 +349,12 @@ function StaffReport({ business }: { business: Business }) {
     <ReportShell
       title="Personel raporu"
       period={period}
+      customStart={customStart}
+      customEnd={customEnd}
       sortDesc={sortDesc}
       onPeriodChange={setPeriod}
+      onCustomStartChange={setCustomStart}
+      onCustomEndChange={setCustomEnd}
       onSortChange={() => setSortDesc((value) => !value)}
       showSort={false}
     >
@@ -262,13 +374,22 @@ function StaffReport({ business }: { business: Business }) {
 }
 
 function SalesReport({ business }: { business: Business }) {
-  const [period, setPeriod] = useState<ReportPeriod>("Bu ay");
   const [sortDesc, setSortDesc] = useState(true);
+  const {
+    period,
+    setPeriod,
+    customStart,
+    customEnd,
+    setCustomStart,
+    setCustomEnd,
+    range,
+  } = useReportFilter();
   const productSales = sortByDate(
     filterByPeriod(
       business.promotions?.productSales || [],
       period,
       (item) => item.date || item.createdAt,
+      range,
     ),
     sortDesc,
     (item) => item.date || item.createdAt,
@@ -278,6 +399,7 @@ function SalesReport({ business }: { business: Business }) {
       business.promotions?.packageSales || [],
       period,
       (item) => item.date || item.createdAt,
+      range,
     ),
     sortDesc,
     (item) => item.date || item.createdAt,
@@ -287,6 +409,7 @@ function SalesReport({ business }: { business: Business }) {
       business.checkouts || [],
       period,
       (item) => item.date || item.createdAt,
+      range,
     ),
     sortDesc,
     (item) => item.date || item.createdAt,
@@ -312,8 +435,12 @@ function SalesReport({ business }: { business: Business }) {
     <ReportShell
       title="Satış raporu"
       period={period}
+      customStart={customStart}
+      customEnd={customEnd}
       sortDesc={sortDesc}
       onPeriodChange={setPeriod}
+      onCustomStartChange={setCustomStart}
+      onCustomEndChange={setCustomEnd}
       onSortChange={() => setSortDesc((value) => !value)}
       showSort={false}
     >
@@ -412,44 +539,61 @@ function ReportTable({
   );
 }
 
-const REPORT_PERIODS = ["Bu ay", "Bugün", "Dün", "Geçen ay"] as const;
+const REPORT_PERIODS = [
+  "Bu ay",
+  "Bugün",
+  "Dün",
+  "Geçen ay",
+  "Özel",
+] as const;
 type ReportPeriod = (typeof REPORT_PERIODS)[number];
 
-function getFinancialSnapshot(business: Business, period: ReportPeriod) {
+function getFinancialSnapshot(
+  business: Business,
+  period: ReportPeriod,
+  range?: CustomRange,
+) {
   const checkouts = filterByPeriod(
     business.checkouts || [],
     period,
     (item) => item.date || item.createdAt,
+    range,
   );
   const productSales = filterByPeriod(
     business.promotions?.productSales || [],
     period,
     (item) => item.date || item.createdAt,
+    range,
   );
   const packageSales = filterByPeriod(
     business.promotions?.packageSales || [],
     period,
     (item) => item.date || item.createdAt,
+    range,
   );
   const payments = filterByPeriod(
     business.promotions?.payments || [],
     period,
     (item) => item.date || item.createdAt,
+    range,
   );
   const expenses = filterByPeriod(
     business.promotions?.expenses || [],
     period,
     (item) => item.date || item.createdAt,
+    range,
   );
   const receivables = filterByPeriod(
     business.promotions?.receivables || [],
     period,
     (item) => item.date || item.createdAt,
+    range,
   );
   const debts = filterByPeriod(
     business.promotions?.debts || [],
     period,
     (item) => item.date || item.createdAt,
+    range,
   );
   const checkoutTotal = checkouts.reduce((sum, item) => sum + item.amount, 0);
   const productTotal = productSales.reduce((sum, item) => sum + item.total, 0);
@@ -465,11 +609,11 @@ function getFinancialSnapshot(business: Business, period: ReportPeriod) {
     0,
   );
   const revenue = checkoutTotal + productTotal + packageTotal;
-  const collected =
-    paymentTotal +
-    checkouts.reduce((sum, item) => sum + paidFromCheckout(item), 0) +
-    productSales.reduce((sum, item) => sum + item.paidAmount, 0) +
-    packageSales.reduce((sum, item) => sum + item.paidAmount, 0);
+  const methodTotals = getMethodTotals(business, period, range);
+  const collected = methodTotals.reduce(
+    (sum, item) => sum + item.collected,
+    0,
+  );
   return {
     checkoutTotal,
     productTotal,
@@ -480,19 +624,136 @@ function getFinancialSnapshot(business: Business, period: ReportPeriod) {
     debtRemaining,
     revenue,
     collected,
+    methodTotals,
     pending: Math.max(0, revenue + receivableRemaining - collected),
   };
+}
+
+function getMethodTotals(
+  business: Business,
+  period: ReportPeriod,
+  range?: CustomRange,
+) {
+  const collected = new Map<string, number>();
+  const expenses = new Map<string, number>();
+  const add = (map: Map<string, number>, method: string, amount: number) => {
+    if (!amount) return;
+    map.set(method, (map.get(method) || 0) + amount);
+  };
+  const inPeriod = (value?: string) => {
+    const date = getDateOnly(value);
+    if (!date) return false;
+    const { start, end } = getPeriodRange(period, range);
+    return date >= start && date <= end;
+  };
+
+  for (const payment of business.promotions?.payments || []) {
+    if (inPeriod(payment.date || payment.createdAt)) {
+      add(
+        collected,
+        normalizePaymentMethod(payment.method),
+        Number(payment.amount) || 0,
+      );
+    }
+  }
+
+  for (const checkout of business.checkouts || []) {
+    for (const payment of checkout.payments || []) {
+      if (inPeriod(payment.date || checkout.date)) {
+        add(
+          collected,
+          normalizePaymentMethod(payment.method),
+          Number(payment.amount) || 0,
+        );
+      }
+    }
+  }
+
+  for (const sale of business.promotions?.packageSales || []) {
+    if (sale.payments && sale.payments.length > 0) {
+      for (const payment of sale.payments) {
+        if (inPeriod(payment.date || sale.date)) {
+          add(
+            collected,
+            normalizePaymentMethod(payment.method || sale.paymentMethod),
+            Number(payment.amount) || 0,
+          );
+        }
+      }
+    } else if (Number(sale.paidAmount) > 0 && inPeriod(sale.date)) {
+      add(
+        collected,
+        normalizePaymentMethod(sale.paymentMethod),
+        Number(sale.paidAmount) || 0,
+      );
+    }
+  }
+
+  for (const sale of business.promotions?.productSales || []) {
+    if (Number(sale.paidAmount) > 0 && inPeriod(sale.date)) {
+      add(
+        collected,
+        normalizePaymentMethod(sale.paymentMethod),
+        Number(sale.paidAmount) || 0,
+      );
+    }
+  }
+
+  for (const expense of business.promotions?.expenses || []) {
+    if (inPeriod(expense.date || expense.createdAt)) {
+      add(
+        expenses,
+        normalizePaymentMethod(expense.paymentMethod),
+        Number(expense.amount) || 0,
+      );
+    }
+  }
+
+  const methods = Array.from(
+    new Set([...collected.keys(), ...expenses.keys()]),
+  );
+  const preferred = ["Nakit", "EFT", "Kredi Kartı"];
+  methods.sort((left, right) => {
+    const leftIndex = preferred.indexOf(left);
+    const rightIndex = preferred.indexOf(right);
+    if (leftIndex !== -1 || rightIndex !== -1) {
+      return (leftIndex === -1 ? 99 : leftIndex) - (rightIndex === -1 ? 99 : rightIndex);
+    }
+    return left.localeCompare(right, "tr");
+  });
+  return methods.map((method) => {
+    const collectedTotal = collected.get(method) || 0;
+    const expenseTotal = expenses.get(method) || 0;
+    return {
+      method,
+      collected: collectedTotal,
+      expenses: expenseTotal,
+      net: collectedTotal - expenseTotal,
+    };
+  });
+}
+
+function normalizePaymentMethod(value?: string) {
+  const text = String(value || "").trim();
+  if (!text) return "Belirtilmemiş";
+  const lower = text.toLocaleLowerCase("tr-TR");
+  if (lower === "nakit") return "Nakit";
+  if (lower === "eft" || lower === "havale") return "EFT";
+  if (lower.includes("kredi")) return "Kredi Kartı";
+  if (lower.includes("online")) return "Online";
+  return text;
 }
 
 function filterByPeriod<T>(
   items: T[],
   period: ReportPeriod,
   getDate: (item: T) => string | undefined,
+  customRange?: CustomRange,
 ) {
-  const range = getPeriodRange(period);
+  const periodRange = getPeriodRange(period, customRange);
   return items.filter((item) => {
     const date = getDateOnly(getDate(item));
-    return date >= range.start && date <= range.end;
+    return date >= periodRange.start && date <= periodRange.end;
   });
 }
 
@@ -508,10 +769,18 @@ function sortByDate<T>(
   });
 }
 
-function getPeriodRange(period: ReportPeriod) {
+function getPeriodRange(period: ReportPeriod, customRange?: CustomRange) {
   const today = new Date();
   const start = new Date(today);
   const end = new Date(today);
+
+  if (period === "Özel") {
+    const customStart = customRange?.start || formatDateKey(today);
+    const customEnd = customRange?.end || customStart;
+    return customStart <= customEnd
+      ? { start: customStart, end: customEnd }
+      : { start: customEnd, end: customStart };
+  }
 
   if (period === "Bugün") {
     return { start: formatDateKey(today), end: formatDateKey(today) };
@@ -558,10 +827,6 @@ function getCheckoutStaffIds(checkout: CheckoutItem) {
     return Array.from(new Set(checkout.lines.map((line) => line.staffId)));
   }
   return checkout.staffId ? [checkout.staffId] : [];
-}
-
-function paidFromCheckout(checkout: CheckoutItem) {
-  return checkout.payments?.reduce((sum, payment) => sum + payment.amount, 0) || 0;
 }
 
 function money(value: number) {

@@ -6,7 +6,7 @@
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
 - Last known green commit: `58a9008` for typecheck; manual UI verification pending
-- Highest priority unfinished feature: `package-session-usage`
+- Highest priority unfinished feature: `cash-register-report`
 - Current blocker: none.
 
 ## Session record
@@ -35,6 +35,9 @@
   - Added Ödeme Al action for remaining package payments, with payment date/amount/method and payment history.
   - Customer package detail shows payment method, paid amount, and payment history; can edit method with paid amount.
   - Added EFT to checkout and finance payment method options alongside Nakit/Kredi Kartı.
+  - Added Kasa raporu method breakdown for Nakit/EFT/Kredi Kartı with collection, expense, and net columns.
+  - Added Bugün / Bu ay / Geçen ay / Özel period selection with custom start/end date inputs.
+  - Product sales now carry a payment method for cash reporting.
 - Verification run:
   - `pnpm exec tsc --noEmit` passed.
   - Package usage performance test: 2,714 sales normalized in 44 ms; Seher's package 8 -> 7.

@@ -928,6 +928,7 @@ export function ProductSaleModal({
   const [sellerId, setSellerId] = useState("");
   const [notes, setNotes] = useState("");
   const [paid, setPaid] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("Nakit");
   const [catalog, setCatalog] = useState(products);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newProductForLine, setNewProductForLine] = useState<{
@@ -952,6 +953,7 @@ export function ProductSaleModal({
         notes,
         lines,
         paid,
+        paymentMethod: paid ? paymentMethod : "",
         total,
         paidAmount: paid ? total : 0,
         createdBy: "Aloyz",
@@ -1051,6 +1053,16 @@ export function ProductSaleModal({
             />
             Tüm tutar tahsil edildi
           </label>
+          {paid && (
+            <NativeSelect
+              value={paymentMethod}
+              onChange={setPaymentMethod}
+              options={["Nakit", "EFT", "Kredi Kartı"].map((value) => ({
+                value,
+                label: value,
+              }))}
+            />
+          )}
           <Button type="button" disabled={saving || !customerName.trim()} onClick={submit}>
             Kaydet
           </Button>
