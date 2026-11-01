@@ -756,7 +756,7 @@ function getKind(view: ViewId): PageKind {
 }
 
 function paymentMethods() {
-  return ["Nakit", "Kredi kartı", "Havale", "Online ödeme", "Diğer"].map((value) => ({
+  return ["Nakit", "EFT", "Kredi kartı", "Havale", "Online ödeme", "Diğer"].map((value) => ({
     value,
     label: value,
   }));

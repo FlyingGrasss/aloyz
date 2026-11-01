@@ -138,6 +138,27 @@
       "notes": "Code complete; manual UI verification pending."
     },
     {
+      "id": "package-partial-payments",
+      "priority": 16,
+      "area": "dashboard/package-sales",
+      "title": "Partial package payments and payment methods",
+      "user_visible_behavior": "When creating a package sale, enter total, paid amount, and Nakit/EFT/Kredi Kartı; later use Ödeme Al to record the remaining payment and see payment history/remaining balance.",
+      "files": [
+        "components/dashboard/app/sales.tsx",
+        "components/dashboard/app/customers.tsx",
+        "components/dashboard/app/shared.tsx"
+      ],
+      "status": "not_started",
+      "verification": [
+        "pnpm exec tsc --noEmit",
+        "Create a 7.000 TL package with 3.500 TL paid via Nakit; confirm Kalan ödeme 3.500 TL.",
+        "Click Ödeme Al and record 3.500 TL via EFT; confirm paid 7.000 TL and remaining 0.",
+        "Customer package detail shows the payment method and updated paid amount."
+      ],
+      "evidence": null,
+      "notes": "Code complete; manual UI verification pending. Nakit/EFT/Kredi Kartı are available on package sales; EFT was also added to checkout and finance payment method lists."
+    },
+    {
       "id": "appointment-list-cleanup",
       "priority": 20,
       "area": "dashboard/appointments",

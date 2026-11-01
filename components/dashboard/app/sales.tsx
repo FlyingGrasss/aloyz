@@ -22,6 +22,7 @@ import {
   ModalHeader,
   NativeSelect,
   PackageCatalogItem,
+  PackagePayment,
   PackageSaleItem,
   PackageSaleLine,
   ProductCatalogItem,
@@ -226,6 +227,7 @@ export function PackageSalesPage({
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<PackageSaleItem | null>(null);
   const [deletingSale, setDeletingSale] = useState<PackageSaleItem | null>(null);
+  const [paymentSale, setPaymentSale] = useState<PackageSaleItem | null>(null);
   const [period, setPeriod] = useState("Bu ay");
   const [searchTerm, setSearchTerm] = useState("");
   const [sort, setSort] = useState("date-desc");
@@ -347,6 +349,28 @@ export function PackageSalesPage({
     if (saved) setDeletingSale(null);
   }
 
+  async function addPackagePayment(sale: PackageSaleItem, payment: PackagePayment) {
+    const paidAmount = Math.min(
+      sale.total,
+      Math.max(0, sale.paidAmount) + Math.max(0, payment.amount),
+    );
+    const nextSale: PackageSaleItem = {
+      ...sale,
+      paidAmount,
+      paymentMethod: payment.method,
+      payments: [...(sale.payments || []), payment],
+    };
+    const saved = await onUpdateAndSave({
+      promotions: {
+        ...promotions,
+        packageSales: allSales.map((item) =>
+          item.id === sale.id ? nextSale : item,
+        ),
+      },
+    });
+    if (saved) setPaymentSale(null);
+  }
+
   function openNewSale() {
     setEditingSale(null);
     setModalOpen(true);
@@ -448,6 +472,17 @@ export function PackageSalesPage({
                     >
                       Düzenle
                     </Button>
+                    {sale.total > sale.paidAmount && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={saving}
+                        onClick={() => setPaymentSale(sale)}
+                      >
+                        Ödeme Al
+                      </Button>
+                    )}
                     <Button
                       type="button"
                       variant="destructive"
@@ -471,7 +506,14 @@ export function PackageSalesPage({
                   {remaining} / {quantity}
                 </td>
                 <td className="px-3 py-3">{sale.total} TL</td>
-                <td className="px-3 py-3">{sale.paidAmount} TL</td>
+                <td className="px-3 py-3">
+                  {sale.paidAmount} TL
+                  {sale.paymentMethod ? (
+                    <span className="ml-1 text-xs text-slate-500">
+                      {sale.paymentMethod}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="px-3 py-3">{sale.total - sale.paidAmount} TL</td>
                 <td className="px-3 py-3">{sale.createdBy}</td>
                 <td className="px-3 py-3">-</td>
@@ -548,7 +590,128 @@ export function PackageSalesPage({
           onConfirm={() => void removeSale(deletingSale)}
         />
       )}
+      {paymentSale && (
+        <PackagePaymentModal
+          sale={paymentSale}
+          saving={saving}
+          onClose={() => setPaymentSale(null)}
+          onSave={(payment) => addPackagePayment(paymentSale, payment)}
+        />
+      )}
     </>
+  );
+}
+
+function PackagePaymentModal({
+  sale,
+  saving,
+  onClose,
+  onSave,
+}: {
+  sale: PackageSaleItem;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (payment: PackagePayment) => void;
+}) {
+  const remaining = Math.max(0, sale.total - sale.paidAmount);
+  const [date, setDate] = useState(todayInput());
+  const [amount, setAmount] = useState(String(remaining));
+  const [method, setMethod] = useState(sale.paymentMethod || "Nakit");
+  const [error, setError] = useState("");
+
+  function submit() {
+    const value = Math.min(remaining, Math.max(0, Number(amount) || 0));
+    if (value <= 0) {
+      setError("Ödeme tutarı 0'dan büyük olmalı.");
+      return;
+    }
+    setError("");
+    onSave({ id: createId(), date, amount: value, method });
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/40 p-4">
+      <section className="w-full max-w-sm rounded bg-white shadow-xl">
+        <ModalHeader title="Ödeme al" onClose={onClose} />
+        <div className="grid gap-3 p-4">
+          <div className="rounded bg-slate-50 px-3 py-2 text-sm">
+            <div className="font-semibold text-slate-800">
+              {sale.customerName}
+            </div>
+            <div className="text-xs text-slate-500">
+              Toplam {sale.total} TL · Ödenen {sale.paidAmount} TL · Kalan{" "}
+              {remaining} TL
+            </div>
+          </div>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Ödeme tarihi
+            <Input
+              type="date"
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Tutar
+            <Input
+              type="number"
+              min={0}
+              max={remaining}
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Ödeme yöntemi
+            <NativeSelect
+              value={method}
+              onChange={setMethod}
+              options={["Nakit", "EFT", "Kredi Kartı"].map((value) => ({
+                value,
+                label: value,
+              }))}
+            />
+          </label>
+          {sale.payments && sale.payments.length > 0 && (
+            <div className="rounded border border-slate-200 p-3">
+              <div className="text-xs font-semibold uppercase text-slate-500">
+                Önceki ödemeler
+              </div>
+              <div className="mt-2 space-y-1 text-xs text-slate-600">
+                {sale.payments.map((payment) => (
+                  <div
+                    key={payment.id}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <span>{payment.date}</span>
+                    <span>{payment.method}</span>
+                    <span className="font-semibold">{payment.amount} TL</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {error && (
+            <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-200 px-4 py-3">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Kapat
+          </Button>
+          <Button
+            type="button"
+            disabled={saving}
+            onClick={submit}
+            className="bg-[#24a647] text-white"
+          >
+            {saving ? "Kaydediliyor..." : "Ödemeyi kaydet"}
+          </Button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -948,6 +1111,12 @@ export function PackageSaleModal({
   const [createReceivable, setCreateReceivable] = useState(
     sale?.createReceivable || false,
   );
+  const [paidAmount, setPaidAmount] = useState(
+    sale ? String(sale.paidAmount ?? 0) : "",
+  );
+  const [paymentMethod, setPaymentMethod] = useState(
+    sale?.paymentMethod || "",
+  );
   const [catalog, setCatalog] = useState(packages);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newPackageForLine, setNewPackageForLine] = useState<{
@@ -983,8 +1152,24 @@ export function PackageSaleModal({
         ],
   );
   const total = lines.reduce((sum, line) => sum + line.amount, 0);
+  const paidValue =
+    paidAmount.trim() === ""
+      ? total
+      : Math.min(total, Math.max(0, Number(paidAmount) || 0));
+  const remainingPayment = Math.max(0, total - paidValue);
 
   function submit() {
+    const nextPayments: PackagePayment[] = sale?.payments
+      ? [...sale.payments]
+      : [];
+    if (!sale && paidValue > 0) {
+      nextPayments.push({
+        id: createId(),
+        date,
+        amount: paidValue,
+        method: paymentMethod,
+      });
+    }
     onSubmit(
       {
         id: sale?.id || createId(),
@@ -998,7 +1183,9 @@ export function PackageSaleModal({
         openPaymentWindow,
         createReceivable,
         total,
-        paidAmount: createReceivable ? 0 : total,
+        paidAmount: paidValue,
+        paymentMethod,
+        payments: nextPayments,
         createdBy: sale?.createdBy || "Aloyz",
         createdAt: sale?.createdAt || new Date().toISOString(),
       },
@@ -1136,6 +1323,36 @@ export function PackageSaleModal({
           <div className="flex items-center justify-between rounded bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
             <span>Toplam tutar</span>
             <span>{total} TL</span>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              Ödenen tutar
+              <Input
+                type="number"
+                min={0}
+                value={paidAmount}
+                placeholder={String(total)}
+                onChange={(event) => setPaidAmount(event.target.value)}
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              Ödeme yöntemi
+              <NativeSelect
+                value={paymentMethod}
+                onChange={setPaymentMethod}
+                options={[
+                  { value: "", label: "Ödeme yöntemi" },
+                  ...["Nakit", "EFT", "Kredi Kartı"].map((value) => ({
+                    value,
+                    label: value,
+                  })),
+                ]}
+              />
+            </label>
+          </div>
+          <div className="flex items-center justify-between rounded bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            <span>Kalan ödeme</span>
+            <span>{remainingPayment} TL</span>
           </div>
           <NativeSelect
             value={sellerId}

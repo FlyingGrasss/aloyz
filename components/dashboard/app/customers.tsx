@@ -509,6 +509,9 @@ export function CustomerModal({
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="text-xs font-medium text-slate-700">
                           {sale.total} TL · Ödenen {sale.paidAmount} TL
+                          {sale.paymentMethod
+                            ? ` (${sale.paymentMethod})`
+                            : ""}
                           {sale.total > sale.paidAmount
                             ? ` · Kalan ödeme ${sale.total - sale.paidAmount} TL`
                             : ""}{" "}
@@ -556,6 +559,17 @@ export function CustomerModal({
                           );
                         })}
                       </div>
+                      {sale.payments && sale.payments.length > 0 && (
+                        <div className="mt-1 text-[11px] text-slate-500">
+                          Ödemeler:{" "}
+                          {sale.payments
+                            .map(
+                              (payment) =>
+                                `${payment.date} ${payment.method || "Ödeme"} ${payment.amount} TL`,
+                            )
+                            .join(" · ")}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -601,6 +615,9 @@ function PackageQuickEditModal({
   const [date, setDate] = useState(sale.date || "");
   const [total, setTotal] = useState(String(sale.total ?? 0));
   const [paidAmount, setPaidAmount] = useState(String(sale.paidAmount ?? 0));
+  const [paymentMethod, setPaymentMethod] = useState(
+    sale.paymentMethod || "",
+  );
   const [notes, setNotes] = useState(sale.notes || "");
   const [lines, setLines] = useState(
     sale.lines.map((line) => {
@@ -665,6 +682,7 @@ function PackageQuickEditModal({
       date,
       total: normalizedTotal,
       paidAmount: normalizedPaid,
+      paymentMethod,
       notes,
       lines: normalizedLines,
     });
@@ -697,6 +715,20 @@ function PackageQuickEditModal({
               type="number"
               value={paidAmount}
               onChange={(event) => setPaidAmount(event.target.value)}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-semibold text-slate-700">
+            Ödeme yöntemi
+            <NativeSelect
+              value={paymentMethod}
+              onChange={setPaymentMethod}
+              options={[
+                { value: "", label: "Ödeme yöntemi" },
+                ...["Nakit", "EFT", "Kredi Kartı"].map((value) => ({
+                  value,
+                  label: value,
+                })),
+              ]}
             />
           </label>
           <label className="grid gap-1 text-sm font-semibold text-slate-700">

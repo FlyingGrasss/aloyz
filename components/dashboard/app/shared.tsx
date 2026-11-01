@@ -276,6 +276,13 @@ export type PackageSaleLine = {
   usedCheckoutIds?: string[];
 };
 
+export type PackagePayment = {
+  id: string;
+  date: string;
+  amount: number;
+  method: string;
+};
+
 export type PackageSaleItem = {
   id: string;
   customerId?: string;
@@ -289,6 +296,8 @@ export type PackageSaleItem = {
   createReceivable: boolean;
   total: number;
   paidAmount: number;
+  paymentMethod?: string;
+  payments?: PackagePayment[];
   createdBy: string;
   createdAt: string;
 };

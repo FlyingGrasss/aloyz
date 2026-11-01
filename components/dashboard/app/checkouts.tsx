@@ -1201,6 +1201,7 @@ function PaymentModal({
             options={[
               { value: "", label: "Ödeme yöntemi" },
               { value: "Nakit", label: "Nakit" },
+              { value: "EFT", label: "EFT" },
               { value: "Kredi kartı", label: "Kredi kartı" },
               { value: "Havale", label: "Havale" },
               { value: "Online ödeme", label: "Online ödeme" },

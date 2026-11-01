@@ -31,6 +31,10 @@
   - Added sort options for date, customer name A-Z/Z-A, and total amount on both sales pages.
   - Added Düzenle to each package row in customer detail; can edit date, total, paid, notes, total sessions, and used sessions; remaining recalculates.
   - Replaced the empty package-line “Hizmet” catalog search with a real İşlem selector from business.services (Lazer, Kaş, Cilt, etc.); package rows stack on mobile.
+  - Added Nakit/EFT/Kredi Kartı payment method and partial “Ödenen tutar” to package creation.
+  - Added Ödeme Al action for remaining package payments, with payment date/amount/method and payment history.
+  - Customer package detail shows payment method, paid amount, and payment history; can edit method with paid amount.
+  - Added EFT to checkout and finance payment method options alongside Nakit/Kredi Kartı.
 - Verification run:
   - `pnpm exec tsc --noEmit` passed.
   - Package usage performance test: 2,714 sales normalized in 44 ms; Seher's package 8 -> 7.
