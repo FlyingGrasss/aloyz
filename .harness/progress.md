@@ -35,6 +35,7 @@
   - Added Ödeme Al action for remaining package payments, with payment date/amount/method and payment history.
   - Customer package detail shows payment method, paid amount, and payment history; can edit method with paid amount.
   - Added EFT to checkout and finance payment method options alongside Nakit/Kredi Kartı.
+  - Replaced the long package service dropdown with a searchable İşlem field (type lazer/kaş/cilt to filter).
   - Added Kasa raporu method breakdown for Nakit/EFT/Kredi Kartı with collection, expense, and net columns.
   - Added Bugün / Bu ay / Geçen ay / Özel period selection with custom start/end date inputs.
   - Product sales now carry a payment method for cash reporting.

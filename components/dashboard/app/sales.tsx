@@ -1389,7 +1389,15 @@ export function PackageSaleModal({
             onChange={setCreateReceivable}
             label="Tüm tutar için alacak kaydı oluştur"
           />
-          <Button type="button" disabled={saving || !customerName.trim()} onClick={submit}>
+          <Button
+            type="button"
+            disabled={
+              saving ||
+              !customerName.trim() ||
+              lines.some((line) => !line.name.trim())
+            }
+            onClick={submit}
+          >
             Kaydet
           </Button>
         </div>
@@ -1528,27 +1536,24 @@ function PackageLineEditor({
           label: value,
         }))}
       />
-      <NativeSelect
-        value={line.serviceId}
-        onChange={(serviceId) => {
-          const service = (business.services || []).find(
-            (item) => item.id === serviceId,
-          );
+      <CatalogSearch
+        value={line.name}
+        placeholder="İşlem ara..."
+        items={business.services || []}
+        getLabel={(service) => service.name}
+        getSubtitle={(service) =>
+          service.duration ? `${service.duration} dk` : ""
+        }
+        onPick={(service) =>
           onChange({
             ...line,
-            serviceId,
-            name: service?.name || "",
+            serviceId: service.id,
+            name: service.name,
             packageType:
               line.packageType === "Paket tipi" ? "Seans" : line.packageType,
-          });
-        }}
-        options={[
-          { value: "", label: "İşlem seçin" },
-          ...(business.services || []).map((service) => ({
-            value: service.id,
-            label: service.name,
-          })),
-        ]}
+          })
+        }
+        onText={(name) => onChange({ ...line, name, serviceId: "" })}
       />
       <MoneyInput
         value={line.amount}
@@ -1584,9 +1589,9 @@ function CatalogSearch<T extends { id: string }>({
   items: T[];
   getLabel: (item: T) => string;
   getSubtitle: (item: T) => string;
-  createLabel: string;
+  createLabel?: string;
   onPick: (item: T) => void;
-  onCreate: (name: string) => void;
+  onCreate?: (name: string) => void;
   onText: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -1594,7 +1599,9 @@ function CatalogSearch<T extends { id: string }>({
     const query = value.trim().toLocaleLowerCase("tr-TR");
     if (!query) return items.slice(0, 5);
     return items
-      .filter((item) => getLabel(item).toLocaleLowerCase("tr-TR").startsWith(query))
+      .filter((item) =>
+        getLabel(item).toLocaleLowerCase("tr-TR").includes(query),
+      )
       .slice(0, 5);
   }, [getLabel, items, value]);
 
@@ -1628,17 +1635,19 @@ function CatalogSearch<T extends { id: string }>({
               )}
             </button>
           ))}
-          <button
-            type="button"
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => {
-              onCreate(value.trim() || "Yeni kayıt");
-              setOpen(false);
-            }}
-            className="block w-full border-t border-slate-100 px-3 py-2 text-left text-sm font-medium text-[#1f7a3a] hover:bg-slate-50"
-          >
-            + {createLabel}
-          </button>
+          {onCreate && (
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                onCreate(value.trim() || "Yeni kayıt");
+                setOpen(false);
+              }}
+              className="block w-full border-t border-slate-100 px-3 py-2 text-left text-sm font-medium text-[#1f7a3a] hover:bg-slate-50"
+            >
+              + {createLabel || "Yeni kayıt ekle"}
+            </button>
+          )}
         </div>
       )}
     </div>
