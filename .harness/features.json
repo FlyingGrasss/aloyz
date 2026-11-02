@@ -61,7 +61,7 @@
         "Yeni paket satışında İşlem alanına lazer/kaş/cilt yazınca eşleşen hizmetler listelenir ve seçim serviceId olarak kaydedilir."
       ],
       "evidence": null,
-      "notes": "Imported 2,714 active 2025+ Salonappy package sales (1.54 MB compact JSON). Seher Abdullah's 8-session package now links to the existing customer and shows 8/8. Customer package rows now have Düzenle for date/total/paid/notes/quantity/used; remaining is recalculated. New package lines now have a real İşlem selector from business.services instead of the empty saved-package catalog. Paket satışları is paginated 100/page. Pure usage helper test: 8 -> 7 in 44 ms. Manual UI verification pending."
+      "notes": "Imported 2,714 active 2025+ Salonappy package sales (1.54 MB compact JSON). Grouped sales were split into one row per service (469 groups split; 0 multi-line sales remain), so 20+20+20 now shows as three 20-session rows. Total/count: 3,539 package sales. Seher Abdullah's 8-session package links to the existing customer and shows 8/8. Customer package rows have Düzenle for date/total/paid/notes/quantity/used; remaining recalculates. Package lines have a searchable İşlem selector. Paket satışları paginates 100/page. Pure usage helper test: 8 -> 7 in 44 ms. Manual UI verification pending."
     },
     {
       "id": "customer-list-mobile",

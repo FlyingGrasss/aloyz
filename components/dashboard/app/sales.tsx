@@ -322,15 +322,15 @@ export function PackageSalesPage({
       }),
     };
     const exists = allSales.some((item) => item.id === normalizedSale.id);
+    const nextSales = splitPackageSale(normalizedSale);
+    const remainingSales = exists
+      ? allSales.filter((item) => item.id !== normalizedSale.id)
+      : allSales;
     const saved = await onUpdateAndSave({
       promotions: {
         ...promotions,
         packages,
-        packageSales: exists
-          ? allSales.map((item) =>
-              item.id === normalizedSale.id ? normalizedSale : item,
-            )
-          : [normalizedSale, ...allSales],
+        packageSales: [...nextSales, ...remainingSales],
       },
     });
     if (saved) {
@@ -1866,6 +1866,60 @@ function MoneyTextInput({
       </span>
     </div>
   );
+}
+
+function splitPackageSale(sale: PackageSaleItem): PackageSaleItem[] {
+  const lines = sale.lines || [];
+  if (lines.length <= 1) return [sale];
+
+  const roundMoney = (value: number) => Math.round(value * 100) / 100;
+  const lineAmounts = lines.map((line) => Number(line.amount) || 0);
+  const sumAmounts = lineAmounts.reduce((sum, value) => sum + value, 0);
+  const weights =
+    sumAmounts > 0
+      ? lineAmounts.map((value) => value / sumAmounts)
+      : lines.map(() => 1 / lines.length);
+  let totalLeft = Number(sale.total) || 0;
+  let paidLeft = Number(sale.paidAmount) || 0;
+  const linePayments: PackagePayment[][] = lines.map(() => []);
+
+  for (const payment of sale.payments || []) {
+    let remaining = Number(payment.amount) || 0;
+    for (let index = 0; index < lines.length; index += 1) {
+      const isLast = index === lines.length - 1;
+      const amount = isLast
+        ? roundMoney(remaining)
+        : roundMoney((Number(payment.amount) || 0) * weights[index]);
+      remaining = roundMoney(remaining - amount);
+      if (amount > 0) {
+        linePayments[index].push({
+          ...payment,
+          id: `${payment.id || sale.id}-${index}`,
+          amount,
+        });
+      }
+    }
+  }
+
+  return lines.map((line, index) => {
+    const isLast = index === lines.length - 1;
+    const total = isLast
+      ? roundMoney(totalLeft)
+      : roundMoney((Number(sale.total) || 0) * weights[index]);
+    totalLeft = roundMoney(totalLeft - total);
+    const paidAmount = isLast
+      ? roundMoney(paidLeft)
+      : roundMoney((Number(sale.paidAmount) || 0) * weights[index]);
+    paidLeft = roundMoney(paidLeft - paidAmount);
+    return {
+      ...sale,
+      id: `${sale.id}-${line.id || index}`,
+      lines: [line],
+      total,
+      paidAmount,
+      payments: linePayments[index],
+    };
+  });
 }
 
 function normalizePromotions(value: PromotionsSettings | undefined) {

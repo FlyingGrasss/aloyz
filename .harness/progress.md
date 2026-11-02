@@ -36,6 +36,8 @@
   - Customer package detail shows payment method, paid amount, and payment history; can edit method with paid amount.
   - Added EFT to checkout and finance payment method options alongside Nakit/Kredi Kartı.
   - Replaced the long package service dropdown with a searchable İşlem field (type lazer/kaş/cilt to filter).
+  - Split grouped package sales into one row per service (469 groups split); 20+20+20 now shows as three separate 20-session rows.
+  - New multi-line package sales are split automatically on save.
   - Added Kasa raporu method breakdown for Nakit/EFT/Kredi Kartı with collection, expense, and net columns.
   - Added Bugün / Bu ay / Geçen ay / Özel period selection with custom start/end date inputs.
   - Product sales now carry a payment method for cash reporting.
