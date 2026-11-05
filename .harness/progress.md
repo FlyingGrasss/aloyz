@@ -5,7 +5,7 @@
 - Branch: `main`
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
-- Last known green commit: `341515e`; typecheck also passes on the current working tree
+- Last known green commit: `7d1ddce` (typecheck clean)
 - Highest priority unfinished feature: `cash-register-report`
 - Current blocker: none.
 
@@ -25,13 +25,15 @@
 - Verification run:
   - `pnpm exec tsc --noEmit` passed.
   - Targeted ESLint on `calendar.tsx`, `shell.tsx`, and `DashboardApp.tsx` still reports only known pre-existing errors; `shell.tsx` has no errors.
-- Evidence recorded: none; phone-width manual UI verification is still required.
-- Commits: `7d1ddce` (code; not pushed).
+- Evidence recorded: `calendar-ux` passing at `7d1ddce` with typecheck + reviewer evidence. The user explicitly waived manual phone-width visual checks on 2026-11-05 and asked to assume completed.
+- Commits: `7d1ddce` (code), `00fa7af` (state), plus the final state record commit.
 - Known risks:
   - Fitting nine staff columns on one screen makes header/block text small; this is the intended tradeoff.
   - The calendar settings modal is no longer reachable from the phone calendar; the global topbar settings gear remains the only mobile settings entry.
   - The reference app's bottom tab bar is still not added.
-- Next best action: open the dashboard at phone width, confirm the calendar-only layout, then mark `calendar-ux` passing if it does.
+  - The mobile view intentionally ignores `calendarWidth` and `calendarTextColor`.
+  - The working tree still contains unrelated mobile changes and an intentional `AGENTS.md` deletion; they were not committed.
+- Next best action: push `main`, then continue with the highest-priority unfinished feature `cash-register-report`.
 
 ### 2026-11-04 — Mobile appointment calendar restyled to the reference
 - Goal: make the web dashboard's phone-width Randevu takvimi look like the provided Salonappy reference.

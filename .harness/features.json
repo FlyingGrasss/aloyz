@@ -1,6 +1,6 @@
 {
   "project": "aloyz",
-  "updated": "2026-11-04",
+  "updated": "2026-11-05",
   "verification": {
     "install": "pnpm install",
     "verify": [
@@ -24,7 +24,7 @@
         "app/globals.css",
         "app/api/appointments/[id]/route.ts"
       ],
-      "status": "in_progress",
+      "status": "passing",
       "verification": [
         "pnpm exec tsc --noEmit",
         "At phone width, the Randevu takvimi page has no page-level staff filter, settings, Bugün, Google status, new-checkout button, or mobile customer-search row; only the top navbar and the full-width date header remain.",
@@ -37,8 +37,16 @@
         "Click an appointment block on a phone-width browser: the edit/cancel modal opens for that appointment.",
         "Desktop weekly and monthly views are unchanged."
       ],
-      "evidence": null,
-      "notes": "2026-11-05: Mobile daily view reduced to the calendar itself. Only the top navbar and a 40px full-width date header remain above the grid; the date text doubles as a full-width date picker. Removed the mobile staff filter, page settings, Bugün, Google status, new-checkout button, breadcrumb, and mobile customer-search row on the calendar view. Staff headers are now one line with truncated first names and no repeated date. Appointment blocks are a single text flow: `time - customer name + notes`, 8px with 1.2 line height. All visible staff columns share the viewport width with no horizontal scroll. Desktop weekly/monthly views are unchanged. `pnpm exec tsc --noEmit` passes. Targeted ESLint still reports only the known pre-existing errors. Code committed as `7d1ddce`; not pushed. Manual phone-width UI verification pending."
+      "evidence": {
+        "date": "2026-11-05",
+        "commit": "7d1ddce",
+        "commands": [
+          "pnpm exec tsc --noEmit",
+          "pnpm exec eslint components/dashboard/app/calendar.tsx components/dashboard/app/shell.tsx components/dashboard/DashboardApp.tsx"
+        ],
+        "result": "Typecheck clean. ESLint reported only the known pre-existing errors in Google-sync/DashboardApp code; no new error in the mobile calendar change. Reviewer verdict PASS WITH NOTES; blocking-free findings were addressed. User explicitly waived manual phone-width visual checks on 2026-11-05 and asked to assume completed."
+      },
+      "notes": "2026-11-05: Mobile daily view reduced to the calendar itself. Only the top navbar and a 40px full-width date header remain above the grid; the date text doubles as a full-width date picker. Removed the mobile staff filter, page settings, Bugün, Google status, new-checkout button, breadcrumb, and mobile customer-search row on the calendar view. Staff headers are now one line with truncated first names and no repeated date. Appointment blocks are a single text flow: `time - customer name + notes`, 8px with 1.2 line height. All visible staff columns share the viewport width with no horizontal scroll. Desktop weekly/monthly views are unchanged. Code committed as `7d1ddce`; state commit `00fa7af`. Manual phone-width checks waived by the user."
     },
     {
       "id": "package-session-usage",
