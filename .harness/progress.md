@@ -5,11 +5,60 @@
 - Branch: `main`
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
-- Last known green commit: `6b58ad3` for typecheck; manual UI verification pending
+- Last known green commit: `341515e`; typecheck also passes on the current working tree
 - Highest priority unfinished feature: `cash-register-report`
 - Current blocker: none.
 
 ## Session record
+
+### 2026-11-05 — Mobile calendar fills the screen without horizontal scrolling
+- Goal: match the final Salonappy reference: calendar-only phone screen, all staff on one width, minimal top chrome.
+- Completed:
+  - Removed the mobile page-level staff filter, settings button, Bugün button, Google status, new-checkout button, and breadcrumb from the calendar.
+  - Hid the mobile customer-search row on the calendar view via a new `mobileSearchEnabled` Topbar prop.
+  - Replaced the mobile header with a single 40px full-width date row; the visible date is also a full-width native date picker.
+  - Reduced the staff header to one line with truncated first names; removed the repeated date under each staff column (mobile and desktop daily views).
+  - Reduced the grid header height to 28px and increased the grid max-height so the calendar fills the screen.
+  - Appointment blocks now use one continuous text flow: `time - customer name + notes`, 8px with 1.2 line height; separate title/description spans were removed.
+  - All visible staff columns share the viewport width; horizontal scrolling is removed.
+  - Added a white mobile background for the calendar view so the topbar, date row, and grid are seamless.
+- Verification run:
+  - `pnpm exec tsc --noEmit` passed.
+  - Targeted ESLint on `calendar.tsx`, `shell.tsx`, and `DashboardApp.tsx` still reports only known pre-existing errors; `shell.tsx` has no errors.
+- Evidence recorded: none; phone-width manual UI verification is still required.
+- Commits: none; the user manages git commits through GitHub Desktop.
+- Known risks:
+  - Fitting nine staff columns on one screen makes header/block text small; this is the intended tradeoff.
+  - The calendar settings modal is no longer reachable from the phone calendar; the global topbar settings gear remains the only mobile settings entry.
+  - The reference app's bottom tab bar is still not added.
+- Next best action: open the dashboard at phone width, confirm the calendar-only layout, then mark `calendar-ux` passing if it does.
+
+### 2026-11-04 — Mobile appointment calendar restyled to the reference
+- Goal: make the web dashboard's phone-width Randevu takvimi look like the provided Salonappy reference.
+- Completed:
+  - Added a full-bleed mobile calendar shell with a compact header: settings, `Tüm çalışanlar (n)` filter, Google refresh, and new checkout actions.
+  - Added a phone date row (`4 Kas Çarşamba`) with previous/next day arrows and a Bugün button.
+  - Added a dedicated mobile day grid with 30-minute rows and a sticky time column.
+  - All visible staff columns now share the phone width; horizontal scrolling is removed. Header text is 9px and block text is 8px so nine staff fit on one screen.
+  - Staff columns now use solid staff colors; appointment and checkout blocks use the same solid color with white text.
+  - Appointment blocks span their real duration using service/checkout duration; overlapping items split into lanes.
+  - Closed business hours are shaded; the current time gets a red line and triangle marker.
+  - Unassigned items appear only in the Atanmamış column when viewing all staff; empty checkout staff IDs are treated as unassigned.
+  - Month arrows use month arithmetic instead of ±28 days; checkout block height uses only the lines for that staff column.
+  - Desktop weekly, daily, and monthly grids are unchanged.
+- Verification run:
+  - `pnpm exec tsc --noEmit` passed, including after the review fixes.
+  - `pnpm exec eslint components/dashboard/app/calendar.tsx` reported only the 3 pre-existing Google-sync errors (setState-in-effect and two `any` errors) plus existing unused-import warnings; no new error from the mobile calendar code.
+- Reviewer verdict: PASS WITH NOTES. Addressed the month-navigation arithmetic, current-time marker alignment, per-staff checkout duration, and icon-button labels. Remaining notes are non-blocking: the current-time marker refreshes on re-render rather than on a minute tick; the mobile view intentionally ignores `calendarWidth` and `calendarTextColor`; white text on light staff colors follows the reference.
+- Evidence recorded: none; phone-width manual UI verification is still required.
+- Commits: none; the user manages git commits through GitHub Desktop.
+- Known risks:
+  - The mobile grid deliberately uses 30-minute rows and ignores `calendarWidth`, while the desktop setting still controls desktop views.
+  - All staff columns are forced into the viewport width; with many staff or long names, text becomes very small and may wrap, which is the intended fit-all tradeoff.
+  - Service duration is the source of block height; appointments whose service is missing and whose description matches no service fall back to 30 minutes.
+  - The current-time line can sit at an old time if the page is left open without any interaction.
+  - The reference app's bottom tab bar is app-shell navigation, not part of the calendar, so it was not added to this page.
+- Next best action: open the dashboard at phone width, confirm the calendar matches the reference, then mark `calendar-ux` passing if it does.
 
 ### 2026-10-29 — Package session usage, responsive customer list, staff columns
 - Completed:
@@ -38,6 +87,8 @@
   - Replaced the long package service dropdown with a searchable İşlem field (type lazer/kaş/cilt to filter).
   - Split grouped package sales into one row per service (469 groups split); 20+20+20 now shows as three separate 20-session rows.
   - New multi-line package sales are split automatically on save.
+  - Synced current Salonappy future bookings: imported 153 new sessions (179 appointment lines) and marked 9 rescheduled/canceled future sessions as CANCELED.
+  - Verified all 355 current Salonappy bookings are now represented; 0 extra sessions remain.
   - Added Kasa raporu method breakdown for Nakit/EFT/Kredi Kartı with collection, expense, and net columns.
   - Added Bugün / Bu ay / Geçen ay / Özel period selection with custom start/end date inputs.
   - Product sales now carry a payment method for cash reporting.
@@ -45,6 +96,7 @@
   - `pnpm exec tsc --noEmit` passed.
   - Package usage performance test: 2,714 sales normalized in 44 ms; Seher's package 8 -> 7.
   - Package helper tests: apply, idempotent, restore, delete restore, cancelled, different customer.
+  - Salonappy sync: 153/153 new booking details fetched sequentially without rate limiting; 179 appointment lines imported; 9 future sessions canceled; compare shows extraSessions=0.
   - Targeted ESLint: `lib/packageUsage.ts`, sales, customers, customer-picker, and shell are clean; calendar has only the pre-existing Google-sync errors.
 - Evidence recorded: none yet; end-to-end UI verification pending.
 - Commits: `72f7201`, `413724f`, `fbe7f36`, `585b0c6`, `3e2fa93`, `e6e0da1`, `94ad06c`, `58a9008`, `d80bb6e`, `a138c3d`, `6b58ad3`.

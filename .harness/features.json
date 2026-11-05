@@ -1,6 +1,6 @@
 {
   "project": "aloyz",
-  "updated": "2026-10-29",
+  "updated": "2026-11-04",
   "verification": {
     "install": "pnpm install",
     "verify": [
@@ -14,27 +14,30 @@
       "id": "calendar-ux",
       "priority": 10,
       "area": "dashboard/calendar",
-      "title": "Calendar defaults, density, staff columns, and appointment edit modal",
-      "user_visible_behavior": "The calendar opens weekly at 60-minute intervals, daily view uses colored staff columns, empty hours are compact, the grid fills the panel, and clicking an appointment opens an edit/cancel modal.",
+      "title": "Calendar defaults, mobile daily staff columns, and appointment edit modal",
+      "user_visible_behavior": "The calendar opens weekly at 60-minute intervals on desktop; on a phone it opens as a full-bleed daily staff-column calendar with only a full-width date header above the grid, all visible staff columns fitting on one screen, and compact appointment blocks. Clicking an appointment opens an edit/cancel modal.",
       "files": [
         "components/dashboard/app/calendar.tsx",
         "components/dashboard/app/pages.tsx",
+        "components/dashboard/app/shell.tsx",
         "components/dashboard/DashboardApp.tsx",
         "app/api/appointments/[id]/route.ts"
       ],
-      "status": "not_started",
+      "status": "in_progress",
       "verification": [
         "pnpm exec tsc --noEmit",
-        "Open Randevu takvimi: default view is Haftalık görünüm, interval 60 Dakika; the grid fills the panel with no right-side gap.",
-        "On a phone-width browser, the calendar automatically uses Günlük görünüm with colored staff columns.",
-        "Switch to Günlük görünüm on desktop: staff appear as colored columns.",
-        "Empty time rows are visibly shorter than rows with appointments.",
-        "Click an appointment card: modal opens for that appointment and can save edits or cancel it.",
-        "Canceled appointments disappear from the calendar.",
-        "Google Calendar cards do not open the local edit modal."
+        "At phone width, the Randevu takvimi page has no page-level staff filter, settings, Bugün, Google status, new-checkout button, or mobile customer-search row; only the top navbar and the full-width date header remain.",
+        "The date header is a single full-width line (for example 5 Kasım 2026 Perşembe); tapping it opens the date picker.",
+        "Staff headers are one line with truncated first names; the same date is not repeated under each staff column.",
+        "All visible staff columns fit the phone width without horizontal scrolling; the grid only scrolls vertically.",
+        "At phone width, the daily grid uses 30-minute rows, colored staff columns, and solid staff-colored appointment blocks with white text.",
+        "Appointment blocks show one continuous text flow: time - customer name + notes, with 1.2 line height.",
+        "At phone width, the grid scrolls vertically from the current time; empty hours are shorter than appointment blocks.",
+        "Click an appointment block on a phone-width browser: the edit/cancel modal opens for that appointment.",
+        "Desktop weekly and monthly views are unchanged."
       ],
       "evidence": null,
-      "notes": "Code complete and typecheck passes; manual UI verification pending. Kept out of in_progress while package-session-usage is active."
+      "notes": "2026-11-05: Mobile daily view reduced to the calendar itself. Only the top navbar and a 40px full-width date header remain above the grid; the date text doubles as a full-width date picker. Removed the mobile staff filter, page settings, Bugün, Google status, new-checkout button, breadcrumb, and mobile customer-search row on the calendar view. Staff headers are now one line with truncated first names and no repeated date. Appointment blocks are a single text flow: `time - customer name + notes`, 8px with 1.2 line height. All visible staff columns share the viewport width with no horizontal scroll. Desktop weekly/monthly views are unchanged. `pnpm exec tsc --noEmit` passes. Targeted ESLint still reports only the known pre-existing errors. Manual phone-width UI verification pending; no commit because git is managed by the user."
     },
     {
       "id": "package-session-usage",
@@ -169,7 +172,7 @@
         "components/dashboard/app/sales.tsx",
         "components/dashboard/app/shared.tsx"
       ],
-      "status": "in_progress",
+      "status": "not_started",
       "verification": [
         "pnpm exec tsc --noEmit",
         "Kasa raporu shows Nakit/EFT/Kredi Kartı collection cards and a method breakdown table.",
@@ -178,6 +181,33 @@
       ],
       "evidence": null,
       "notes": "Code complete; manual UI verification pending. Product sales now carry paymentMethod; EFT added to checkout/finance methods."
+    },
+    {
+      "id": "salonappy-live-booking-sync",
+      "priority": 45,
+      "area": "data-import",
+      "title": "Sync current Salonappy future bookings and cancellations",
+      "user_visible_behavior": "Future appointments canceled or rescheduled in Salonappy disappear from the calendar, and new future bookings appear.",
+      "files": [],
+      "status": "passing",
+      "verification": [
+        "Current Salonappy future bookings: 355.",
+        "New booking details fetched: 153 sessions / 179 appointment lines.",
+        "Future sessions missing from Salonappy and marked CANCELED: 9.",
+        "After sync: extraSessions=0; 16 earlier-today appointments remain because Salonappy's current booking list excludes past-time entries."
+      ],
+      "evidence": {
+        "date": "2026-11-05",
+        "commit": "341515e",
+        "commands": [
+          "one sequential booking/list request: 355 current future bookings",
+          "sequential booking/detail fetch: 153/153 successful, no rate limit",
+          "transaction: imported 179 new appointment lines; marked 9 future sessions CANCELED",
+          "read-only compare: extraSessions=0; 9 canceled future sessions; 16 earlier-today appointments retained"
+        ],
+        "result": "All 355 current Salonappy bookings are represented; canceled future sessions are hidden."
+      },
+      "notes": "Data-only sync. Backup written to appointments-before-sync.json in the temp import folder."
     },
     {
       "id": "appointment-list-cleanup",
