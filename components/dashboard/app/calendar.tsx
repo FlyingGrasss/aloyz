@@ -149,6 +149,11 @@ export function CalendarPage({
     String(calendarSettings.calendarSlotInterval || "60 Dakika").match(/\d+/)?.[0] ||
       "60",
   );
+  const mobileDayView =
+    isMobileViewport && effectiveCalendarView === "Günlük görünüm";
+  // The phone layout follows the reference app: 30-minute rows are readable
+  // without forcing the desktop setting to change.
+  const displaySlotInterval = mobileDayView ? 30 : slotInterval;
   const calendarTextClass =
     calendarSettings.calendarTextColor === "Açık"
       ? "text-white"
@@ -174,24 +179,28 @@ export function CalendarPage({
     const index = visibleStaff.findIndex((member) => member.id === staffId);
     return STAFF_COLORS[(index < 0 ? 0 : index) % STAFF_COLORS.length];
   };
+  // The phone layout always shows every visible staff member and has no
+  // staff filter in the compact header.
+  const effectiveStaffId = isMobileViewport ? "all" : selectedStaffId;
   const dayStaff =
-    selectedStaffId === "all"
+    effectiveStaffId === "all"
       ? visibleStaff
-      : visibleStaff.filter((member) => member.id === selectedStaffId);
+      : visibleStaff.filter((member) => member.id === effectiveStaffId);
   const hasUnassignedDayItems =
-    visibleAppointments.some(
+    effectiveStaffId === "all" &&
+    (visibleAppointments.some(
       (appointment) =>
         appointment.date === selectedDate && !appointment.staffId,
     ) ||
-    checkouts.some(
-      (checkout) =>
-        checkout.date === selectedDate &&
-        getCheckoutStaffIds(checkout).length === 0,
-    );
+      checkouts.some(
+        (checkout) =>
+          checkout.date === selectedDate &&
+          getCheckoutStaffIds(checkout).length === 0,
+      ));
   const dayColumns: CalendarColumn[] = dayStaff.map((member) => ({
     key: `staff-${member.id}`,
     label: member.name,
-    sublabel: formatDateLong(selectedDate),
+    sublabel: "",
     date: selectedDate,
     staffId: member.id,
     color: staffColorById(member.id),
@@ -200,7 +209,7 @@ export function CalendarPage({
     dayColumns.push({
       key: "staff-unassigned",
       label: "Atanmamış",
-      sublabel: formatDateLong(selectedDate),
+      sublabel: "",
       date: selectedDate,
       staffId: "__unassigned__",
       color: "#64748b",
@@ -305,6 +314,28 @@ export function CalendarPage({
     date.setDate(date.getDate() + days);
     onDateChange(date.toISOString().slice(0, 10));
   };
+  const shiftCalendar = (direction: 1 | -1) => {
+    if (effectiveCalendarView !== "Aylık görünüm") {
+      shiftDate(direction);
+      return;
+    }
+    const date = new Date(`${selectedDate}T12:00:00`);
+    const day = date.getDate();
+    const target = new Date(
+      date.getFullYear(),
+      date.getMonth() + direction,
+      1,
+      12,
+    );
+    const lastDay = new Date(
+      target.getFullYear(),
+      target.getMonth() + 1,
+      0,
+      12,
+    ).getDate();
+    target.setDate(Math.min(day, lastDay));
+    onDateChange(target.toISOString().slice(0, 10));
+  };
 
   function openAppointment(appointment: Appointment) {
     if (appointment.id.startsWith("google-")) {
@@ -327,112 +358,193 @@ export function CalendarPage({
   }, [
     effectiveCalendarView,
     selectedDate,
-    slotInterval,
+    displaySlotInterval,
     today,
     visibleDates.join("|"),
   ]);
   return (
-    <div className="space-y-3">
-      <Breadcrumb
-        items={[
-          { label: "Aloyz", view: "dashboard" },
-          { label: "Randevu takvimi", view: "calendar" },
-        ]}
-        onSelectView={onSelectView}
-      />
-      <section className="rounded bg-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-3 sm:px-4">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            <NativeSelect
-              value={selectedStaffId}
-              onChange={setSelectedStaffId}
-              className="w-full sm:w-44"
-              options={[
-                { value: "all", label: "Tüm personel" },
-                ...visibleStaff.map((member) => ({
-                  value: member.id,
-                  label: member.name,
-                })),
-              ]}
-            />
+    <div className={isMobileViewport ? "space-y-0" : "space-y-3"}>
+      <div className="hidden md:block">
+        <Breadcrumb
+          items={[
+            { label: "Aloyz", view: "dashboard" },
+            { label: "Randevu takvimi", view: "calendar" },
+          ]}
+          onSelectView={onSelectView}
+        />
+      </div>
+      <section
+        className={
+          isMobileViewport
+            ? "-mx-4 overflow-hidden bg-white shadow-none"
+            : "rounded bg-white shadow-sm"
+        }
+      >
+        {isMobileViewport ? (
+          <div className="flex items-center gap-1 border-b border-slate-200 bg-white px-2 py-1">
             <Button
               type="button"
-              variant="outline"
-              size="icon-sm"
-              onClick={() => shiftDate(-1)}
+              variant="ghost"
+              size="icon"
+              onClick={() => shiftCalendar(-1)}
+              title={
+                effectiveCalendarView === "Aylık görünüm"
+                  ? "Önceki ay"
+                  : "Önceki gün"
+              }
+              aria-label={
+                effectiveCalendarView === "Aylık görünüm"
+                  ? "Önceki ay"
+                  : "Önceki gün"
+              }
             >
               <ChevronLeft className="size-4" />
             </Button>
-            <div className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-1.5 text-center text-sm font-medium sm:min-w-[260px] sm:flex-none">
-              {formatDateLong(selectedDate)}
-            </div>
+            <label className="relative flex h-8 min-w-0 flex-1 cursor-pointer items-center rounded text-center focus-within:ring-2 focus-within:ring-slate-300">
+              <span className="block w-full truncate text-sm font-semibold text-slate-800">
+                {formatDateLong(selectedDate)}
+              </span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(event) => onDateChange(event.target.value)}
+                aria-label="Takvim tarihi"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </label>
             <Button
               type="button"
-              variant="outline"
-              size="icon-sm"
-              onClick={() => shiftDate(1)}
+              variant="ghost"
+              size="icon"
+              onClick={() => shiftCalendar(1)}
+              title={
+                effectiveCalendarView === "Aylık görünüm"
+                  ? "Sonraki ay"
+                  : "Sonraki gün"
+              }
+              aria-label={
+                effectiveCalendarView === "Aylık görünüm"
+                  ? "Sonraki ay"
+                  : "Sonraki gün"
+              }
             >
               <ChevronRight className="size-4" />
             </Button>
-            <Input
-              type="date"
-              value={selectedDate}
-              onChange={(event) => onDateChange(event.target.value)}
-              className="h-8 w-full sm:w-36"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                onDateChange(new Date().toISOString().slice(0, 10))
-              }
-            >
-              Bugün
-            </Button>
           </div>
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              onClick={() => setSettingsOpen(true)}
-            >
-              <Settings className="size-4" />
-            </Button>
-            <span className="min-w-0 flex-1 truncate rounded border border-slate-200 px-3 py-1.5 text-xs text-slate-500 sm:flex-none">
-              {calendarId
-                ? `Google Takvim bağlı: ${calendarId}`
-                : "Google Takvim bağlı değil"}
-            </span>
-            {calendarId && (
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-3 sm:px-4">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <NativeSelect
+                value={selectedStaffId}
+                onChange={setSelectedStaffId}
+                className="w-full sm:w-44"
+                options={[
+                  { value: "all", label: "Tüm personel" },
+                  ...visibleStaff.map((member) => ({
+                    value: member.id,
+                    label: member.name,
+                  })),
+                ]}
+              />
               <Button
                 type="button"
                 variant="outline"
                 size="icon-sm"
-                disabled={googleSyncing}
-                onClick={() => setRefreshNonce((value) => value + 1)}
-                title="Google Takvim'i yenile"
+                onClick={() => shiftDate(-1)}
               >
-                <RefreshCw className="size-4" />
+                <ChevronLeft className="size-4" />
               </Button>
-            )}
-            <Button
-              type="button"
-              className="w-full bg-[#24a647] text-white sm:w-auto"
-              onClick={() => setModal("checkout")}
-            >
-              <Plus className="size-4" />
-              Yeni adisyon
-            </Button>
+              <div className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-1.5 text-center text-sm font-medium sm:min-w-[260px] sm:flex-none">
+                {formatDateLong(selectedDate)}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                onClick={() => shiftDate(1)}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={(event) => onDateChange(event.target.value)}
+                className="h-8 w-full sm:w-36"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  onDateChange(new Date().toISOString().slice(0, 10))
+                }
+              >
+                Bugün
+              </Button>
+            </div>
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                onClick={() => setSettingsOpen(true)}
+              >
+                <Settings className="size-4" />
+              </Button>
+              <span className="min-w-0 flex-1 truncate rounded border border-slate-200 px-3 py-1.5 text-xs text-slate-500 sm:flex-none">
+                {calendarId
+                  ? `Google Takvim bağlı: ${calendarId}`
+                  : "Google Takvim bağlı değil"}
+              </span>
+              {calendarId && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  disabled={googleSyncing}
+                  onClick={() => setRefreshNonce((value) => value + 1)}
+                  title="Google Takvim'i yenile"
+                >
+                  <RefreshCw className="size-4" />
+                </Button>
+              )}
+              <Button
+                type="button"
+                className="w-full bg-[#24a647] text-white sm:w-auto"
+                onClick={() => setModal("checkout")}
+              >
+                <Plus className="size-4" />
+                Yeni adisyon
+              </Button>
+            </div>
           </div>
-        </div>
-        {googleSyncMessage && (
+        )}
+        {googleSyncMessage && !isMobileViewport && (
           <div className="border-b border-slate-200 bg-emerald-50 px-4 py-2 text-xs font-medium text-emerald-700">
             {googleSyncMessage}
           </div>
         )}
-        <div ref={calendarScrollRef} className="max-h-[calc(100vh-220px)] overflow-auto sm:max-h-[calc(100vh-180px)]">
-          {effectiveCalendarView === "Aylık görünüm" ? (
+        <div
+          ref={calendarScrollRef}
+          className={
+            mobileDayView
+              ? "max-h-[calc(100dvh-105px)] overflow-auto overscroll-contain"
+              : "max-h-[calc(100vh-220px)] overflow-auto sm:max-h-[calc(100vh-180px)]"
+          }
+        >
+          {mobileDayView ? (
+            <MobileDayCalendar
+              date={selectedDate}
+              columns={dayColumns}
+              appointments={visibleAppointments}
+              checkouts={checkouts}
+              business={business}
+              today={today}
+              currentTime={currentTime}
+              staffColorById={staffColorById}
+              onOpenAppointment={openAppointment}
+              onSelectView={onSelectView}
+            />
+          ) : effectiveCalendarView === "Aylık görünüm" ? (
             <div
               className="grid"
               style={{
@@ -452,15 +564,15 @@ export function CalendarPage({
                 const dateAppointments = visibleAppointments.filter(
                   (appointment) =>
                     appointment.date === date &&
-                    (selectedStaffId === "all" ||
+                    (effectiveStaffId === "all" ||
                       (appointment as Appointment & { staffId?: string }).staffId ===
-                        selectedStaffId),
+                        effectiveStaffId),
                 );
                 const dateCheckouts = checkouts.filter(
                   (checkout) =>
                     checkout.date === date &&
-                    (selectedStaffId === "all" ||
-                      getCheckoutStaffIds(checkout).includes(selectedStaffId)),
+                    (effectiveStaffId === "all" ||
+                      getCheckoutStaffIds(checkout).includes(effectiveStaffId)),
                 );
                 const inSelectedMonth = date.slice(0, 7) === selectedDate.slice(0, 7);
                 const isToday = date === today;
@@ -537,7 +649,9 @@ export function CalendarPage({
                   }
                 >
                   <div>{column.label}</div>
-                  <div className="font-normal">{column.sublabel}</div>
+                  {column.sublabel ? (
+                    <div className="font-normal">{column.sublabel}</div>
+                  ) : null}
                 </div>
               ))}
               {slots.map((slot) => {
@@ -756,6 +870,428 @@ export function CalendarPage({
       )}
     </div>
   );
+}
+
+const MOBILE_DAY_INTERVAL = 30;
+const MOBILE_DAY_ROW_HEIGHT = 30;
+const MOBILE_DAY_SLOT_COUNT = (24 * 60) / MOBILE_DAY_INTERVAL;
+
+type MobileCalendarItem = {
+  id: string;
+  kind: "appointment" | "checkout";
+  time: string;
+  customerName: string;
+  description: string;
+  staffId?: string | null;
+  start: number;
+  duration: number;
+  appointment?: Appointment;
+  checkout?: CheckoutItem;
+};
+
+type PositionedMobileCalendarItem = MobileCalendarItem & {
+  lane: number;
+  laneCount: number;
+};
+
+function MobileDayCalendar({
+  date,
+  columns,
+  appointments,
+  checkouts,
+  business,
+  today,
+  currentTime,
+  staffColorById,
+  onOpenAppointment,
+  onSelectView,
+}: {
+  date: string;
+  columns: CalendarColumn[];
+  appointments: Appointment[];
+  checkouts: CheckoutItem[];
+  business: Business;
+  today: string;
+  currentTime: string;
+  staffColorById: (staffId: string | null | undefined) => string;
+  onOpenAppointment: (appointment: Appointment) => void;
+  onSelectView: (view: ViewId) => void;
+}) {
+  const dayWindow = getMobileDayWindow(business, date);
+  const currentMinutes =
+    date === today ? parseTimeToMinutes(currentTime) : null;
+  const slots = Array.from({ length: MOBILE_DAY_SLOT_COUNT }, (_, index) => {
+    const start = index * MOBILE_DAY_INTERVAL;
+    return {
+      start,
+      label: formatMinutesAsTime(start),
+      closed:
+        dayWindow.closed ||
+        start < dayWindow.start ||
+        start >= dayWindow.end,
+    };
+  });
+  const totalHeight = MOBILE_DAY_SLOT_COUNT * MOBILE_DAY_ROW_HEIGHT;
+  const pixelsPerMinute = MOBILE_DAY_ROW_HEIGHT / MOBILE_DAY_INTERVAL;
+  const columnsWithItems = columns.map((column) => {
+    const appointmentItems: MobileCalendarItem[] = appointments
+      .filter(
+        (appointment) =>
+          appointment.date === date &&
+          appointmentBelongsToColumn(appointment, column.staffId),
+      )
+      .map((appointment) => {
+        const start = parseTimeToMinutes(appointment.time);
+        return {
+          id: `appointment-${appointment.id}`,
+          kind: "appointment" as const,
+          time: appointment.time,
+          customerName: appointment.customerName,
+          description: getMobileAppointmentBody(business, appointment),
+          staffId: appointment.staffId,
+          start,
+          duration: clampMobileDuration(
+            getAppointmentDurationMinutes(business, appointment),
+            start,
+          ),
+          appointment,
+        };
+      });
+    const checkoutItems: MobileCalendarItem[] = checkouts
+      .filter(
+        (checkout) =>
+          checkout.date === date &&
+          checkoutBelongsToColumn(checkout, column.staffId),
+      )
+      .map((checkout) => {
+        const time = `${checkout.hour}:${checkout.minute}`;
+        const start = parseTimeToMinutes(time);
+        return {
+          id: `checkout-${checkout.id}`,
+          kind: "checkout" as const,
+          time,
+          customerName: checkout.customerName,
+          description: `Adisyon · ${
+            getCheckoutServiceSummary(business, checkout) || "Hizmet"
+          }`,
+          staffId: checkout.staffId,
+          start,
+          duration: clampMobileDuration(
+            getCheckoutDurationMinutes(business, checkout, column.staffId),
+            start,
+          ),
+          checkout,
+        };
+      });
+    return {
+      column,
+      items: layoutMobileCalendarItems([
+        ...appointmentItems,
+        ...checkoutItems,
+      ]),
+    };
+  });
+
+  if (!columns.length) {
+    return (
+      <div className="px-4 py-10 text-center text-sm text-slate-500">
+        Görüntülenecek çalışan yok.
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full">
+      <div className="sticky top-0 z-30 flex w-full bg-white">
+        <div className="sticky left-0 z-40 h-7 w-10 shrink-0 border-b border-r border-slate-200 bg-white" />
+        {columns.map((column) => (
+          <div
+            key={column.key}
+            className="flex h-7 min-w-0 flex-1 basis-0 items-center justify-center overflow-hidden border-b border-r border-white/30 px-0 text-center text-[10px] font-semibold leading-none text-white"
+            style={{
+              backgroundColor: column.color || "#64748b",
+            }}
+            title={column.label}
+          >
+            <span className="block w-full truncate">
+              {firstName(column.label)}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="flex w-full">
+        <div className="sticky left-0 z-20 w-10 shrink-0 bg-white">
+          {slots.map((slot) => {
+            const active =
+              currentMinutes !== null &&
+              currentMinutes >= slot.start &&
+              currentMinutes < slot.start + MOBILE_DAY_INTERVAL;
+            return (
+              <div
+                key={slot.start}
+                data-current-time-slot={active ? "true" : undefined}
+                className={[
+                  "relative flex items-start justify-end border-b border-r border-slate-200 pr-1 pt-1 text-[10px] leading-none",
+                  slot.closed
+                    ? "bg-slate-100 text-slate-400"
+                    : "bg-white text-slate-500",
+                ].join(" ")}
+                style={{ height: MOBILE_DAY_ROW_HEIGHT }}
+              >
+                {slot.label}
+              </div>
+            );
+          })}
+          {currentMinutes !== null &&
+            currentMinutes >= 0 &&
+            currentMinutes < 24 * 60 && (
+              <span
+                className="pointer-events-none absolute right-0 z-30 -translate-y-1/2 translate-x-1/2 border-y-[4px] border-l-[6px] border-y-transparent border-l-red-500"
+                style={{ top: currentMinutes * pixelsPerMinute }}
+              />
+            )}
+        </div>
+        {columnsWithItems.map(({ column, items }) => (
+          <div
+            key={column.key}
+            className="relative basis-0 border-r border-slate-200"
+            style={{
+              flex: "1 1 0",
+              minWidth: 0,
+              height: totalHeight,
+            }}
+          >
+            {slots.map((slot) => (
+              <div
+                key={slot.start}
+                className={[
+                  "border-b",
+                  slot.closed ? "bg-slate-100" : "bg-white",
+                ].join(" ")}
+                style={{ height: MOBILE_DAY_ROW_HEIGHT }}
+              />
+            ))}
+            {items.map((item) => {
+              const widthPercent = 100 / item.laneCount;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() =>
+                    item.appointment
+                      ? onOpenAppointment(item.appointment)
+                      : onSelectView("visit/list")
+                  }
+                  title={`${item.time} · ${item.customerName} · ${item.description}`}
+                  className="absolute z-[2] cursor-pointer overflow-hidden rounded-[2px] px-0.5 py-0.5 text-left text-[8px] leading-[1.2] text-white shadow-sm transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 active:opacity-80"
+                  style={{
+                    top: item.start * pixelsPerMinute,
+                    height: Math.max(
+                      26,
+                      item.duration * pixelsPerMinute - 2,
+                    ),
+                    left: `${(item.lane / item.laneCount) * 100}%`,
+                    width: `calc(${widthPercent}% - 1px)`,
+                    backgroundColor:
+                      column.color || staffColorById(item.staffId),
+                  }}
+                >
+                  <span className="block break-words font-medium">
+                    {item.time} - {item.customerName}
+                    {item.description ? ` ${item.description}` : ""}
+                  </span>
+                </button>
+              );
+            })}
+            {currentMinutes !== null &&
+              currentMinutes >= 0 &&
+              currentMinutes < 24 * 60 && (
+                <div
+                  className="pointer-events-none absolute inset-x-0 z-[1] border-t border-red-500/80"
+                  style={{ top: currentMinutes * pixelsPerMinute }}
+                />
+              )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function firstName(value: string) {
+  return String(value || "").trim().split(/\s+/)[0] || "—";
+}
+
+function parseTimeToMinutes(value: string) {
+  const match = String(value || "").match(/(\d{1,2}):(\d{1,2})/);
+  if (!match) return 0;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function formatMinutesAsTime(totalMinutes: number) {
+  const hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function getMobileDayWindow(business: Business, date: string) {
+  const dayKeys = [
+    "pazar",
+    "pazartesi",
+    "sali",
+    "carsamba",
+    "persembe",
+    "cuma",
+    "cumartesi",
+  ];
+  const dayIndex = new Date(`${date}T12:00:00`).getDay();
+  const parsed = parseHourValue(
+    String(business.hours?.[dayKeys[dayIndex]] || ""),
+  );
+  if (parsed.status === "Kapalı") {
+    return { closed: true, start: 0, end: 0 };
+  }
+  const start = Math.max(
+    0,
+    Math.min(24 * 60, parseTimeToMinutes(parsed.start)),
+  );
+  const end = Math.max(
+    start,
+    Math.min(24 * 60, parseTimeToMinutes(parsed.end)),
+  );
+  return { closed: false, start, end };
+}
+
+function getMobileAppointmentBody(
+  business: Business,
+  appointment: Appointment,
+) {
+  const staffName = getAppointmentStaffName(business, appointment);
+  const parts = String(appointment.description || "")
+    .split(" · ")
+    .map((part) => part.trim())
+    .filter(
+      (part) =>
+        part &&
+        part !== staffName &&
+        !part.startsWith("Salonappy #"),
+    );
+  return (
+    parts.join(" · ") ||
+    getAppointmentServiceName(business, appointment) ||
+    appointment.status
+  );
+}
+
+function getAppointmentDurationMinutes(
+  business: Business,
+  appointment: Appointment,
+) {
+  const direct = (business.services || []).find(
+    (service) => service.id === appointment.serviceId,
+  );
+  if (direct?.duration) return Number(direct.duration);
+  const description = String(appointment.description || "");
+  const matchedTotal = (business.services || [])
+    .filter((service) => service.name && description.includes(service.name))
+    .reduce((total, service) => total + Number(service.duration || 0), 0);
+  return matchedTotal || MOBILE_DAY_INTERVAL;
+}
+
+function getCheckoutDurationMinutes(
+  business: Business,
+  checkout: CheckoutItem,
+  staffId?: string,
+) {
+  const allLines = getCheckoutLines(checkout);
+  const relevantLines =
+    staffId === "__unassigned__"
+      ? allLines.filter((line) => !line.staffId)
+      : staffId
+        ? allLines.filter((line) => line.staffId === staffId)
+        : allLines;
+  const total = (relevantLines.length ? relevantLines : allLines).reduce(
+    (sum, line) => {
+      const direct = Number(line.duration || 0);
+      if (direct > 0) return sum + direct;
+      const service = (business.services || []).find(
+        (item) => item.id === line.serviceId,
+      );
+      return sum + Number(service?.duration || 0);
+    },
+    0,
+  );
+  return total || MOBILE_DAY_INTERVAL;
+}
+
+function clampMobileDuration(duration: number, start: number) {
+  const available = Math.max(MOBILE_DAY_INTERVAL, 24 * 60 - start);
+  return Math.min(
+    available,
+    Math.max(MOBILE_DAY_INTERVAL, Math.round(duration || MOBILE_DAY_INTERVAL)),
+  );
+}
+
+function appointmentBelongsToColumn(
+  appointment: Appointment,
+  staffId: string | undefined,
+) {
+  if (staffId === "__unassigned__") return !appointment.staffId;
+  return Boolean(staffId) && appointment.staffId === staffId;
+}
+
+function checkoutBelongsToColumn(
+  checkout: CheckoutItem,
+  staffId: string | undefined,
+) {
+  const staffIds = getCheckoutStaffIds(checkout);
+  if (staffId === "__unassigned__") return staffIds.length === 0;
+  return Boolean(staffId) && staffIds.includes(staffId as string);
+}
+
+function layoutMobileCalendarItems(items: MobileCalendarItem[]) {
+  const sorted = [...items].sort(
+    (left, right) =>
+      left.start - right.start || left.time.localeCompare(right.time),
+  );
+  const result: PositionedMobileCalendarItem[] = [];
+  let cluster: MobileCalendarItem[] = [];
+  let clusterEnd = -1;
+
+  const flush = () => {
+    if (!cluster.length) return;
+    const laneEnds: number[] = [];
+    const laneById = new Map<string, number>();
+    for (const item of cluster) {
+      const end = item.start + item.duration;
+      let lane = laneEnds.findIndex((laneEnd) => laneEnd <= item.start);
+      if (lane === -1) {
+        lane = laneEnds.length;
+        laneEnds.push(end);
+      } else {
+        laneEnds[lane] = end;
+      }
+      laneById.set(item.id, lane);
+    }
+    const laneCount = Math.max(1, laneEnds.length);
+    for (const item of cluster) {
+      result.push({
+        ...item,
+        lane: laneById.get(item.id) ?? 0,
+        laneCount,
+      });
+    }
+    cluster = [];
+    clusterEnd = -1;
+  };
+
+  for (const item of sorted) {
+    if (cluster.length && item.start >= clusterEnd) flush();
+    cluster.push(item);
+    clusterEnd = Math.max(clusterEnd, item.start + item.duration);
+  }
+  flush();
+  return result;
 }
 
 function AppointmentEditModal({
@@ -1558,7 +2094,13 @@ function getCheckoutLines(checkout: CheckoutItem) {
 }
 
 function getCheckoutStaffIds(checkout: CheckoutItem) {
-  return Array.from(new Set(getCheckoutLines(checkout).map((line) => line.staffId)));
+  return Array.from(
+    new Set(
+      getCheckoutLines(checkout)
+        .map((line) => line.staffId)
+        .filter(Boolean),
+    ),
+  );
 }
 
 function getCheckoutServiceSummary(business: Business, checkout: CheckoutItem) {

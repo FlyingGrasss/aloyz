@@ -495,6 +495,7 @@ export function Topbar({
   onOpenMobileNav,
   canManageSetup,
   mobileNavEnabled = true,
+  mobileSearchEnabled = true,
 }: {
   business: Business;
   selectedDate: string;
@@ -515,6 +516,7 @@ export function Topbar({
   onOpenMobileNav: () => void;
   canManageSetup: boolean;
   mobileNavEnabled?: boolean;
+  mobileSearchEnabled?: boolean;
 }) {
   return (
     <header className="z-20 shrink-0 border-b border-slate-200/80 bg-white/90 shadow-sm shadow-slate-900/5 backdrop-blur supports-[backdrop-filter]:bg-white/75">
@@ -713,17 +715,19 @@ export function Topbar({
           )}
         </div>
       </div>
-      <div className="border-t border-slate-200/80 px-3 py-2 sm:hidden">
-        <div className="relative">
-          <Search className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-slate-300" />
-          <Input
-            value={searchTerm}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Müşteri ara..."
-            className="h-9 rounded-lg border-slate-200 bg-slate-50 pr-10 shadow-none hover:bg-white focus-visible:bg-white"
-          />
+      {mobileSearchEnabled && (
+        <div className="border-t border-slate-200/80 px-3 py-2 sm:hidden">
+          <div className="relative">
+            <Search className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-slate-300" />
+            <Input
+              value={searchTerm}
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder="Müşteri ara..."
+              className="h-9 rounded-lg border-slate-200 bg-slate-50 pr-10 shadow-none hover:bg-white focus-visible:bg-white"
+            />
+          </div>
         </div>
-      </div>
+      )}
     </header>
   );
 }

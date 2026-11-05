@@ -169,6 +169,14 @@
       linear-gradient(180deg, rgb(248 250 252) 0%, var(--dashboard-bg) 100%);
   }
 
+  @media (max-width: 767px) {
+    .dashboard-app main.mobile-calendar-main {
+      background: #fff;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+  }
+
   .dashboard-app section.rounded.bg-white,
   .dashboard-app aside.rounded.bg-white,
   .dashboard-app div.rounded.bg-white,

@@ -21,6 +21,7 @@
         "components/dashboard/app/pages.tsx",
         "components/dashboard/app/shell.tsx",
         "components/dashboard/DashboardApp.tsx",
+        "app/globals.css",
         "app/api/appointments/[id]/route.ts"
       ],
       "status": "in_progress",

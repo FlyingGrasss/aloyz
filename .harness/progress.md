@@ -21,7 +21,7 @@
   - Reduced the grid header height to 28px and increased the grid max-height so the calendar fills the screen.
   - Appointment blocks now use one continuous text flow: `time - customer name + notes`, 8px with 1.2 line height; separate title/description spans were removed.
   - All visible staff columns share the viewport width; horizontal scrolling is removed.
-  - Added a white mobile background for the calendar view so the topbar, date row, and grid are seamless.
+  - Added a `mobile-calendar-main` mobile CSS rule that removes the main gradient and top/bottom padding so the topbar, date row, and grid are seamless and fill the viewport.
 - Verification run:
   - `pnpm exec tsc --noEmit` passed.
   - Targeted ESLint on `calendar.tsx`, `shell.tsx`, and `DashboardApp.tsx` still reports only known pre-existing errors; `shell.tsx` has no errors.

@@ -841,9 +841,10 @@ export function DashboardApp() {
             onOpenMobileNav={() => setMobileNavOpen(true)}
             canManageSetup={canManageSetup}
             mobileNavEnabled={!forcedSetup}
+            mobileSearchEnabled={view !== "calendar"}
           />
 
-          <main className="min-h-0 flex-1 overflow-auto px-4 py-4 md:px-6">
+          <main className={`min-h-0 flex-1 overflow-auto px-4 py-4 md:px-6 ${view === "calendar" ? "mobile-calendar-main" : ""}`}>
             {isAdminMode && (
               <StatusBanner tone="warning">
                 {business.name || "İşletme"} profilini yönetici olarak
