@@ -26,7 +26,7 @@
   - `pnpm exec tsc --noEmit` passed.
   - Targeted ESLint on `calendar.tsx`, `shell.tsx`, and `DashboardApp.tsx` still reports only known pre-existing errors; `shell.tsx` has no errors.
 - Evidence recorded: none; phone-width manual UI verification is still required.
-- Commits: none; the user manages git commits through GitHub Desktop.
+- Commits: `7d1ddce` (code; not pushed).
 - Known risks:
   - Fitting nine staff columns on one screen makes header/block text small; this is the intended tradeoff.
   - The calendar settings modal is no longer reachable from the phone calendar; the global topbar settings gear remains the only mobile settings entry.
