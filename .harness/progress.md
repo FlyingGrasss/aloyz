@@ -5,11 +5,35 @@
 - Branch: `main`
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
-- Last known green commit: `7d1ddce` (typecheck clean)
+- Last known green commit: `0267f5c` (typecheck clean; package session usage committed)
 - Highest priority unfinished feature: `cash-register-report`
 - Current blocker: none.
 
 ## Session record
+
+### 2026-11-07 — Appointment Geldi deducts package sessions
+- Goal: open an appointment, mark Geldi, and deduct one session from the matching package.
+- Completed:
+  - Added `applyAppointmentAttendanceUsage` to `lib/packageUsage.ts`; it is idempotent, applies on COMPLETED, reverts on leaving COMPLETED, and reallocates when a completed appointment's customer/service changes.
+  - Extended `PATCH /api/appointments/[id]` to resolve the customer by normalized phone (last 10 digits) then exact name, resolve the service by serviceId then description, apply/revert package usage, and update the appointment + business promotions in one transaction.
+  - The route returns the changed package sale/line keys, used/remaining counts, and completion transition.
+  - The appointment modal now shows the matching package line and remaining sessions, plus a `Geldi` action; already-completed appointments show `Seansı düş` so legacy completed appointments can still deduct. Already-applied appointments show `Seans düşülmüş`.
+  - The client updates package line used/remaining/usedCheckoutIds immediately and shows a success banner (`1 seans düşüldü`, `Seans geri eklendi`, etc.).
+  - Canceling a completed appointment or changing its status away from COMPLETED restores the session.
+  - Checkout attendance usage behavior is preserved.
+- Verification run:
+  - `pnpm exec tsc --noEmit` passed.
+  - Helper unit tests passed: appointment deduct 8 -> 7, repeat no double deduction, revert 7 -> 8, no-match service, completed service change reallocates, checkout Geldi still 8 -> 7.
+  - Read-only real DB dry-run: adnan erdem appointment (COMPLETED) + Lazer Epilasyon package 8 sessions, used 6/remaining 2 -> deduct change to used 7/remaining 1 with key.
+  - ESLint clean on `lib/packageUsage.ts` and the appointment API route; calendar only has the known pre-existing errors.
+- Evidence recorded: `package-session-usage` passing at `0267f5c` with typecheck, helper unit tests, and a read-only real DB dry-run.
+- Commits: `0267f5c` (code) plus the following state record commit.
+- Known risks:
+  - The real adnan erdem appointment is already COMPLETED; the modal shows `Seansı düş` and deducts when clicked.
+  - If the package line is fully used or no matching package exists, no deduction happens; the modal warns.
+  - Matching relies on the customer phone/name and package line serviceId/name; imported sales without customerId or a matching name will not match.
+  - The whole promotions JSON (about 1.5 MB) is read and rewritten on Geldi.
+- Next best action: push `main`, then continue with the highest-priority unfinished feature `cash-register-report`.
 
 ### 2026-11-05 — Mobile calendar fills the screen without horizontal scrolling
 - Goal: match the final Salonappy reference: calendar-only phone screen, all staff on one width, minimal top chrome.

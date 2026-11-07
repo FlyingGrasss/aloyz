@@ -1,6 +1,6 @@
 {
   "project": "aloyz",
-  "updated": "2026-11-05",
+  "updated": "2026-11-07",
   "verification": {
     "install": "pnpm install",
     "verify": [
@@ -52,15 +52,19 @@
       "id": "package-session-usage",
       "priority": 15,
       "area": "dashboard/package-sales",
-      "title": "Deduct package sessions when a checkout is marked Geldi",
-      "user_visible_behavior": "When a checkout attendance is set to Geldi, one session is deducted from the matching package sale and the package sales table shows used/remaining counts such as 1 used, 7/8 remaining.",
+      "title": "Deduct package sessions when a checkout or appointment is marked Geldi",
+      "user_visible_behavior": "When a checkout attendance or an appointment is marked Geldi, one session is deducted from the matching package sale; the package sales table shows used/remaining counts such as 1 used, 7/8 remaining.",
       "files": [
         "lib/packageUsage.ts",
         "app/api/business/route.ts",
+        "app/api/appointments/[id]/route.ts",
         "components/dashboard/app/sales.tsx",
-        "components/dashboard/app/shared.tsx"
+        "components/dashboard/app/shared.tsx",
+        "components/dashboard/app/calendar.tsx",
+        "components/dashboard/app/pages.tsx",
+        "components/dashboard/DashboardApp.tsx"
       ],
-      "status": "not_started",
+      "status": "passing",
       "verification": [
         "pnpm exec tsc --noEmit",
         "Local unit test: apply Geldi -> used 1, remaining 7; repeat -> unchanged; Gelmedi/delete -> restored to 8.",
@@ -70,10 +74,22 @@
         "Open a customer detail: package lines show total, paid, Kalan X/Y and Kullanılan X.",
         "Click Düzenle on a customer package, change Kullanılan, save, and confirm Kalan updates.",
         "Paket satışları with Tümü shows 2,714 imported active packages and paginates 100/page.",
-        "Yeni paket satışında İşlem alanına lazer/kaş/cilt yazınca eşleşen hizmetler listelenir ve seçim serviceId olarak kaydedilir."
+        "Yeni paket satışında İşlem alanına lazer/kaş/cilt yazınca eşleşen hizmetler listelenir ve seçim serviceId olarak kaydedilir.",
+        "Local unit test: appointment COMPLETED -> used 1, remaining 7; repeat -> unchanged; revert to CONFIRMED -> restored to 8.",
+        "UI: open an appointment for a customer with a matching package, click Geldi, and confirm the package line shows Kullanılan=1 and Kalan 7/8.",
+        "Read-only DB dry-run: adnan erdem appointment (COMPLETED) + Lazer Epilasyon package (8 sessions, used 6/remaining 2) produces one deduct change to used 7/remaining 1 with an appointment usage key."
       ],
-      "evidence": null,
-      "notes": "Imported 2,714 active 2025+ Salonappy package sales (1.54 MB compact JSON). Grouped sales were split into one row per service (469 groups split; 0 multi-line sales remain), so 20+20+20 now shows as three 20-session rows. Total/count: 3,539 package sales. Seher Abdullah's 8-session package links to the existing customer and shows 8/8. Customer package rows have Düzenle for date/total/paid/notes/quantity/used; remaining recalculates. Package lines have a searchable İşlem selector. Paket satışları paginates 100/page. Pure usage helper test: 8 -> 7 in 44 ms. Manual UI verification pending."
+      "evidence": {
+        "date": "2026-11-07",
+        "commit": "0267f5c",
+        "commands": [
+          "pnpm exec tsc --noEmit",
+          "tsx helper unit test: appointment deduct 8->7, repeat no-op, revert 8, no-match service, completed service reallocation, checkout 8->7",
+          "read-only Prisma dry-run: adnan erdem appointment + Lazer package used 6/remaining 2 -> used 7/remaining 1 with appointment usage key"
+        ],
+        "result": "All checks passed. Typecheck clean; package usage helper and real DB dry-run behaved as expected."
+      },
+      "notes": "2026-11-07: Appointment Geldi -> package session deduction implemented and verified. The appointment modal shows the matching package line and a Geldi / Seansı düş action; the API resolves the customer by phone then name, resolves the service by serviceId then description, applies or reverts package usage on COMPLETED transitions (idempotent), and returns the changed sale/line so the client state and success banner update. Code committed as 0267f5c."
     },
     {
       "id": "customer-list-mobile",
@@ -81,7 +97,9 @@
       "area": "dashboard/customers",
       "title": "Responsive customer list matching the mobile layout",
       "user_visible_behavior": "On small screens the web customer list shows name and phone as clean tappable rows with a chevron; email, Instagram, and notes remain on desktop.",
-      "files": ["components/dashboard/app/customers.tsx"],
+      "files": [
+        "components/dashboard/app/customers.tsx"
+      ],
       "status": "not_started",
       "verification": [
         "pnpm exec tsc --noEmit",
@@ -118,7 +136,9 @@
       "area": "dashboard/sales",
       "title": "Search and multi-field sort for package/product sales",
       "user_visible_behavior": "Paket satışları and Ürün satışları have a search box and a sort selector; sorting supports date, customer name A-Z/Z-A, and total amount.",
-      "files": ["components/dashboard/app/sales.tsx"],
+      "files": [
+        "components/dashboard/app/sales.tsx"
+      ],
       "status": "not_started",
       "verification": [
         "pnpm exec tsc --noEmit",
