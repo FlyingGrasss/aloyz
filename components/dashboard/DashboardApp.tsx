@@ -19,6 +19,7 @@ import {
 } from "./app/finance";
 import {
   Appointment,
+  AppointmentPackageUsage,
   Business,
   ViewId,
   CheckoutItem,
@@ -668,15 +669,88 @@ export function DashboardApp() {
     return saveBusiness(nextBusiness);
   }
 
-  function updateAppointmentInState(updated: Appointment) {
-    setBusiness((prev) => ({
-      ...prev,
-      appointments: (prev.appointments || []).map((appointment) =>
+  function updateAppointmentInState(
+    updated: Appointment,
+    packageUsage?: AppointmentPackageUsage,
+  ) {
+    setBusiness((prev) => {
+      const appointments = (prev.appointments || []).map((appointment) =>
         appointment.id === updated.id
           ? { ...appointment, ...updated }
           : appointment,
-      ),
-    }));
+      );
+      if (!packageUsage?.changes.length) {
+        return { ...prev, appointments };
+      }
+      const packageSales = (prev.promotions?.packageSales || []).map((sale) => {
+        const saleChanges = packageUsage.changes.filter(
+          (change) => change.saleId === sale.id,
+        );
+        if (!saleChanges.length) return sale;
+        return {
+          ...sale,
+          lines: (sale.lines || []).map((line) => {
+            const lineChanges = saleChanges.filter(
+              (item) => item.lineId === line.id,
+            );
+            if (!lineChanges.length) return line;
+            const usedCheckoutIds = new Set(
+              Array.isArray(line.usedCheckoutIds)
+                ? line.usedCheckoutIds
+                : [],
+            );
+            let used = Number(line.used || 0);
+            let remaining = Number(line.remaining || 0);
+            for (const change of lineChanges) {
+              used = change.used;
+              remaining = change.remaining;
+              if (change.direction === "deduct") {
+                usedCheckoutIds.add(change.key);
+              } else {
+                usedCheckoutIds.delete(change.key);
+              }
+            }
+            return {
+              ...line,
+              used,
+              remaining,
+              usedCheckoutIds: Array.from(usedCheckoutIds),
+            };
+          }),
+        };
+      });
+      return {
+        ...prev,
+        appointments,
+        promotions: { ...prev.promotions, packageSales },
+      };
+    });
+    if (packageUsage?.isCompleted && !packageUsage.wasCompleted) {
+      setSuccessMsg(
+        packageUsage.changes.some((change) => change.direction === "deduct")
+          ? "1 seans düşüldü."
+          : "Geldi olarak işaretlendi; eşleşen paket seansı bulunamadı.",
+      );
+    } else if (!packageUsage?.isCompleted && packageUsage?.wasCompleted) {
+      setSuccessMsg(
+        packageUsage.changes.some((change) => change.direction === "restore")
+          ? "Seans geri eklendi."
+          : "Randevu güncellendi.",
+      );
+    } else if (
+      packageUsage?.isCompleted &&
+      packageUsage.wasCompleted &&
+      packageUsage.changes.length === 1 &&
+      packageUsage.changes[0]?.direction === "deduct"
+    ) {
+      setSuccessMsg("1 seans düşüldü.");
+    } else if (
+      packageUsage?.isCompleted &&
+      packageUsage.wasCompleted &&
+      packageUsage.changes.length > 0
+    ) {
+      setSuccessMsg("Paket seansı güncellendi.");
+    }
   }
 
   function openQuickCreate(label: string) {

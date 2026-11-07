@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   Bell,
   CalendarDays,
@@ -21,11 +21,14 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ActionPanel,
   Appointment,
+  AppointmentPackageUsage,
   BotSettings,
   Breadcrumb,
   Business,
   ChannelBadge,
   CheckoutItem,
+  PackageSaleItem,
+  PackageSaleLine,
   ContactRow,
   CustomerProfile,
   DAYS,
@@ -123,7 +126,10 @@ export function CalendarPage({
   onDateChange: (date: string) => void;
   onUpdateAndSave: (fields: Partial<Business>) => Promise<boolean>;
   onSelectView: (view: ViewId) => void;
-  onAppointmentUpdated?: (appointment: Appointment) => void;
+  onAppointmentUpdated?: (
+    appointment: Appointment,
+    packageUsage?: AppointmentPackageUsage,
+  ) => void;
 }) {
   const [modal, setModal] = useState<"checkout" | "customer" | null>(null);
   const [selectedAppointment, setSelectedAppointment] =
@@ -846,8 +852,8 @@ export function CalendarPage({
           appointment={selectedAppointment}
           business={business}
           onClose={() => setSelectedAppointment(null)}
-          onSaved={(updated) => {
-            onAppointmentUpdated?.(updated);
+          onSaved={(updated, packageUsage) => {
+            onAppointmentUpdated?.(updated, packageUsage);
             setSelectedAppointment(null);
           }}
         />
@@ -1183,6 +1189,87 @@ function getMobileAppointmentBody(
   );
 }
 
+function findPackageLineForAppointment(
+  business: Business,
+  customerName: string,
+  phone: string,
+  serviceId: string,
+): {
+  sale: PackageSaleItem;
+  line: PackageSaleLine;
+  remaining: number;
+} | null {
+  const packageSales = business.promotions?.packageSales || [];
+  const customers = business.customers || [];
+  const phoneKey = normalizeMatchPhone(phone);
+  const nameKey = normalizeMatchName(customerName);
+  const customer = customers.find((item) => {
+    const customerPhone = normalizeMatchPhone(
+      `${item.countryCode || ""}${item.phone || ""}`,
+    );
+    if (phoneKey && customerPhone === phoneKey) return true;
+    return Boolean(nameKey) && normalizeMatchName(item.name) === nameKey;
+  });
+  const serviceName =
+    (business.services || []).find((service) => service.id === serviceId)
+      ?.name || "";
+  const candidates: Array<{
+    sale: PackageSaleItem;
+    line: PackageSaleLine;
+    remaining: number;
+    score: number;
+    date: string;
+  }> = [];
+
+  for (const sale of packageSales) {
+    const saleCustomerId = String(sale.customerId || "");
+    const sameCustomer =
+      customer?.id && saleCustomerId
+        ? saleCustomerId === customer.id
+        : Boolean(nameKey) &&
+          normalizeMatchName(sale.customerName) === nameKey;
+    if (!sameCustomer) continue;
+    for (const line of sale.lines || []) {
+      const quantity = Number(line.quantity || 0);
+      const used = Number(line.used || 0);
+      const remaining = Number.isFinite(Number(line.remaining))
+        ? Number(line.remaining)
+        : Math.max(0, quantity - used);
+      if (remaining <= 0) continue;
+      const lineServiceId = String(line.serviceId || "");
+      const lineName = normalizeMatchName(line.name);
+      let score = 0;
+      if (serviceId && lineServiceId === serviceId) score = 3;
+      else if (serviceName && lineName === normalizeMatchName(serviceName))
+        score = 2;
+      else if (serviceId && !lineServiceId) score = 1;
+      if (score > 0) {
+        candidates.push({
+          sale,
+          line,
+          remaining,
+          score,
+          date: String(sale.date || ""),
+        });
+      }
+    }
+  }
+
+  candidates.sort(
+    (left, right) =>
+      right.score - left.score || left.date.localeCompare(right.date),
+  );
+  return candidates[0] || null;
+}
+
+function normalizeMatchPhone(value: unknown) {
+  return String(value ?? "").replace(/\D/g, "").slice(-10);
+}
+
+function normalizeMatchName(value: unknown) {
+  return String(value ?? "").trim().toLocaleLowerCase("tr-TR");
+}
+
 function getAppointmentDurationMinutes(
   business: Business,
   appointment: Appointment,
@@ -1303,7 +1390,10 @@ function AppointmentEditModal({
   appointment: Appointment;
   business: Business;
   onClose: () => void;
-  onSaved: (appointment: Appointment) => void;
+  onSaved: (
+    appointment: Appointment,
+    packageUsage?: AppointmentPackageUsage,
+  ) => void;
 }) {
   const currentService = (business.services || []).find(
     (service) => service.id === appointment.serviceId,
@@ -1339,6 +1429,20 @@ function AppointmentEditModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const packageLine = useMemo(
+    () =>
+      findPackageLineForAppointment(
+        business,
+        form.customerName,
+        form.phone,
+        form.serviceId,
+      ),
+    [business, form.customerName, form.phone, form.serviceId],
+  );
+  const appointmentUsageKey = `appointment-${appointment.id}:appointment-${appointment.id}-line`;
+  const alreadyApplied = Boolean(
+    packageLine?.line.usedCheckoutIds?.includes(appointmentUsageKey),
+  );
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -1366,7 +1470,10 @@ function AppointmentEditModal({
       if (!response.ok) {
         throw new Error(data.error || "Randevu iptal edilemedi.");
       }
-      onSaved(data.appointment as Appointment);
+      onSaved(
+        data.appointment as Appointment,
+        data.packageUsage as AppointmentPackageUsage | undefined,
+      );
     } catch (cancelError) {
       setError(
         cancelError instanceof Error
@@ -1379,7 +1486,7 @@ function AppointmentEditModal({
     }
   }
 
-  async function save() {
+  async function save(statusOverride?: string) {
     if (!form.customerName.trim()) {
       setError("Müşteri adı zorunlu.");
       return;
@@ -1388,6 +1495,7 @@ function AppointmentEditModal({
       setError("Tarih ve saat zorunlu.");
       return;
     }
+    const nextStatus = statusOverride || form.status;
     setSaving(true);
     setError("");
     const serviceName = (business.services || []).find(
@@ -1416,14 +1524,17 @@ function AppointmentEditModal({
           serviceId: form.serviceId || null,
           staffId: form.staffId || null,
           description,
-          status: form.status,
+          status: nextStatus,
         }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(data.error || "Randevu güncellenemedi.");
       }
-      onSaved(data.appointment as Appointment);
+      onSaved(
+        data.appointment as Appointment,
+        data.packageUsage as AppointmentPackageUsage | undefined,
+      );
     } catch (saveError) {
       setError(
         saveError instanceof Error
@@ -1443,8 +1554,9 @@ function AppointmentEditModal({
       aria-modal="true"
       aria-label="Randevuyu düzenle"
     >
-      <section className="w-full max-w-2xl rounded bg-white shadow-xl">
+      <section className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col rounded bg-white shadow-xl">
         <ModalHeader title="Randevuyu düzenle" onClose={onClose} />
+        <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="grid gap-3 p-4 sm:grid-cols-2">
           <label className="grid gap-1 text-sm font-semibold text-slate-700">
             Müşteri
@@ -1538,6 +1650,15 @@ function AppointmentEditModal({
             />
           </label>
         </div>
+        {packageLine ? (
+          <div className="mx-4 mb-3 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+            <div className="font-semibold">Paket mevcut</div>
+            <div className="mt-1">
+              {packageLine.line.name} · {packageLine.remaining}/
+              {packageLine.line.quantity} seans kaldı
+            </div>
+          </div>
+        ) : null}
         {error && (
           <div className="mx-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
@@ -1568,7 +1689,33 @@ function AppointmentEditModal({
             </div>
           </div>
         )}
-        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 px-4 py-3">
+        <div className="mx-4 mb-3 flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            disabled={saving || confirmCancel || alreadyApplied}
+            onClick={() => save("COMPLETED")}
+            className="bg-emerald-600 text-white"
+          >
+            {alreadyApplied
+              ? "Seans düşülmüş"
+              : form.status === "COMPLETED"
+                ? "Seansı düş"
+                : "Geldi"}
+          </Button>
+          <span className="text-xs text-slate-500">
+            {alreadyApplied
+              ? "Bu randevunun 1 seansı paketten düşülmüş."
+              : form.status === "COMPLETED"
+                ? packageLine
+                  ? "Geldi olarak işaretli; seans henüz düşülmemiş."
+                  : "Eşleşen paket seansı bulunamadı."
+                : packageLine
+                  ? "Geldi seçilince 1 seans düşülür."
+                  : "Eşleşen paket seansı bulunamadı."}
+          </span>
+        </div>
+        </div>
+        <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-slate-200 px-4 py-3">
           <Button type="button" variant="outline" onClick={onClose}>
             Kapat
           </Button>
@@ -1603,7 +1750,10 @@ export function AppointmentsPage({
 }: {
   appointments: Appointment[];
   business: Business;
-  onAppointmentUpdated?: (appointment: Appointment) => void;
+  onAppointmentUpdated?: (
+    appointment: Appointment,
+    packageUsage?: AppointmentPackageUsage,
+  ) => void;
 }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [staffFilter, setStaffFilter] = useState("all");
@@ -1745,7 +1895,10 @@ export function AppointmentsPage({
       }
       if (data.appointment) {
         const updated = data.appointment as Appointment;
-        onAppointmentUpdated?.(updated);
+        onAppointmentUpdated?.(
+          updated,
+          data.packageUsage as AppointmentPackageUsage | undefined,
+        );
         setSelectedRow((current) => {
           if (!current) return current;
           const appointments = current.appointments.map((item) =>
@@ -1997,8 +2150,8 @@ export function AppointmentsPage({
           appointment={editingAppointment}
           business={business}
           onClose={() => setEditingAppointment(null)}
-          onSaved={(updated) => {
-            onAppointmentUpdated?.(updated);
+          onSaved={(updated, packageUsage) => {
+            onAppointmentUpdated?.(updated, packageUsage);
             setEditingAppointment(null);
             setSelectedRow(null);
           }}

@@ -303,6 +303,21 @@ export type PackageSaleItem = {
   createdAt: string;
 };
 
+export type AppointmentPackageUsageChange = {
+  key: string;
+  saleId: string;
+  lineId: string;
+  used: number;
+  remaining: number;
+  direction: "deduct" | "restore";
+};
+
+export type AppointmentPackageUsage = {
+  changes: AppointmentPackageUsageChange[];
+  wasCompleted: boolean;
+  isCompleted: boolean;
+};
+
 export type ExpenseItem = {
   id: string;
   date: string;

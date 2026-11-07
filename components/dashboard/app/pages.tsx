@@ -2,6 +2,7 @@
 
 import {
   Appointment,
+  AppointmentPackageUsage,
   Business,
   ContactRow,
   PlaceholderPage,
@@ -72,7 +73,10 @@ export function ContentRouter({
   onTogglePatch: (field: "is_active" | "test_mode", value: boolean) => void;
   onReconnectWhatsApp: () => void;
   onDisconnectWhatsApp: () => void;
-  onAppointmentUpdated: (appointment: Appointment) => void;
+  onAppointmentUpdated: (
+    appointment: Appointment,
+    packageUsage?: AppointmentPackageUsage,
+  ) => void;
 }) {
   if (view === "dashboard") {
     return (

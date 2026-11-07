@@ -31,6 +31,15 @@ function usageKey(checkoutId: string, lineId: string) {
   return `${checkoutId}:${lineId}`
 }
 
+export type PackageUsageChange = {
+  key: string
+  saleId: string
+  lineId: string
+  used: number
+  remaining: number
+  direction: "deduct" | "restore"
+}
+
 function normalizeLine(raw: JsonObject): JsonObject {
   const quantity = Math.max(0, asNumber(raw.quantity))
   const usedValue = Number(raw.used)
@@ -120,6 +129,7 @@ function applyUsage(
   checkout: JsonObject,
   direction: 1 | -1,
 ) {
+  const changes: PackageUsageChange[] = []
   const checkoutId = asText(checkout.id) || "checkout"
   const sales = asArray(promotions.packageSales)
     .map((sale) => asObject(sale))
@@ -142,7 +152,15 @@ function applyUsage(
           line.used = used
           line.remaining = clamp(asNumber(line.remaining) + 1, 0, quantity - used)
           line.usedCheckoutIds = usedCheckoutIds.filter((id) => id !== key)
-          return
+          changes.push({
+            key,
+            saleId: asText(sale.id),
+            lineId: asText(line.id),
+            used,
+            remaining: asNumber(line.remaining),
+            direction: "restore",
+          })
+          return changes
         }
       }
       continue
@@ -205,7 +223,16 @@ function applyUsage(
       ...asArray(candidate.line.usedCheckoutIds).map(asText),
       key,
     ]
+    changes.push({
+      key,
+      saleId: asText(candidate.sale.id),
+      lineId: asText(candidate.line.id),
+      used,
+      remaining: asNumber(candidate.line.remaining),
+      direction: "deduct",
+    })
   }
+  return changes
 }
 
 export function applyCheckoutAttendanceUsage({
@@ -246,4 +273,57 @@ export function applyCheckoutAttendanceUsage({
   }
 
   return result
+}
+
+function isCompletedAppointment(appointment: JsonObject | null) {
+  return (
+    Boolean(appointment) &&
+    asText(appointment?.status).toUpperCase() === "COMPLETED"
+  )
+}
+
+function appointmentUsageTargetChanged(previous: JsonObject, next: JsonObject) {
+  const previousCustomer =
+    asText(previous.customerId) || normalizeName(previous.customerName)
+  const nextCustomer =
+    asText(next.customerId) || normalizeName(next.customerName)
+  const previousService =
+    asText(previous.serviceId) || normalizeName(previous.name)
+  const nextService = asText(next.serviceId) || normalizeName(next.name)
+  return (
+    previousCustomer !== nextCustomer || previousService !== nextService
+  )
+}
+
+export function applyAppointmentAttendanceUsage({
+  previousAppointment,
+  nextAppointment,
+  promotions,
+}: {
+  previousAppointment: unknown
+  nextAppointment: unknown
+  promotions: unknown
+}) {
+  const result = normalizePackageSales(promotions)
+  const previous = asObject(previousAppointment)
+  const next = asObject(nextAppointment)
+  const changes: PackageUsageChange[] = []
+  const previousCompleted = isCompletedAppointment(previous)
+  const nextCompleted = isCompletedAppointment(next)
+
+  if (previousCompleted && !nextCompleted) {
+    if (previous) changes.push(...applyUsage(result, previous, -1))
+  } else if (nextCompleted) {
+    if (
+      previousCompleted &&
+      previous &&
+      next &&
+      appointmentUsageTargetChanged(previous, next)
+    ) {
+      changes.push(...applyUsage(result, previous, -1))
+    }
+    if (next) changes.push(...applyUsage(result, next, 1))
+  }
+
+  return { promotions: result, changes }
 }
