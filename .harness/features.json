@@ -220,23 +220,23 @@
       "files": [],
       "status": "passing",
       "verification": [
-        "Current Salonappy future bookings: 355.",
-        "New booking details fetched: 153 sessions / 179 appointment lines.",
-        "Future sessions missing from Salonappy and marked CANCELED: 9.",
-        "After sync: extraSessions=0; 16 earlier-today appointments remain because Salonappy's current booking list excludes past-time entries."
+        "Current Salonappy future bookings (2026-11-08): 362.",
+        "New booking details fetched: 71 sessions / 84 appointment lines.",
+        "Future sessions missing from Salonappy and marked CANCELED: 8.",
+        "After sync: extraSessions=0; all 362 current bookings represented; 8 canceled future sessions hidden."
       ],
       "evidence": {
-        "date": "2026-11-05",
-        "commit": "341515e",
+        "date": "2026-11-08",
+        "commit": "62a6ea7",
         "commands": [
-          "one sequential booking/list request: 355 current future bookings",
-          "sequential booking/detail fetch: 153/153 successful, no rate limit",
-          "transaction: imported 179 new appointment lines; marked 9 future sessions CANCELED",
-          "read-only compare: extraSessions=0; 9 canceled future sessions; 16 earlier-today appointments retained"
+          "one sequential booking/list request: 362 current future bookings",
+          "sequential booking/detail fetch: 71/71 successful, no rate limit",
+          "transaction: imported 84 new appointment lines; marked 8 future sessions CANCELED",
+          "read-only compare: extraSessions=0; 8 canceled future sessions; no mojibake descriptions; 1 known null-service appointment"
         ],
-        "result": "All 355 current Salonappy bookings are represented; canceled future sessions are hidden."
+        "result": "All 362 current Salonappy bookings are represented; canceled future sessions are hidden."
       },
-      "notes": "Data-only sync. Backup written to appointments-before-sync.json in the temp import folder."
+      "notes": "Data-only sync. Backup written to appointments-before-sync-2026-11-08.json in the temp import folder."
     },
     {
       "id": "appointment-list-cleanup",

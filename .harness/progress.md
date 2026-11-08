@@ -115,6 +115,7 @@
   - New multi-line package sales are split automatically on save.
   - Synced current Salonappy future bookings: imported 153 new sessions (179 appointment lines) and marked 9 rescheduled/canceled future sessions as CANCELED.
   - Verified all 355 current Salonappy bookings are now represented; 0 extra sessions remain.
+  - Synced again on 2026-11-08: 362 current bookings; imported 71 new sessions (84 lines); canceled 8 missing future sessions; extraSessions=0; Turkish names clean.
   - Added Kasa raporu method breakdown for Nakit/EFT/Kredi Kartı with collection, expense, and net columns.
   - Added Bugün / Bu ay / Geçen ay / Özel period selection with custom start/end date inputs.
   - Product sales now carry a payment method for cash reporting.
