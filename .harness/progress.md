@@ -5,7 +5,7 @@
 - Branch: `main`
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
-- Last known green commit: `0267f5c` (typecheck clean; package session usage committed)
+- Last known green commit: `88cf7e6` (typecheck clean; package payment backfill state committed)
 - Highest priority unfinished feature: `cash-register-report`
 - Current blocker: none.
 
@@ -26,7 +26,7 @@
   - Cent audit: over 0, shortFully 0, groupMismatch 0.
   - Reviewer verdict: PASS WITH NOTES; the only should-fix finding (sub-cent rows) was fixed and reconfirmed.
 - Evidence recorded: `salonappy-package-payment-sync` passing with the verification above.
-- Commits: `11f235d` (state start) plus the close commit.
+- Commits: `11f235d` (state start), `88cf7e6` (backfill evidence), plus the close commit.
 - Known risks/limitations:
   - 4 deleted Salonappy groups (17.100 TL, fully paid, 2025-03 to 2026-06) have no source history; their paid amount stays on the sale date and is counted once by the report fallback.
   - Editing `paidAmount` via Düzenle does not reconcile the `payments` array that the report prefers.

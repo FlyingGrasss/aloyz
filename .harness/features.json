@@ -208,7 +208,7 @@
       ],
       "evidence": {
         "date": "2026-11-09",
-        "commit": "pending",
+        "commit": "88cf7e6",
         "commands": [
           "sequential payments_v2 fetch: 2,710/2,714 groups, 3,223 source payments",
           "apply-package-payment-history.cjs: 2,701 groups applied, 3,530 rows updated, 4,241 allocated entries, 0 mismatches",
