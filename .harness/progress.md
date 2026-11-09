@@ -6,10 +6,25 @@
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
 - Last known green commit: `0267f5c` (typecheck clean; package session usage committed)
-- Highest priority unfinished feature: `cash-register-report`
+- Highest priority unfinished feature: `salonappy-package-payment-sync`
 - Current blocker: none.
 
 ## Session record
+
+### 2026-11-09 — Backfill package payment history from Salonappy
+- Goal: every imported package shows real payment dates/amounts/methods so monthly checks are possible.
+- State: `salonappy-package-payment-sync` is `in_progress`.
+- Plan:
+  - Snapshot 2,714 imported package groups (3,534 rows) from the DB.
+  - Fetch `/api/package_sale/payments_v2?package_sale_group_id=<id>` sequentially, partial/unpaid and recent groups first.
+  - Checkpoint after every group; stop on any non-JSON/429 response and resume from the checkpoint.
+  - Map nakit->Nakit, havale/eft->EFT, kart/kredi->Kredi Kartı.
+  - Allocate each group payment across its split service rows proportionally by row total; set paidAmount/paymentMethod/payments.
+  - Verify group totals against Salonappy total_payment and sample group 7372560.
+- Preflight: 16 representative groups all returned JSON; paid-in-full groups matched total, and stale partials were corrected by the API (7372560: DB 1.000 -> API 8.000).
+- Fetch started 2026-11-09 18:31 in the background: `node %TEMP%/opencode/salonappy-import/scripts/fetch-package-payment-history.cjs` with `SALONAPPY_TOKEN` set.
+- Checkpoint: `%TEMP%/opencode/salonappy-import/package-payments-checkpoint.json` (saved after every group; non-JSON/429 stops cleanly).
+- Next best action: when the fetch reports complete, run the allocation/apply script, verify group totals, then commit state.
 
 ### 2026-11-07 — Appointment Geldi deducts package sessions
 - Goal: open an appointment, mark Geldi, and deduct one session from the matching package.

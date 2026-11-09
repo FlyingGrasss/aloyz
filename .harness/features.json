@@ -1,6 +1,6 @@
 {
   "project": "aloyz",
-  "updated": "2026-11-07",
+  "updated": "2026-11-09",
   "verification": {
     "install": "pnpm install",
     "verify": [
@@ -189,6 +189,24 @@
       ],
       "evidence": null,
       "notes": "Code complete; manual UI verification pending. Nakit/EFT/Kredi Kartı are available on package sales; EFT was also added to checkout and finance payment method lists."
+    },
+    {
+      "id": "salonappy-package-payment-sync",
+      "priority": 13,
+      "area": "data-import",
+      "title": "Backfill Salonappy package payment history",
+      "user_visible_behavior": "Each imported package sale shows its real payment dates, amounts, and methods (Nakit/EFT/Kredi Kartı), and Kasa raporu can be checked month by month.",
+      "files": [],
+      "status": "in_progress",
+      "verification": [
+        "Fetch payment history for all 2,714 imported Salonappy package groups sequentially with no 429/HTML response.",
+        "Group 7372560 shows two payments: 1.000 TL Nakit on 2026-10-29 and 7.000 TL Nakit on 2026-11-06; paidAmount is 8.000.",
+        "Per group, the sum of split-row payment amounts equals the Salonappy total_payment.",
+        "All 3,534 imported package rows have a payments array; no manual/UUID sale is modified.",
+        "Kasa raporu for a chosen month totals package payments by Nakit/EFT/Kredi Kartı without double counting."
+      ],
+      "evidence": null,
+      "notes": "Started 2026-11-09 18:30. Source methods map: nakit->Nakit, havale/eft->EFT, kart/kredi->Kredi Kartı. Fetch checkpoint lives in the temp import folder; payments are allocated across split service rows proportionally by row total."
     },
     {
       "id": "cash-register-report",
