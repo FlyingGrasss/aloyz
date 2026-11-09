@@ -6,25 +6,34 @@
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
 - Last known green commit: `0267f5c` (typecheck clean; package session usage committed)
-- Highest priority unfinished feature: `salonappy-package-payment-sync`
+- Highest priority unfinished feature: `cash-register-report`
 - Current blocker: none.
 
 ## Session record
 
 ### 2026-11-09 — Backfill package payment history from Salonappy
 - Goal: every imported package shows real payment dates/amounts/methods so monthly checks are possible.
-- State: `salonappy-package-payment-sync` is `in_progress`.
-- Plan:
-  - Snapshot 2,714 imported package groups (3,534 rows) from the DB.
-  - Fetch `/api/package_sale/payments_v2?package_sale_group_id=<id>` sequentially, partial/unpaid and recent groups first.
-  - Checkpoint after every group; stop on any non-JSON/429 response and resume from the checkpoint.
-  - Map nakit->Nakit, havale/eft->EFT, kart/kredi->Kredi Kartı.
-  - Allocate each group payment across its split service rows proportionally by row total; set paidAmount/paymentMethod/payments.
-  - Verify group totals against Salonappy total_payment and sample group 7372560.
-- Preflight: 16 representative groups all returned JSON; paid-in-full groups matched total, and stale partials were corrected by the API (7372560: DB 1.000 -> API 8.000).
-- Fetch started 2026-11-09 18:31 in the background: `node %TEMP%/opencode/salonappy-import/scripts/fetch-package-payment-history.cjs` with `SALONAPPY_TOKEN` set.
-- Checkpoint: `%TEMP%/opencode/salonappy-import/package-payments-checkpoint.json` (saved after every group; non-JSON/429 stops cleanly).
-- Next best action: when the fetch reports complete, run the allocation/apply script, verify group totals, then commit state.
+- Completed:
+  - Fetched `/api/package_sale/payments_v2?package_sale_group_id=<id>` sequentially with 2.5–2.9s spacing and 10s every 15 requests: 2,710/2,714 groups, no 429/HTML; 4 deleted groups returned `Package sale not found`.
+  - 3,223 source payments mapped: nakit->Nakit, havale/eft->EFT, kart/kredi->Kredi Kartı.
+  - Allocated each group payment across its split service rows proportionally by row total; updated `paidAmount`, `paymentMethod`, and `payments` for 3,530 rows in 2,701 groups (9 groups have no payments).
+  - Applied in a locked transaction from a fresh backup: 4,241 allocated payment entries, 0 group mismatches.
+  - Rebalanced 15 cent artifacts in 5 fully paid groups; 0 rows overpaid or short afterwards.
+  - Sample 7372560 now shows 1.000 TL Nakit (2026-10-29) + 7.000 TL Nakit (2026-11-06), paidAmount 8.000.
+- Verification run:
+  - `pnpm exec tsc --noEmit` passed.
+  - Independent verifier: paymentSum == paidSum == 13.055.250 TL; issueCount 0; no paid-amount decrease; manual/UUID sales unchanged.
+  - Cent audit: over 0, shortFully 0, groupMismatch 0.
+  - Reviewer verdict: PASS WITH NOTES; the only should-fix finding (sub-cent rows) was fixed and reconfirmed.
+- Evidence recorded: `salonappy-package-payment-sync` passing with the verification above.
+- Commits: `11f235d` (state start) plus the close commit.
+- Known risks/limitations:
+  - 4 deleted Salonappy groups (17.100 TL, fully paid, 2025-03 to 2026-06) have no source history; their paid amount stays on the sale date and is counted once by the report fallback.
+  - Editing `paidAmount` via Düzenle does not reconcile the `payments` array that the report prefers.
+  - Payment history for fully paid sales is visible in customer detail; the sales-list `Ödeme Al` modal is hidden when nothing remains.
+  - Any dashboard/mobile session opened before the backfill must be reloaded before saving, or its whole-business save can overwrite `promotions`.
+  - Temp checkpoint/backup/report files contain customer and payment data; they are outside the repo and should not be committed.
+- Next best action: reload all clients and check Kasa raporu month by month; then continue with `cash-register-report`.
 
 ### 2026-11-07 — Appointment Geldi deducts package sessions
 - Goal: open an appointment, mark Geldi, and deduct one session from the matching package.
