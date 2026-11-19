@@ -5,11 +5,37 @@
 - Branch: `main`
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
-- Last known green commit: `88cf7e6` (typecheck clean; package payment backfill state committed)
+- Last known green commit: `88cf7e6` (typecheck clean; code unchanged by the data sync)
 - Highest priority unfinished feature: `cash-register-report`
 - Current blocker: none.
 
 ## Session record
+
+### 2026-11-19 — Sync new Salonappy bookings, package sales, and payments
+- Goal: pull the current Salonappy data so new appointments and package sales appear and canceled future appointments disappear.
+- Completed:
+  - Current future bookings: 357; identified 192 new sessions not in our DB and fetched all 192 details sequentially without rate limiting.
+  - Imported 192 sessions / 246 appointment lines; 10 future sessions / 12 rows newly CANCELED plus 1 already canceled; left the 4 earlier-today appointments untouched.
+  - Final compare: extraSessions=0; 357 current bookings represented; dbFutureSessions=372 (357 current + 11 canceled + 4 earlier today).
+  - Recent package window (2026-11-09..2026-11-19): 53 groups / 75 rows, 20 new customers, total 346.500 TL / paid 333.500 TL.
+  - Gap window (2026-10-30..2026-11-08): 26 groups / 46 rows, 5 new customers, total 189.500 TL / paid 182.000 TL; removed 10 duplicate manual rows (used 0, no checkout usage).
+  - Fetched payments_v2 for 79 new groups and 114 existing partial groups; updated 3 existing packages with 5.500 TL new payments.
+  - Package sales now 3.655; imported groups 2.793; imported rows 3.655; manual rows 0.
+  - Relinked sale 7401893 to a new burcu şahin customer with the source phone 5444214411; corrected HANİFE ŞİMŞEK and koza örük phones to the source numbers.
+- Verification run:
+  - `pnpm exec tsc --noEmit` passed.
+  - Booking compare: extraSessions=0, missingTomorrow=11 (all CANCELED), 4 earlier-today retained.
+  - Full package verifier: 79 groups / 121 rows checked; 0 issues; totals/payments/used/remaining match; duplicate sale IDs 0; removed manual IDs absent; customer links present; no duplicate added-customer phones.
+  - Customer phone audit: 79/79 source groups, 0 mismatches.
+- Reviewer verdict: PASS WITH NOTES after the first pass FAIL on the missing 2026-10-30..2026-11-08 window was fixed; reviewer confirmed no double counting and that the removal set contained only duplicates.
+- Evidence recorded: `salonappy-live-sync-2026-11-19` passing with the verification above.
+- Commits: state commit pending.
+- Known risks:
+  - A dashboard/mobile session opened before the sync must be reloaded before saving; the whole-business save can overwrite the 3.655 package rows and 26 new customers.
+  - The booking import is destructive if rerun; it deletes and reinserts the 192 sessions.
+  - The retained-today rule keeps every missing session dated today, not only earlier-than-run sessions.
+  - 11 new appointment rows have empty source phones.
+- Next best action: commit state, push, verify Vercel; then continue with `cash-register-report`.
 
 ### 2026-11-09 — Backfill package payment history from Salonappy
 - Goal: every imported package shows real payment dates/amounts/methods so monthly checks are possible.

@@ -1,6 +1,6 @@
 {
   "project": "aloyz",
-  "updated": "2026-11-09",
+  "updated": "2026-11-19",
   "verification": {
     "install": "pnpm install",
     "verify": [
@@ -10,6 +10,41 @@
     "start": "pnpm dev"
   },
   "features": [
+    {
+      "id": "salonappy-live-sync-2026-11-19",
+      "priority": 5,
+      "area": "data-import",
+      "title": "Sync current Salonappy bookings, package sales, and payments",
+      "user_visible_behavior": "New Salonappy appointments and package sales appear in the dashboard with correct remaining sessions and payment history; canceled future appointments disappear.",
+      "files": [],
+      "status": "passing",
+      "verification": [
+        "Current Salonappy future bookings: 357; new booking details fetched: 192 sessions / 246 appointment lines.",
+        "After sync: extraSessions=0; 10 future sessions / 12 rows newly CANCELED plus 1 already canceled; 4 earlier-today appointments remain untouched.",
+        "Recent package window 2026-11-09..2026-11-19: 53 groups / 75 rows, 346.500 TL total / 333.500 TL paid.",
+        "Gap window 2026-10-30..2026-11-08: 26 groups / 46 rows, 189.500 TL total / 182.000 TL paid; 10 duplicate manual rows removed.",
+        "Combined new package groups: 79; new rows: 121; new customers: 26; package sales total 3.655 and manual rows 0.",
+        "Combined new package rows total 536.000 TL, paid 515.500 TL; per-group totals and payment sums match the source; used/remaining match source for all 121 rows.",
+        "Three existing partial packages updated with 5.500 TL new payments: 7360153 -> 2.500, 7332109 -> 5.000, 7118692 -> 6.000.",
+        "Sale 7401893 relinked to a new burcu şahin customer with source phone 5444214411; HANİFE ŞİMŞEK and koza örük phones corrected to source.",
+        "Independent full verifier: issueCount 0; 79/79 source groups and 121/121 rows match; phone audit 0 mismatches; removed manual IDs absent; duplicate sale IDs 0."
+      ],
+      "evidence": {
+        "date": "2026-11-19",
+        "commit": "pending",
+        "commands": [
+          "booking/list + 192 sequential booking/detail fetches: 357 current bookings",
+          "appointment import: 192 sessions / 246 lines added; 10 sessions / 12 rows newly canceled; extraSessions=0",
+          "package_sale/list_v2 recent + gap: 79 groups / 121 rows; payments_v2 for 79 new + 114 partial groups",
+          "package apply: 3.655 sales, 2.793 groups, 10 duplicate manual rows removed, 26 customers added",
+          "verify-full-sync-2026-11-19.cjs: issueCount 0; 121/121 totals/payments/used/remaining match",
+          "customer phone audit: 79/79 source groups, 0 mismatches",
+          "pnpm exec tsc --noEmit"
+        ],
+        "result": "PASS WITH NOTES from reviewer after the 2026-10-30..2026-11-08 gap was imported. Bookings, package sales, payments, customers, and cancellations are current; no double counting or duplicate sale IDs."
+      },
+      "notes": "Started 2026-11-19 13:25. Bookings imported from booking/list + booking/detail; packages from package_sale/list_v2 for 2026-10-30..2026-11-19 plus payments_v2 for 79 new groups and 114 partial groups. Backups: appointments-before-sync-2026-11-19.json, package-sales-before-sync-2026-11-19.json, and package-sales-before-gap-sync-2026-11-19.json in the temp import folder. Initial run missed 2026-10-30..2026-11-08; gap imported and 10 duplicate manual rows replaced."
+    },
     {
       "id": "calendar-ux",
       "priority": 10,
