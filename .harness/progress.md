@@ -5,7 +5,7 @@
 - Branch: `main`
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
-- Last known green commit: `88cf7e6` (typecheck clean; code unchanged by the data sync)
+- Last known green commit: `8c647d1` (typecheck clean; data sync state committed)
 - Highest priority unfinished feature: `cash-register-report`
 - Current blocker: none.
 
@@ -29,7 +29,7 @@
   - Customer phone audit: 79/79 source groups, 0 mismatches.
 - Reviewer verdict: PASS WITH NOTES after the first pass FAIL on the missing 2026-10-30..2026-11-08 window was fixed; reviewer confirmed no double counting and that the removal set contained only duplicates.
 - Evidence recorded: `salonappy-live-sync-2026-11-19` passing with the verification above.
-- Commits: state commit pending.
+- Commits: `8c647d1` (sync state and evidence), plus the close commit.
 - Known risks:
   - A dashboard/mobile session opened before the sync must be reloaded before saving; the whole-business save can overwrite the 3.655 package rows and 26 new customers.
   - The booking import is destructive if rerun; it deletes and reinserts the 192 sessions.
