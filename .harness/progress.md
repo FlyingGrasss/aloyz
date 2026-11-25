@@ -30,7 +30,8 @@
   - Direct `runSalonappySync()` test: first run added 1 appointment session/line, 1 package group/row (12.000 TL), 1.000 TL new payment; second run added 0 rows.
 - Reviewer verdict: unavailable — the reviewer subagent failed with an OpenCode Go subscription error. Independent verification was used instead.
 - Evidence recorded: `admin-salonappy-sync-button` passing at `2c259ae` with typecheck, targeted lint, the 403 boundary test, and the idempotent end-to-end sync test.
-- Commits: `2c259ae` (code), `7a36d93` (.gitignore), plus the state commit.
+- Commits: `2c259ae` (initial code), `7a36d93` (.gitignore), `e92e0a3` (owner access), plus the state commit.
+- Owner follow-up (2026-11-25): the button is now also visible to the active business owner (not only global admins), only on the dashboard home of this business, compact and right-aligned so it does not block content. The API route authorizes global admin or ACTIVE owner membership; employees/anonymous get 403. Typecheck and targeted lint re-run clean.
 - Known risks:
   - The endpoint is admin-only and hardcodes this business; it is not a general multi-business sync.
   - The whole sync runs in one serverless request with 10-way concurrency; Salonappy could tighten rate limits later, in which case a retry/backoff or slower concurrency would be needed.
