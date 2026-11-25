@@ -5,7 +5,7 @@
 - Branch: `main`
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
-- Last known green commit: `f7762f7` (typecheck clean; data sync state committed)
+- Last known green commit: `f130e51` (typecheck clean; admin sync button committed)
 - Highest priority unfinished feature: `cash-register-report`
 - Current blocker: none.
 
