@@ -1,8 +1,11 @@
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { runSalonappySync } from "@/lib/salonappy-sync";
 
 export const maxDuration = 60;
+
+const BUSINESS_ID = "cmsg51y28000004l6hacg2plq";
 
 function unauthorized() {
   return NextResponse.json(
@@ -13,9 +16,24 @@ function unauthorized() {
 
 export async function POST(request: Request) {
   const session = await auth();
-  if (!session || (session.user as { role?: string } | undefined)?.role !== "admin") {
-    return unauthorized();
+  if (!session) return unauthorized();
+
+  const isAdmin = (session.user as { role?: string } | undefined)?.role === "admin";
+  const userId = (session.user as { id?: string } | undefined)?.id;
+  let isOwner = false;
+  if (!isAdmin && userId) {
+    const membership = await prisma.businessMembership.findFirst({
+      where: {
+        businessId: BUSINESS_ID,
+        userId,
+        status: "ACTIVE",
+        role: "owner",
+      },
+      select: { id: true },
+    });
+    isOwner = Boolean(membership);
   }
+  if (!isAdmin && !isOwner) return unauthorized();
 
   const origin = request.headers.get("origin");
   const expectedOrigin = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL;

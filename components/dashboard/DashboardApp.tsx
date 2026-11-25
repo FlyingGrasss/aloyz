@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { Building2, UserRound } from "lucide-react";
+import { Building2, RefreshCw, UserRound } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { hasDashboardAccess } from "@/lib/access";
 import { MobileNavDrawer, Sidebar, Topbar } from "./app/shell";
@@ -142,6 +142,10 @@ export function DashboardApp() {
   });
   const canManageSetup =
     isAdminMode || business.currentMembershipRole === "owner";
+  const canSyncSalonappy =
+    business.id === "cmsg51y28000004l6hacg2plq" &&
+    ((session?.user as { role?: string } | undefined)?.role === "admin" ||
+      business.currentMembershipRole === "owner");
   const forcedSetup = canManageSetup && !savedSetupComplete && !isAdminMode;
 
   useEffect(() => {
@@ -949,26 +953,28 @@ export function DashboardApp() {
                 düzenliyorsunuz.
               </StatusBanner>
             )}
-            {(session?.user as { role?: string } | undefined)?.role ===
-              "admin" &&
-              business.id === "cmsg51y28000004l6hacg2plq" && (
-              <div className="mb-3 flex flex-wrap items-center gap-3">
+            {canSyncSalonappy && view === "dashboard" && (
+              <div className="mb-3 flex justify-end">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
+                  className="h-8 px-3 text-xs"
+                  aria-label="Salonappy senkronizasyonunu başlat"
                   disabled={syncing || loading}
                   onClick={syncSalonappy}
                 >
+                  <RefreshCw
+                    className={
+                      syncing
+                        ? "mr-2 h-3.5 w-3.5 animate-spin"
+                        : "mr-2 h-3.5 w-3.5"
+                    }
+                  />
                   {syncing
                     ? t("Senkronize ediliyor…")
-                    : t("Salonappy ile senkronize et")}
+                    : t("Salonappy senkronu")}
                 </Button>
-                <span className="text-xs text-slate-500">
-                  {t(
-                    "Randevular, paket satışları ve ödemeler güncellenir.",
-                  )}
-                </span>
               </div>
             )}
             {successMsg && (
