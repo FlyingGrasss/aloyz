@@ -30,7 +30,7 @@
       ],
       "evidence": {
         "date": "2026-11-25",
-        "commit": "pending",
+        "commit": "f7762f7",
         "commands": [
           "booking/list + 157 sequential booking/detail fetches: 362 current bookings",
           "appointment reimport: 157 sessions / 185 lines; 0 newly canceled; extraSessions=0",

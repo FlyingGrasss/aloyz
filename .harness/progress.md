@@ -5,8 +5,8 @@
 - Branch: `main`
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
-- Last known green commit: `8c647d1` (typecheck clean; data sync state committed)
-- Highest priority unfinished feature: `salonappy-live-sync-2026-11-25`
+- Last known green commit: `f7762f7` (typecheck clean; data sync state committed)
+- Highest priority unfinished feature: `cash-register-report`
 - Current blocker: none.
 
 ## Session record
@@ -27,7 +27,7 @@
   - Booking compare: extraSessions 0; backup/current diff shows 0 newly canceled rows.
 - Reviewer verdict: unavailable — the reviewer subagent failed twice with an OpenCode Go subscription error. Independent verifier, phone audit, booking compare, and typecheck all passed.
 - Evidence recorded: `salonappy-live-sync-2026-11-25` passing with the executed checks above.
-- Commits: state commit pending.
+- Commits: `f7762f7` (sync state and evidence), plus the close commit.
 - Known risks:
   - A dashboard/mobile session opened before the sync must be reloaded before saving; a whole-business save can overwrite the 3.685 package rows and 8 new customers.
   - Rerunning the booking reimport is destructive: it deletes and reinserts the 157 sessions.
