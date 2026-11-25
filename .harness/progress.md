@@ -11,6 +11,32 @@
 
 ## Session record
 
+### 2026-11-25 — Admin-only Salonappy sync button
+- Goal: let the administrator trigger the exact manual sync from the dashboard without asking the agent; no cron.
+- Evidence and constraints:
+  - Previous syncs took ~20-30 min only because requests were deliberately spaced 2.5-3s apart.
+  - Probe: 30 requests at concurrency 10 finished in 431ms; 220 requests (120 booking details + 100 payments) at concurrency 10 finished in ~3s with zero 429/HTML responses. A single serverless request is enough.
+  - Next.js 16.2.4; local docs consulted: `maxDuration` route-segment config and `after()` (not needed).
+- Completed:
+  - Added `lib/salonappy-api.ts` with server-only token, bounded concurrency, pagination, and 429/non-JSON guards.
+  - Added `lib/salonappy-sync.ts` that fetches bookings/package sales/payments and applies them in one `FOR UPDATE` transaction; idempotent; re-reads state inside the transaction.
+  - Added `POST /api/admin/salonappy-sync` with `auth()` + `role === admin`, origin check, `maxDuration = 60`, and stable error codes.
+  - Added an admin-only button in `DashboardApp.tsx`, visible only for role admin and business `cmsg51y28000004l6hacg2plq`, with loading and success/error feedback and a business refresh afterwards.
+  - Set `SALONAPPY_TOKEN` as a Vercel production secret and in gitignored `.env.local`.
+- Verification run:
+  - `pnpm exec tsc --noEmit` passed.
+  - Targeted ESLint clean on the three new files; DashboardApp has only pre-existing errors.
+  - Unauthenticated POST returned 403.
+  - Direct `runSalonappySync()` test: first run added 1 appointment session/line, 1 package group/row (12.000 TL), 1.000 TL new payment; second run added 0 rows.
+- Reviewer verdict: unavailable — the reviewer subagent failed with an OpenCode Go subscription error. Independent verification was used instead.
+- Evidence recorded: `admin-salonappy-sync-button` passing at `2c259ae` with typecheck, targeted lint, the 403 boundary test, and the idempotent end-to-end sync test.
+- Commits: `2c259ae` (code), `7a36d93` (.gitignore), plus the state commit.
+- Known risks:
+  - The endpoint is admin-only and hardcodes this business; it is not a general multi-business sync.
+  - The whole sync runs in one serverless request with 10-way concurrency; Salonappy could tighten rate limits later, in which case a retry/backoff or slower concurrency would be needed.
+  - An admin session opened before deployment should reload once so the new button appears.
+- Next best action: commit state, push, verify Vercel; then continue with `cash-register-report`.
+
 ### 2026-11-25 — Sync new Salonappy bookings, package sales, and payments
 - Goal: refresh current bookings and package/payment data since the 2026-11-19 sync.
 - Completed:

@@ -11,6 +11,41 @@
   },
   "features": [
     {
+      "id": "admin-salonappy-sync-button",
+      "priority": 5,
+      "area": "dashboard/admin",
+      "title": "Admin-only Salonappy sync button",
+      "user_visible_behavior": "An administrator can click 'Salonappy ile senkronize et' in the dashboard to refresh bookings, package sales, and payments from Salonappy without asking the agent.",
+      "files": [
+        "lib/salonappy-api.ts",
+        "lib/salonappy-sync.ts",
+        "app/api/admin/salonappy-sync/route.ts",
+        "components/dashboard/DashboardApp.tsx"
+      ],
+      "status": "passing",
+      "verification": [
+        "pnpm exec tsc --noEmit",
+        "Targeted ESLint clean on the three new files.",
+        "POST /api/admin/salonappy-sync without an admin session returns 403 with a stable code/message.",
+        "Direct runSalonappySync() test imported 1 appointment session/line, 1 package group/row (12.000 TL) and 1.000 TL new payment; a second immediate run added 0 rows.",
+        "The button is rendered only when the session user role is admin and business.id is cmsg51y28000004l6hacg2plq.",
+        "SALONAPPY_TOKEN is configured as a server-only Vercel production secret and a gitignored local env file."
+      ],
+      "evidence": {
+        "date": "2026-11-25",
+        "commit": "2c259ae",
+        "commands": [
+          "pnpm exec tsc --noEmit",
+          "pnpm exec eslint lib/salonappy-api.ts lib/salonappy-sync.ts app/api/admin/salonappy-sync/route.ts",
+          "POST http://localhost:3100/api/admin/salonappy-sync (no session) -> 403",
+          "pnpm exec tsx direct runSalonappySync() test -> first run 1 session / 1 package / 1.000 TL payment; second run 0 new rows",
+          "vercel env add SALONAPPY_TOKEN production"
+        ],
+        "result": "All executed checks passed. Reviewer subagent was unavailable (OpenCode Go subscription error), so typecheck, lint, the 403 boundary test, and the direct idempotent sync test are the recorded evidence."
+      },
+      "notes": "2026-11-25. Measured 220 concurrent Salonappy read requests in ~3s with zero rate limiting, so one serverless request is enough; no cron or step endpoint. maxDuration=60. The endpoint hardcodes business cmsg51y28000004l6hacg2plq so an admin cannot sync another business. .gitignore now ignores .vercel and .env*."
+    },
+    {
       "id": "salonappy-live-sync-2026-11-25",
       "priority": 5,
       "area": "data-import",
