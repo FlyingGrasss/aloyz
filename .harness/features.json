@@ -1,6 +1,6 @@
 {
   "project": "aloyz",
-  "updated": "2026-11-19",
+  "updated": "2026-11-25",
   "verification": {
     "install": "pnpm install",
     "verify": [
@@ -10,6 +10,41 @@
     "start": "pnpm dev"
   },
   "features": [
+    {
+      "id": "salonappy-live-sync-2026-11-25",
+      "priority": 5,
+      "area": "data-import",
+      "title": "Sync current Salonappy bookings, package sales, and payments",
+      "user_visible_behavior": "New Salonappy appointments and package sales appear in the dashboard with correct remaining sessions and payment history; canceled future appointments disappear.",
+      "files": [],
+      "status": "passing",
+      "verification": [
+        "Current Salonappy future bookings: 362; new booking details fetched: 157 sessions / 185 appointment lines.",
+        "After sync: extraSessions=0; 9 missing future sessions were already CANCELED (0 newly canceled); 18 earlier-today appointments retained.",
+        "First booking import had mojibake; all 185 rows were deleted and re-imported correctly. Final audit: 0 bad descriptions, 1 known null-service appointment.",
+        "Package window 2026-11-19..2026-11-25 starts at the last imported sale date; no gap. Source 29 records / 29 groups.",
+        "New package groups: 25; new rows: 30; total 135.500 TL / paid 129.000 TL; new customers: 8; manual rows still 0.",
+        "Two existing partial packages updated with 1.600 TL new payments: 7332054 -> 2.900, 7164037 -> 1.500.",
+        "Package sales now 3.685; imported groups 2.818; no duplicate sale IDs or double counted TL.",
+        "Independent verifier: issueCount 0; 29/29 source groups and 37/37 rows match; phone audit 0 mismatches; typecheck clean."
+      ],
+      "evidence": {
+        "date": "2026-11-25",
+        "commit": "pending",
+        "commands": [
+          "booking/list + 157 sequential booking/detail fetches: 362 current bookings",
+          "appointment reimport: 157 sessions / 185 lines; 0 newly canceled; extraSessions=0",
+          "mojibake reimport cleanup: deleted 185 bad rows and re-imported from a UTF-8-preserved script",
+          "package_sale/list_v2 2026-11-19..2026-11-25: 29 groups; payments_v2 for 148 targets",
+          "package apply: 25 new groups / 30 rows, 8 customers, 2 existing packages updated",
+          "verify-package-sync-2026-11-25.cjs: issueCount 0; 29/29 groups and 37/37 rows match",
+          "audit-customer-phones-2026-11-25b.cjs: 29/29 source groups, 0 mismatches",
+          "pnpm exec tsc --noEmit"
+        ],
+        "result": "All executed checks passed. Reviewer subagent was unavailable (OpenCode Go subscription error on two attempts), so the independent verifier, phone audit, booking compare, and typecheck are the recorded evidence."
+      },
+      "notes": "Started 2026-11-25 17:47. Package window starts at the previous sync's latest imported sale date (2026-11-19) so no gap remains. Manual duplicates were already removed in the prior sync (manual rows 0)."
+    },
     {
       "id": "salonappy-live-sync-2026-11-19",
       "priority": 5,

@@ -6,10 +6,33 @@
 - Standard startup: `pnpm dev`
 - Standard verification: `pnpm exec tsc --noEmit` plus targeted ESLint
 - Last known green commit: `8c647d1` (typecheck clean; data sync state committed)
-- Highest priority unfinished feature: `cash-register-report`
+- Highest priority unfinished feature: `salonappy-live-sync-2026-11-25`
 - Current blocker: none.
 
 ## Session record
+
+### 2026-11-25 — Sync new Salonappy bookings, package sales, and payments
+- Goal: refresh current bookings and package/payment data since the 2026-11-19 sync.
+- Completed:
+  - Current future bookings: 362; identified 157 new sessions and fetched all details sequentially without rate limiting.
+  - First import had mojibake from a PowerShell UTF-8 copy; deleted all 185 imported rows and re-imported from a Node-preserved UTF-8 script. Final audit: 0 bad descriptions, 1 known null-service appointment.
+  - Final compare: extraSessions=0; 9 missing future sessions were already CANCELED (0 newly canceled); 18 earlier-today sessions retained.
+  - Package window 2026-11-19..2026-11-25 (last imported date was 2026-11-19, so no gap): 29 source records/groups; 25 new groups / 30 rows; 135.500 TL total / 129.000 TL paid; 8 new customers.
+  - payments_v2 fetched for 148 targets; 2 existing packages updated with 1.600 TL new payments.
+  - Package sales now 3.685; imported groups 2.818; manual rows 0.
+- Verification run:
+  - `pnpm exec tsc --noEmit` passed.
+  - Package verifier: issueCount 0; 29/29 source groups and 37/37 rows match totals, payments, used, and remaining; duplicate sale IDs 0.
+  - Customer phone audit: 29/29 source groups, 0 mismatches.
+  - Booking compare: extraSessions 0; backup/current diff shows 0 newly canceled rows.
+- Reviewer verdict: unavailable — the reviewer subagent failed twice with an OpenCode Go subscription error. Independent verifier, phone audit, booking compare, and typecheck all passed.
+- Evidence recorded: `salonappy-live-sync-2026-11-25` passing with the executed checks above.
+- Commits: state commit pending.
+- Known risks:
+  - A dashboard/mobile session opened before the sync must be reloaded before saving; a whole-business save can overwrite the 3.685 package rows and 8 new customers.
+  - Rerunning the booking reimport is destructive: it deletes and reinserts the 157 sessions.
+  - The 9 missing future sessions were already canceled from the previous sync; no new cancellations were made this run.
+- Next best action: commit state, push, verify Vercel; then continue with `cash-register-report`.
 
 ### 2026-11-19 — Sync new Salonappy bookings, package sales, and payments
 - Goal: pull the current Salonappy data so new appointments and package sales appear and canceled future appointments disappear.
