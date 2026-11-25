@@ -127,6 +127,7 @@ export function DashboardApp() {
     field: "start" | "end";
   } | null>(null);
   const [whatsAppInstance, setWhatsAppInstance] = useState<any | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [instagramNotice, setInstagramNotice] = useState<string | null>(null);
@@ -368,6 +369,29 @@ export function DashboardApp() {
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function syncSalonappy() {
+    setSyncing(true);
+    setSuccessMsg("");
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/admin/salonappy-sync", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorMsg(t(data.message || "Senkron tamamlanamadı."));
+        return;
+      }
+      const summary = data.summary || {};
+      setSuccessMsg(
+        `Senkron tamamlandı: ${summary.newAppointmentLines || 0} randevu satırı, ${summary.newPackageRows || 0} paket satırı, ${summary.newCustomers || 0} yeni müşteri.`,
+      );
+      await fetchBusiness();
+    } catch {
+      setErrorMsg(t("Senkron sırasında sunucu hatası oluştu."));
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -924,6 +948,28 @@ export function DashboardApp() {
                 {business.name || "İşletme"} profilini yönetici olarak
                 düzenliyorsunuz.
               </StatusBanner>
+            )}
+            {(session?.user as { role?: string } | undefined)?.role ===
+              "admin" &&
+              business.id === "cmsg51y28000004l6hacg2plq" && (
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={syncing || loading}
+                  onClick={syncSalonappy}
+                >
+                  {syncing
+                    ? t("Senkronize ediliyor…")
+                    : t("Salonappy ile senkronize et")}
+                </Button>
+                <span className="text-xs text-slate-500">
+                  {t(
+                    "Randevular, paket satışları ve ödemeler güncellenir.",
+                  )}
+                </span>
+              </div>
             )}
             {successMsg && (
               <div
