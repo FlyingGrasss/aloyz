@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { runSalonappySync } from "@/lib/salonappy-sync";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const BUSINESS_ID = "cmsg51y28000004l6hacg2plq";
 

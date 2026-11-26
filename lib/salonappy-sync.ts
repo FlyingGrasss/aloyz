@@ -2,10 +2,10 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import {
+  fetchAllPackageSales,
   fetchBookingDetails,
   fetchCurrentBookings,
   fetchPackagePayments,
-  fetchRecentPackageSales,
   type SalonappyBookingDetail,
   type SalonappyPackageSale,
   type SalonappyPayment,
@@ -493,14 +493,7 @@ export async function runSalonappySync(): Promise<SyncSummary> {
   const sales: any[] = Array.isArray((initial.promotions as any)?.packageSales)
     ? (initial.promotions as any).packageSales
     : [];
-  const datedSales = sales
-    .filter((sale) => groupIdOf(sale))
-    .map((sale) => String(sale.date || ""))
-    .filter(Boolean)
-    .sort();
-  const packageWindowStart = datedSales.length
-    ? datedSales[datedSales.length - 1]
-    : turkeyDate(-7);
+  const packageWindowStart = "all";
 
   const initialAppointments = await prisma.appointmentTrack.findMany({
     where: {
@@ -518,7 +511,7 @@ export async function runSalonappySync(): Promise<SyncSummary> {
 
   const [currentBookings, sourceRows] = await Promise.all([
     fetchCurrentBookings(today),
-    fetchRecentPackageSales(packageWindowStart, today),
+    fetchAllPackageSales(),
   ]);
   const currentSessions = new Set(
     currentBookings.map((row) => String(row.session)),
@@ -545,11 +538,18 @@ export async function runSalonappySync(): Promise<SyncSummary> {
     initialDbGroups.set(groupId, rows);
   }
   const paymentTargets = new Set<string>();
-  for (const groupId of sourceGroups.keys()) paymentTargets.add(groupId);
-  for (const [groupId, rows] of initialDbGroups) {
-    const total = rows.reduce((sum, sale) => sum + (Number(sale.total) || 0), 0);
-    const paid = rows.reduce((sum, sale) => sum + (Number(sale.paidAmount) || 0), 0);
-    if (paid < total - 0.01) paymentTargets.add(groupId);
+  for (const [groupId, row] of sourceGroups) {
+    const dbRows = initialDbGroups.get(groupId) || [];
+    if (dbRows.length === 0) {
+      paymentTargets.add(groupId);
+      continue;
+    }
+    const sourcePaid = Number(row.paid_amount) || 0;
+    const dbPaid = dbRows.reduce(
+      (sum, sale) => sum + (Number(sale.paidAmount) || 0),
+      0,
+    );
+    if (sourcePaid > dbPaid + 0.01) paymentTargets.add(groupId);
   }
   const payments = await fetchPackagePayments([...paymentTargets]);
 

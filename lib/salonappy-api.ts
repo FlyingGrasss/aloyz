@@ -2,7 +2,11 @@ const API_BASE = "https://web-api.salonappy.com/api";
 
 type FetchOptions = {
   timeoutMs?: number;
+  attempts?: number;
 };
+
+const sleep = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 export type SalonappyBooking = {
   session: string | number;
@@ -101,19 +105,50 @@ function salonappyHeaders(): HeadersInit {
 }
 
 async function fetchJson<T>(url: string, options: FetchOptions = {}): Promise<T> {
-  const response = await fetch(url, {
-    headers: salonappyHeaders(),
-    signal: AbortSignal.timeout(options.timeoutMs ?? 30000),
-    cache: "no-store",
-  });
-  const text = await response.text();
-  if (response.status === 429 || !text.trimStart().startsWith("{")) {
-    throw new Error("Salonappy istek limiti veya geçersiz yanıt");
+  const attempts = options.attempts ?? 3;
+  let lastError = "Salonappy istek limiti veya geçersiz yanıt";
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: salonappyHeaders(),
+        signal: AbortSignal.timeout(options.timeoutMs ?? 30000),
+        cache: "no-store",
+      });
+      if (response.status === 429) {
+        const retryAfter = Number(response.headers.get("retry-after"));
+        const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter * 1000, 30000)
+          : Math.min(8000 * 2 ** attempt + Math.random() * 500, 30000);
+        lastError = "Salonappy istek limiti";
+        await sleep(waitMs);
+        continue;
+      }
+      const text = await response.text();
+      if (!text.trimStart().startsWith("{")) {
+        lastError = "Salonappy geçersiz yanıt";
+        await sleep(Math.min(2000 * 2 ** attempt + Math.random() * 300, 10000));
+        continue;
+      }
+      if (response.status >= 500) {
+        lastError = `Salonappy HTTP ${response.status}`;
+        await sleep(Math.min(2000 * 2 ** attempt + Math.random() * 300, 10000));
+        continue;
+      }
+      if (response.status !== 200) {
+        throw new Error(`Salonappy HTTP ${response.status}`);
+      }
+      return JSON.parse(text) as T;
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("Salonappy HTTP")) {
+        throw error;
+      }
+      lastError = error instanceof Error ? error.message : "Salonappy isteği başarısız";
+      if (attempt < attempts - 1) {
+        await sleep(Math.min(2000 * 2 ** attempt + Math.random() * 300, 10000));
+      }
+    }
   }
-  if (response.status !== 200) {
-    throw new Error(`Salonappy HTTP ${response.status}`);
-  }
-  return JSON.parse(text) as T;
+  throw new Error(lastError);
 }
 
 export async function mapWithConcurrency<T, R>(
@@ -157,12 +192,13 @@ export async function fetchCurrentBookings(
 export async function fetchBookingDetails(
   sessions: string[],
 ): Promise<Record<string, SalonappyBookingDetail>> {
-  const pairs = await mapWithConcurrency(sessions, 10, async (session) => {
+  const pairs = await mapWithConcurrency(sessions, 2, async (session) => {
     const url = `${API_BASE}/booking/detail?session=${encodeURIComponent(session)}`;
     const json = await fetchJson<{
       status: number;
       data?: { booking?: SalonappyBookingDetail };
     }>(url);
+    await sleep(350);
     if (json.status !== 1 || !json.data?.booking) return null;
     return { session, detail: json.data.booking };
   });
@@ -202,15 +238,43 @@ export async function fetchRecentPackageSales(
   );
 }
 
+export async function fetchAllPackageSales(): Promise<SalonappyPackageSale[]> {
+  const rows: SalonappyPackageSale[] = [];
+  let offset = 0;
+  for (let page = 0; page < 60; page += 1) {
+    const url = `${API_BASE}/package_sale/list_v2?offset=${offset}&limit=500`;
+    const json = await fetchJson<{
+      status: number;
+      data?: {
+        package_sales?: SalonappyPackageSale[];
+        total_records?: number;
+      };
+    }>(url);
+    if (json.status !== 1 || !Array.isArray(json.data?.package_sales)) {
+      throw new Error("Paket satış listesi alınamadı");
+    }
+    const pageRows = json.data.package_sales;
+    rows.push(...pageRows);
+    offset += pageRows.length;
+    const total = Number(json.data.total_records) || 0;
+    if (pageRows.length === 0 || (total > 0 && rows.length >= total)) break;
+    await sleep(300);
+  }
+  return rows.filter(
+    (row) => row.is_valid !== false && !(row as { deleted_at?: unknown }).deleted_at,
+  );
+}
+
 export async function fetchPackagePayments(
   groupIds: string[],
 ): Promise<Record<string, { totalPayment: number; payments: SalonappyPayment[] }>> {
-  const pairs = await mapWithConcurrency(groupIds, 10, async (groupId) => {
+  const pairs = await mapWithConcurrency(groupIds, 2, async (groupId) => {
     const url = `${API_BASE}/package_sale/payments_v2?package_sale_group_id=${encodeURIComponent(groupId)}`;
     const json = await fetchJson<{
       status: number;
       data?: { total_payment?: number; payments?: SalonappyPayment[] };
     }>(url);
+    await sleep(350);
     if (json.status !== 1 || !json.data) return null;
     return {
       groupId,
