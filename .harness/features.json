@@ -11,6 +11,35 @@
   },
   "features": [
     {
+      "id": "salonappy-sync-rate-limit-hardening",
+      "priority": 5,
+      "area": "dashboard/admin",
+      "title": "Prevent Salonappy rate limiting during admin sync",
+      "user_visible_behavior": "The admin sync button no longer fails with the temporary limit warning; it makes far fewer requests, paces them, and retries with backoff when Salonappy throttles.",
+      "files": ["lib/salonappy-api.ts", "lib/salonappy-sync.ts", "app/api/admin/salonappy-sync/route.ts"],
+      "status": "passing",
+      "verification": [
+        "pnpm exec tsc --noEmit and targeted ESLint clean.",
+        "Payment history is fetched only for new groups and groups whose source paid amount increased.",
+        "Full package list is read for comparison only; only sales on or after the last imported date are imported, so no window is missed and old sales are not duplicated.",
+        "Requests are paced (concurrency 2 + 350ms) and 429/non-JSON responses retry with exponential backoff.",
+        "A real sync completed in 39 seconds with 0 new package groups and no rate-limit warning.",
+        "The accidental 9,328 duplicate package rows were removed; package sales are back to 3,695 with 0 bad group IDs and 0 duplicate IDs."
+      ],
+      "evidence": {
+        "date": "2026-11-26",
+        "commit": "ea2c35b",
+        "commands": [
+          "pnpm exec tsc --noEmit",
+          "pnpm exec eslint lib/salonappy-api.ts lib/salonappy-sync.ts app/api/admin/salonappy-sync/route.ts",
+          "direct runSalonappySync(): 39s, 3 new appointment lines, 0 new package rows, total 3,695",
+          "read-only DB audit: 3,695 sales, 2,824 groups, 0 bad group IDs, 0 duplicate IDs"
+        ],
+        "result": "Rate-limit fix and import-window fix verified. Two background test runs with the earlier buggy build created duplicate package rows; they were repaired from backups before this evidence was recorded."
+      },
+      "notes": "2026-11-26. The full-list comparison initially imported 9,328 old sale rows as new packages; the fix limits imports to the last imported date. No cron, no separate server."
+    },
+    {
       "id": "admin-salonappy-sync-button",
       "priority": 5,
       "area": "dashboard/admin",

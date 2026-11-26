@@ -8,8 +8,32 @@
 - Last known green commit: `f130e51` (typecheck clean; admin sync button committed)
 - Highest priority unfinished feature: `cash-register-report`
 - Current blocker: none.
+- Last known green commit: `ea2c35b` (typecheck clean; rate-limit and import-window fixes committed).
 
 ## Session record
+
+### 2026-11-26 — Harden admin sync against Salonappy rate limits
+- Goal: remove the "Salonappy geçici olarak istekleri sınırlıyor" warning seen after clicking the button.
+- Completed:
+  - Replaced the date-window package scan with a full paginated package list used only for comparison; imports are limited to sales on or after the last imported date.
+  - Payments are fetched only for new groups and groups whose source paid amount increased.
+  - Reduced request concurrency from 10 to 2 with 350ms pacing; list pages paced 300ms.
+  - Added 429/non-JSON/5xx retries with exponential backoff up to 30s; `maxDuration` raised to 300.
+- Incident and repair:
+  - Two background test runs with the intermediate build treated all 11,951 source rows as new groups and created 9,328 duplicate package rows (13,023 total).
+  - Restored from `package-sales-before-rate-limit-repair.json`, then repaired with the pre-Nov-25 backup plus recent groups; final state 3,695 package sales, 2,824 groups, 0 bad group IDs, 0 duplicate IDs, 6,017 customers.
+  - The 3 new appointment lines and 5 new customers from today were kept as legitimate.
+- Verification run:
+  - `pnpm exec tsc --noEmit` and targeted ESLint clean.
+  - Direct `runSalonappySync()` with the fixed code: 39 seconds, 3 new appointment lines, 0 new package rows, total 3,695.
+  - Read-only DB audit: 0 bad group rows, 0 duplicate IDs.
+- Reviewer verdict: unavailable (OpenCode Go subscription error); independent verification used.
+- Evidence recorded: `salonappy-sync-rate-limit-hardening` passing at `ea2c35b`.
+- Commits: `d4bf89e` (hardening), `ea2c35b` (import-window fix), plus the state commit.
+- Known risks:
+  - Salonappy can still throttle under unusual load; the retry/backoff makes the button retry instead of failing immediately.
+  - A dashboard tab opened before deployment must be reloaded.
+- Next best action: commit state, push, verify Vercel.
 
 ### 2026-11-25 — Admin-only Salonappy sync button
 - Goal: let the administrator trigger the exact manual sync from the dashboard without asking the agent; no cron.
