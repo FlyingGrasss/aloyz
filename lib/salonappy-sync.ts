@@ -493,7 +493,14 @@ export async function runSalonappySync(): Promise<SyncSummary> {
   const sales: any[] = Array.isArray((initial.promotions as any)?.packageSales)
     ? (initial.promotions as any).packageSales
     : [];
-  const packageWindowStart = "all";
+  const datedSales = sales
+    .filter((sale) => groupIdOf(sale))
+    .map((sale) => String(sale.date || ""))
+    .filter(Boolean)
+    .sort();
+  const packageWindowStart = datedSales.length
+    ? datedSales[datedSales.length - 1]
+    : turkeyDate(-7);
 
   const initialAppointments = await prisma.appointmentTrack.findMany({
     where: {
@@ -522,11 +529,18 @@ export async function runSalonappySync(): Promise<SyncSummary> {
   const details = await fetchBookingDetails(extraSessions);
 
   const sourceGroups = new Map<string, SalonappyPackageSale>();
+  const importGroups = new Map<string, SalonappyPackageSale>();
   for (const row of sourceRows) {
     const groupId = String(row.group_id || row.id);
     const existing = sourceGroups.get(groupId);
     if (!existing || models(row).length > models(existing).length) {
       sourceGroups.set(groupId, row);
+    }
+    if (String(row.date || "") >= packageWindowStart) {
+      const importExisting = importGroups.get(groupId);
+      if (!importExisting || models(row).length > models(importExisting).length) {
+        importGroups.set(groupId, row);
+      }
     }
   }
   const initialDbGroups = new Map<string, any[]>();
@@ -538,12 +552,10 @@ export async function runSalonappySync(): Promise<SyncSummary> {
     initialDbGroups.set(groupId, rows);
   }
   const paymentTargets = new Set<string>();
+  for (const groupId of importGroups.keys()) paymentTargets.add(groupId);
   for (const [groupId, row] of sourceGroups) {
     const dbRows = initialDbGroups.get(groupId) || [];
-    if (dbRows.length === 0) {
-      paymentTargets.add(groupId);
-      continue;
-    }
+    if (dbRows.length === 0) continue;
     const sourcePaid = Number(row.paid_amount) || 0;
     const dbPaid = dbRows.reduce(
       (sum, sale) => sum + (Number(sale.paidAmount) || 0),
@@ -568,7 +580,7 @@ export async function runSalonappySync(): Promise<SyncSummary> {
         currentSessions,
         details,
         tomorrow,
-        sourceGroups,
+        sourceGroups: importGroups,
         payments,
         today,
         packageWindowStart,
